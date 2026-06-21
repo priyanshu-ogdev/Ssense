@@ -1,0 +1,201 @@
+[
+  {
+    "filename": "policy_compliant_001.txt",
+    "policy_type": "compliant",
+    "expected_violations": [],
+    "expected_trust_score": 95,
+    "expected_compliance_summary": "Fully compliant with all DPDP requirements"
+  },
+  {
+    "filename": "policy_retention_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 8(7)",
+        "statute_alias": ["Section 8(7)", "Section 8", "Rule 8(3)"],
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "severity": "HIGH",
+        "evidence_quote": "We retain your data indefinitely",
+        "cross_reference": "Rule 8(3) mandates 1-year retention limit"
+      }
+    ],
+    "expected_trust_score": 30,
+    "expected_compliance_summary": "Non-compliant on data retention"
+  },
+  {
+    "filename": "policy_consent_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 6(2)",
+        "statute_alias": ["Section 6(2)", "Section 6", "Rule 5(1)"],
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "severity": "HIGH",
+        "evidence_quote": "By using our service, you consent to all processing",
+        "cross_reference": "Rule 5(1) requires explicit, granular consent"
+      }
+    ],
+    "expected_trust_score": 35,
+    "expected_compliance_summary": "Non-compliant on consent requirements"
+  },
+  {
+    "filename": "policy_children_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 9(1)",
+        "statute_alias": ["Section 9(1)", "Section 9", "Rule 10(1)"],
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "severity": "CRITICAL",
+        "evidence_quote": "We collect data from users of all ages",
+        "cross_reference": "Rule 10(1) requires verifiable parental consent"
+      }
+    ],
+    "expected_trust_score": 20,
+    "expected_compliance_summary": "Critical violation on children's data"
+  },
+  {
+    "filename": "policy_purpose_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 4(1)",
+        "statute_alias": ["Section 4(1)", "Section 4"],
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "severity": "HIGH",
+        "evidence_quote": "We use your data for any purpose we deem appropriate",
+        "cross_reference": "Section 4 requires specific, lawful purpose"
+      }
+    ],
+    "expected_trust_score": 25,
+    "expected_compliance_summary": "Non-compliant on purpose limitation"
+  },
+  {
+    "filename": "policy_notice_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 5",
+        "statute_alias": ["Section 5", "Rule 4"],
+        "violation_type": "NOTICE_INADEQUATE",
+        "severity": "MEDIUM",
+        "evidence_quote": "No clear notice provided about data collection practices",
+        "cross_reference": "Section 5 requires comprehensive notice"
+      }
+    ],
+    "expected_trust_score": 45,
+    "expected_compliance_summary": "Non-compliant on notice requirements"
+  },
+  {
+    "filename": "policy_sdf_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 10(1)",
+        "statute_alias": ["Section 10(1)", "Section 10"],
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "severity": "MEDIUM",
+        "evidence_quote": "No DPO appointed despite processing data for 10M+ users",
+        "cross_reference": "Section 10 requires DPO for Significant Data Fiduciaries"
+      }
+    ],
+    "expected_trust_score": 40,
+    "expected_compliance_summary": "Non-compliant on SDF obligations"
+  },
+  {
+    "filename": "policy_crossborder_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 16(1)",
+        "statute_alias": ["Section 16(1)", "Section 16"],
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "severity": "HIGH",
+        "evidence_quote": "We transfer data to servers in restricted jurisdictions",
+        "cross_reference": "Section 16 prohibits transfers to notified countries"
+      }
+    ],
+    "expected_trust_score": 15,
+    "expected_compliance_summary": "Non-compliant on cross-border transfers"
+  },
+  {
+    "filename": "policy_grievance_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 11(3)",
+        "statute_alias": ["Section 11(3)", "Section 11", "Rule 12"],
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "severity": "MEDIUM",
+        "evidence_quote": "No grievance officer or redressal mechanism specified",
+        "cross_reference": "Section 11 requires effective grievance redressal"
+      }
+    ],
+    "expected_trust_score": 50,
+    "expected_compliance_summary": "Non-compliant on grievance redressal"
+  },
+  {
+    "filename": "policy_security_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 8(6)",
+        "statute_alias": ["Section 8(6)", "Section 8", "Rule 7"],
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "severity": "HIGH",
+        "evidence_quote": "No security measures mentioned for data protection",
+        "cross_reference": "Section 8(6) requires reasonable security safeguards"
+      }
+    ],
+    "expected_trust_score": 30,
+    "expected_compliance_summary": "Non-compliant on security safeguards"
+  },
+  {
+    "filename": "policy_multi_violation.txt",
+    "policy_type": "non_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 8(7)",
+        "statute_alias": ["Section 8(7)", "Section 8", "Rule 8(3)"],
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "severity": "HIGH",
+        "evidence_quote": "We retain your data indefinitely",
+        "cross_reference": "Rule 8(3) mandates 1-year retention limit"
+      },
+      {
+        "statute_reference": "Section 6(2)",
+        "statute_alias": ["Section 6(2)", "Section 6", "Rule 5(1)"],
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "severity": "HIGH",
+        "evidence_quote": "By using our service, you consent to all processing",
+        "cross_reference": "Rule 5(1) requires explicit, granular consent"
+      },
+      {
+        "statute_reference": "Section 9(1)",
+        "statute_alias": ["Section 9(1)", "Section 9", "Rule 10(1)"],
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "severity": "CRITICAL",
+        "evidence_quote": "We collect data from users of all ages",
+        "cross_reference": "Rule 10(1) requires verifiable parental consent"
+      }
+    ],
+    "expected_trust_score": 10,
+    "expected_compliance_summary": "Multiple critical violations across retention, consent, and children's data"
+  },
+  {
+    "filename": "policy_partial_compliance.txt",
+    "policy_type": "partially_compliant",
+    "expected_violations": [
+      {
+        "statute_reference": "Section 8(7)",
+        "statute_alias": ["Section 8(7)", "Section 8", "Rule 8(3)"],
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "severity": "MEDIUM",
+        "evidence_quote": "We retain data for 5 years",
+        "cross_reference": "Rule 8(3) mandates 1-year retention limit"
+      }
+    ],
+    "expected_trust_score": 65,
+    "expected_compliance_summary": "Compliant on most aspects but non-compliant on retention period"
+  }
+]
