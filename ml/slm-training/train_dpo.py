@@ -1,75 +1,103 @@
 import torch
 from unsloth import FastLanguageModel, PatchDPOTrainer
-PatchDPOTrainer()
 from trl import DPOTrainer, DPOConfig
 from datasets import load_dataset
+from transformers import AutoModelForCausalLM
 
-SYSTEM_PROMPT = "You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal Data Protection (DPDP) Act 2023 and Rules 2025. Output ONLY valid JSON matching the dpdp_schema."
+PatchDPOTrainer()
 
 def run_dpo():
-    print("🚀 Initializing Phase 2: DPO Adversarial Hardening")
-    
+    print("🚀 Starting DPO on Qwen3.5-9B | BF16 | batch=8")
+
+    # Load the SFT model (LoRA adapters)
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = "sft-lora-out", 
-        max_seq_length = 8192,
-        dtype = None,
-        load_in_4bit = True,
+        model_name="sft-lora-out",
+        max_seq_length=8192,
+        dtype=torch.bfloat16,
+        load_in_4bit=False,
     )
 
-    dataset = load_dataset("json", data_files="./data/dpo_data.jsonl", split="train")
+    tokenizer.padding_side = "right"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    def format_dpo_chatml(examples):
+    # 1. Load DPO data (output of prepare_axolotl_data.py)
+    dataset = load_dataset("json", data_files="./data/dpo_data.jsonl", split="train")
+    split = dataset.train_test_split(test_size=0.05, seed=42)
+
+    # 2. Format conversations correctly (no duplicate BOS tokens)
+    def format_dpo(examples):
         prompts, chosens, rejecteds = [], [], []
         for p, c, r in zip(examples["prompt"], examples["chosen"], examples["rejected"]):
-            
-            # CRITICAL FIX: Use add_generation_prompt=False to avoid duplicate tokens
-            p_text = tokenizer.apply_chat_template(p, tokenize=False, add_generation_prompt=False)
-            
-            # Concatenate prompt + chosen/rejected (which start with <|im_start|>assistant\n)
-            c_text = p_text + tokenizer.apply_chat_template(c, tokenize=False)
-            r_text = p_text + tokenizer.apply_chat_template(r, tokenize=False)
-            
-            prompts.append(p_text)
-            chosens.append(c_text)
-            rejecteds.append(r_text)
-            
+            # Concatenate message lists BEFORE applying template
+            chosen_conv = p + c
+            rejected_conv = p + r
+
+            prompts.append(
+                tokenizer.apply_chat_template(p, tokenize=False, add_generation_prompt=True)
+            )
+            chosens.append(
+                tokenizer.apply_chat_template(chosen_conv, tokenize=False)
+            )
+            rejecteds.append(
+                tokenizer.apply_chat_template(rejected_conv, tokenize=False)
+            )
         return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds}
 
-    dataset = dataset.map(format_dpo_chatml, batched=True)
+    train_dataset = split["train"].map(format_dpo, batched=True)
+    eval_dataset = split["test"].map(format_dpo, batched=True)
 
-    dpo_args = DPOConfig(
-        per_device_train_batch_size = 1,
-        gradient_accumulation_steps = 8,
-        learning_rate = 5e-5, 
-        warmup_steps = 50,
-        num_train_epochs = 1,
-        optim = "paged_adamw_8bit",
-        output_dir = "dpo-out",
-        logging_steps = 10,
-        fp16 = not torch.cuda.is_bf16_supported(),
-        bf16 = torch.cuda.is_bf16_supported(),
-        max_length = 8192,
-        max_prompt_length = 7500,
-        report_to = "none",
+    # 3. Reference model – load explicitly for safety
+    ref_model = AutoModelForCausalLM.from_pretrained(
+        "sft-lora-out", torch_dtype=torch.bfloat16, device_map="auto"
     )
 
+    # 4. Training configuration
+    dpo_args = DPOConfig(
+        per_device_train_batch_size=8,
+        gradient_accumulation_steps=2,        # effective batch 16
+        warmup_ratio=0.03,
+        num_train_epochs=1,
+        learning_rate=5e-5,
+        bf16=True,
+        fp16=False,
+        optim="adamw_torch",
+        max_grad_norm=1.0,
+        output_dir="dpo-out",
+        logging_steps=10,
+        max_length=8192,
+        max_prompt_length=7500,
+        beta=0.1,                             # standard DPO strength
+        report_to="none",
+        seed=42,
+        eval_strategy="steps",
+        eval_steps=50,
+        save_strategy="steps",
+        save_steps=100,
+        save_total_limit=2,
+        load_best_model_at_end=True,
+    )
+
+    # 5. Trainer
     dpo_trainer = DPOTrainer(
-        model = model,
-        ref_model = None,
-        args = dpo_args,
-        beta = 0.1,
-        tokenizer = tokenizer,
-        train_dataset = dataset,
+        model=model,
+        ref_model=ref_model,
+        args=dpo_args,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
     )
 
     dpo_trainer.train()
-    
-    print("✅ DPO Complete. Executing Native Unsloth GGUF Export...")
-    
-    model.save_pretrained_gguf("ssense-dpdp-9b-local", tokenizer, quantization_method="q4_k_m")
-    model.save_pretrained_gguf("ssense-dpdp-9b-remote", tokenizer, quantization_method="q8_0")
-    
-    print("🚀 Neural Forging Complete. Ready for Rust Integration.")
+
+    # 6. Export quantized GGUF files
+    model.save_pretrained_gguf(
+        "ssense-dpdp-9b-local", tokenizer, quantization_method="q4_k_m"
+    )
+    model.save_pretrained_gguf(
+        "ssense-dpdp-9b-remote", tokenizer, quantization_method="q8_0"
+    )
+    print("✅ DPO complete – GGUF models exported.")
 
 if __name__ == "__main__":
     run_dpo()
