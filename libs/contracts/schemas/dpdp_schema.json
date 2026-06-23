@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ssense DPDP Compliance Audit Result",
+  "type": "object",
+  "description": "Deterministic legal audit output bridging the SLM reasoning engine to the Rust network interceptor.",
+  "properties": {
+    "global_legal_reasoning": {
+      "type": "string",
+      "description": "Chain-of-thought reasoning analyzing the policy text against the DPDP Act and 2025 Rules before any conclusions are made."
+    },
+    "violations": {
+      "type": "array",
+      "description": "Specific statutory violations detected, coupled directly with their mechanical enforcement actions.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "statute_reference": {
+            "type": "string",
+            "description": "The exact Section or Rule violated (e.g., 'DPDP Act Sec 8(7)', 'DPDP Rules 2025 Rule 8(3)')."
+          },
+          "violation_type": {
+            "type": "string",
+            "enum": [
+                "PURPOSE_LIMITATION_VIOLATION",
+                "CONSENT_NOT_FREE_OR_SPECIFIC",
+                "NOTICE_INADEQUATE",
+                "DATA_RETENTION_LIMIT_EXCEEDED",
+                "CHILD_CONSENT_VIOLATION",
+                "SECURITY_SAFEGUARDS_MISSING",
+                "GRIEVANCE_REDRESSAL_INADEQUATE",
+                "BREACH_NOTIFICATION_FAILURE",
+                "SDF_OBLIGATIONS_MISSING",
+                "CROSS_BORDER_TRANSFER_VIOLATION"
+            ]
+          },
+          "evidence_quote": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact verbatim string extracted from the scraped privacy policy proving the violation."
+          },
+          "network_action": {
+            "type": "string",
+            "enum": [
+              "BLOCK_THIRD_PARTY",
+              "STRIP_TELEMETRY_HEADER",
+              "SPOOF_HARDWARE_API",
+              "INJECT_GPC_SIGNAL",
+              "WARN_USER_ONLY"
+            ]
+          },
+          "offending_entities": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Specific targets for the network action. Empty array if WARN_USER_ONLY."
+          }
+        },
+        "required": [
+          "statute_reference", 
+          "violation_type", 
+          "evidence_quote", 
+          "network_action", 
+          "offending_entities"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "dpdp_trust_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Final compliance score from 0 (malicious) to 100 (perfectly compliant)."
+    }
+  },
+  "required": [
+    "global_legal_reasoning",
+    "violations",
+    "dpdp_trust_score"
+  ],
+  "additionalProperties": false
+}
