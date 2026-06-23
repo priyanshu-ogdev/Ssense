@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════════════
+# SSENSE - MASTER .GITIGNORE
+# ═══════════════════════════════════════════════════════════════
+
+# 1. OS / Environment
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+
+# 2. IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 3. Node & Extension Frontend (apps/extension)
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+apps/extension/dist/
+apps/extension/.vite/
+
+# 4. Rust Backend (apps/native-daemon & libs)
+target/
+apps/native-daemon/target/
+libs/*/target/
+**/*.rs.bk
+
+# 5. Native Messaging Host Manifests
+# Note: Keep your template JSON, but ignore the ones generated 
+# by your setup scripts that contain absolute local paths.
+*.generated.json
+
+# 6. Heavy AI Models (Never commit!)
+*.gguf
+*.bin
+apps/native-daemon/models/
+ml/models/
+
+# 7. Local Databases / Cache
+# (In case local dev execution creates the SQLite DB in the repo tree)
+*.db
+*.db-wal
+*.db-shm
+ssense_cache.db*
+
+# 8. Machine Learning & Python Forge (ml directory)
+__pycache__/
+*.pyc
+venv/
+.venv/
+.ipynb_checkpoints/
+ml/data-forge/raw-policies/
+ml/data-forge/indian-seeds/
+ml/data-forge/training-pairs/
+ml/slm-training/data/
+ml/slm-training/sft-out/
+ml/slm-training/dpo-out/apps/native-daemon/com.ssense.daemon.json
+scripts/com.ssense.daemon.json
