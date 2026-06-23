@@ -1,3 +1,5 @@
+// apps/native-daemon/src/messaging/protocol.rs
+
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,6 +24,15 @@ impl DaemonRequest {
             Self::HealthCheck(r) => &r.request_id,
         }
     }
+}
+
+// 🚀 SOTA FIX: The Fallback Envelope
+// If full deserialization fails, we use this to rescue the requestId
+// so we can send an error back to Chrome and unlock the UI.
+#[derive(Debug, Deserialize)]
+pub struct RawEnvelope {
+    #[serde(rename = "requestId")]
+    pub request_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,8 +74,6 @@ pub enum DaemonResponse {
     AuditPolicyResult {
         #[serde(rename = "requestId")] request_id: String,
         success: bool,
-        // CRITICAL FIX: The skip_serializing_if attribute is completely removed.
-        // A successful audit will ALWAYS contain this report object.
         report: DpdpAuditReport,
         cached: bool,
     },
@@ -76,6 +85,8 @@ pub enum DaemonResponse {
     TrustScoreResult {
         #[serde(rename = "requestId")] request_id: String,
         success: bool,
+        // 🚀 SOTA FIX: Removed skip_serializing_if. 
+        // Serde will now natively serialize None as `null`, preventing V8 `undefined` crashes.
         score: Option<i32>,
     },
     HealthCheckResult {
@@ -83,6 +94,8 @@ pub enum DaemonResponse {
         success: bool,
         #[serde(rename = "modelLoaded")] model_loaded: bool,
         #[serde(rename = "cacheSize")] cache_size: usize,
+        #[serde(rename = "totalInferences")] total_inferences: u64,
+        #[serde(rename = "avgTokensPerSecond")] avg_tokens_per_second: u32,
     },
     Error {
         #[serde(rename = "requestId")] request_id: String,
@@ -92,8 +105,7 @@ pub enum DaemonResponse {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SHARED TYPES (The Legal Payload)
-// CRITICAL: Defaults to snake_case to perfectly mirror the ML schema
+// SHARED TYPES (Strictly Typed & Schema Mirrored)
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -106,8 +118,37 @@ pub struct DpdpAuditReport {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Violation {
     pub statute_reference: String,
-    pub violation_type: String,
+    pub violation_type: ViolationType,
     pub evidence_quote: String,
-    pub network_action: String,
+    pub network_action: NetworkAction,
     pub offending_entities: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ViolationType {
+    PurposeLimitationViolation,
+    ConsentNotFreeOrSpecific,
+    NoticeInadequate,
+    DataRetentionLimitExceeded,
+    ChildConsentViolation,
+    SecuritySafeguardsMissing,
+    GrievanceRedressalInadequate,
+    BreachNotificationFailure,
+    SdfObligationsMissing,
+    CrossBorderTransferViolation,
+    #[serde(other)]
+    UnknownViolation,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum NetworkAction {
+    BlockThirdParty,
+    StripTelemetryHeader,
+    SpoofHardwareApi,
+    InjectGpcSignal,
+    WarnUserOnly,
+    #[serde(other)]
+    UnknownAction,
 }

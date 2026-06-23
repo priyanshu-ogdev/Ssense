@@ -1,0 +1,71 @@
+/* 
+ * Ssense DOM Enforcer Styles
+ * Injected directly into the host webpage to physically neutralize 
+ * third-party trackers and highlight DPDP violations.
+ */
+
+/* 1. THE NUCLEAR OPTION: Blocking Trackers/Ads */
+/* We don't just use display:none. We collapse the element to 0 dimensions, 
+   strip all interactivity, and push it behind the z-index. This bypasses 
+   JS anti-blocker detection and prevents CSS Grid/Flexbox layout shifts. */
+.ssense-blocked-element {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+  border: none !important;
+}
+
+/* 2. Highlighting DPDP Violations in the Text */
+/* Uses a subtle, professional dashed outline so it looks like a security tool, 
+   not a broken CSS rule on the host site. */
+.ssense-highlight-violation {
+  outline: 2px dashed rgba(244, 63, 94, 0.6) !important;
+  outline-offset: 2px !important;
+  background-color: rgba(244, 63, 94, 0.04) !important;
+  border-radius: 4px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: help !important;
+  position: relative;
+}
+
+.ssense-highlight-violation:hover {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  outline-color: rgba(244, 63, 94, 0.9) !important;
+}
+
+/* Tooltip for highlighted violations */
+.ssense-highlight-violation::after {
+  content: "⚠️ Ssense: DPDP Violation Detected" !important;
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-4px) !important;
+  background: #18181B !important;
+  color: #FAFAFA !important;
+  font-size: 11px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+  z-index: 2147483647 !important; /* Max z-index to ensure it's on top */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+}
+
+.ssense-highlight-violation:hover::after {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(-8px) !important;
+}

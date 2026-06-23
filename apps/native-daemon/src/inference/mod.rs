@@ -1,4 +1,5 @@
 pub mod local_engine;
-pub mod remote_engine;
-pub mod hardware_profiler;
-pub mod keyword_router;
+pub mod hardware_profiler; // Add this
+
+pub use local_engine::LocalEngine;
+pub use hardware_profiler::HardwareProfiler;
