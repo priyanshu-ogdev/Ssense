@@ -1,11 +1,7 @@
-# 1. Inject the NVIDIA CUDA 12.1 Toolkit (provides 'nvcc')
-conda install -c "nvidia/label/cuda-12.1.0" cuda-toolkit -y
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
+    --index-url https://download.pytorch.org/whl/cu121
 
-# 2. Inject modern C++ compilers into Conda to handle vLLM's advanced kernels
-conda install -c conda-forge gcc gxx -y
+pip install -r requirements.txt
 
-# 3. Explicitly map the CUDA path for vLLM's setup script
-export CUDA_HOME=$CONDA_PREFIX
 
-# 4. Execute the source build (This will take 10-20 minutes on the DGX)
-pip install vllm==0.6.4.post1 --no-build-isolation
+pip install flash-attn==2.7.2.post1 --no-build-isolation
