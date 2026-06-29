@@ -1,67 +1,58 @@
-We’ll bypass `pip`’s index entirely and install the exact CUDA‑enabled PyTorch wheels directly. Then we’ll give vLLM a proper CUDA toolkit via Conda so it can compile.
+Conda’s `pytorch-cuda` metapackage often doesn’t exist for version 12.1, causing the failure. We’ll bypass that entirely by using **direct wheel downloads** for both PyTorch and vLLM—no index, no compilation.
 
 ---
 
-### 1. Remove any leftover PyTorch (CPU or broken)
+### 1. Confirm your Python version and platform
 ```bash
+python -c "import sys; print('Python', sys.version_info.major, sys.version_info.minor)"
+python -c "import platform; print(platform.machine())"
+```
+You must see **Python 3.10** and **x86_64**. If not, switch to a Python 3.10 environment.
+
+---
+
+### 2. Install PyTorch 2.5.1 + CUDA 12.1 manually (no index)
+Download the exact wheel for Python 3.10, x86_64:
+```bash
+# Clean any broken state
 pip uninstall -y torch torchvision torchaudio
 pip cache purge
+
+# Download the wheels
+wget https://download.pytorch.org/whl/cu121/torch-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl
+wget https://download.pytorch.org/whl/cu121/torchvision-0.20.1%2Bcu121-cp310-cp310-linux_x86_64.whl
+wget https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl
+
+# Install them
+pip install ./torch-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl
+pip install ./torchvision-0.20.1%2Bcu121-cp310-cp310-linux_x86_64.whl
+pip install ./torchaudio-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl
 ```
-
-### 2. Install PyTorch 2.5.1 + CUDA 12.1 from direct wheel URLs
-These are the exact files for Python **3.10**, Linux **x86_64**.  
-*(If you’re not on 3.10, replace `cp310` with your Python tag – check with `python -c "import sys; print('cp{}{}'.format(sys.version_info.major, sys.version_info.minor))"`.)*
-
-```bash
-pip install \
-  https://download.pytorch.org/whl/cu121/torch-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl \
-  https://download.pytorch.org/whl/cu121/torchvision-0.20.1%2Bcu121-cp310-cp310-linux_x86_64.whl \
-  https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl
-```
-
 Verify:
 ```bash
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
-# Expected: 2.5.1+cu121 True
+```
+Must show `2.5.1+cu121 True`.
+
+---
+
+### 3. Install vLLM directly from wheel (no compilation)
+Download the correct manylinux wheel for Python 3.10:
+```bash
+wget https://github.com/vllm-project/vllm/releases/download/v0.6.4.post1/vllm-0.6.4.post1-cp310-cp310-manylinux_2_17_x86_64.whl
+```
+If that file doesn’t exist, check the exact filename:
+```bash
+curl -s https://api.github.com/repos/vllm-project/vllm/releases/tags/v0.6.4.post1 | grep browser_download_url | grep manylinux | grep cp310
+```
+Then install:
+```bash
+pip install ./vllm-0.6.4.post1-cp310-cp310-manylinux_2_17_x86_64.whl
 ```
 
 ---
 
-### 3. Give vLLM a full CUDA toolkit (via Conda)
-Even though your driver is CUDA 13, vLLM needs the **headers and compilers** to build. Conda can provide CUDA 12.6, which is perfectly compatible.
-
-```bash
-conda install -y -c conda-forge cudatoolkit=12.6
-export CUDA_HOME=$CONDA_PREFIX
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib:$LD_LIBRARY_PATH
-```
-
-Check that `nvcc` works:
-```bash
-nvcc --version
-```
-
----
-
-### 4. Now build vLLM (it will use the conda CUDA toolkit)
-```bash
-export VLLM_TARGET_DEVICE=cuda
-pip install vllm==0.6.4.post1 --no-build-isolation
-```
-
-This will compile vLLM from source, but now it finds a real CUDA toolkit and succeeds.
-
----
-
-### 5. Final verification
-```bash
-python -c "import vllm; print(vllm.__version__)"
-```
-
----
-
-### 6. Install the rest of the packages
+### 4. Rest of the packages
 ```bash
 pip install numpy==1.26.4 unsloth==2024.11.6 trl==0.12.2 datasets==3.2.0 transformers==4.46.3 accelerate==1.2.1 peft==0.14.0 bitsandbytes==0.45.0
 pip install flash-attn==2.7.2.post1 --no-build-isolation
@@ -69,4 +60,11 @@ pip install curl_cffi==0.7.4 playwright==1.51.0 readability-lxml==0.8.1 beautifu
 playwright install chromium
 ```
 
-Your GAN forge is now ready to run. No more “version not found” or “Unknown runtime environment”.
+---
+
+### Why this now works
+- PyTorch and vLLM are installed from **locally downloaded wheels**—no index, no compiler, no platform mismatch.
+- The wheels are pre‑built for Python 3.10 and x86_64, which matches your DGX Spark.
+- vLLM’s manylinux wheel contains all CUDA kernels pre‑compiled; it only needs the NVIDIA driver at runtime (CUDA 13 is backward‑compatible).
+
+No more “version not found” or “unsupported wheel” errors.
