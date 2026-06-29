@@ -1,40 +1,11 @@
-#!/bin/bash
-set -e
+# 1. Install PyTorch with explicit CUDA 12.1 support
+pip install torch==2.4.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-echo "🖼️ Processing Ssense extension icons..."
+# 2. Install vLLM (Will now use the pre-built wheel because Torch matches)
+pip install vllm==0.6.4.post1
 
-SOURCE_IMG="$HOME/Downloads/a.png"
-DEST_DIR="apps/extension/public/icons"
+# 3. Install Unsloth (Using their dedicated wheel to prevent xformers conflicts)
+pip install unsloth==2024.11.6
 
-# 1. Verify source exists
-if [ ! -f "$SOURCE_IMG" ]; then
-    echo "❌ Error: Source image not found at $SOURCE_IMG"
-    exit 1
-fi
-
-# 2. Ensure ImageMagick is installed
-if ! command -v convert &> /dev/null; then
-    echo "⚠️ ImageMagick is required but not installed."
-    echo "Installing now..."
-    sudo apt-get update && sudo apt-get install imagemagick -y
-fi
-
-# 3. Create destination directory
-mkdir -p "$DEST_DIR"
-
-echo "✂️ Center-cropping and resizing to strict Chrome dimensions..."
-
-# Chrome Web Store & Installation Icon (128x128)
-convert "$SOURCE_IMG" -resize 128x128^ -gravity center -extent 128x128 "$DEST_DIR/icon128.png"
-echo "✅ Generated icon128.png"
-
-# Extension Management Page Icon (48x48)
-convert "$SOURCE_IMG" -resize 48x48^ -gravity center -extent 48x48 "$DEST_DIR/icon48.png"
-echo "✅ Generated icon48.png"
-
-# Browser Toolbar Favicon (16x16)
-convert "$SOURCE_IMG" -resize 16x16^ -gravity center -extent 16x16 "$DEST_DIR/icon16.png"
-echo "✅ Generated icon16.png"
-
-echo ""
-echo "🎉 Icon processing complete. Your Chrome Extension is fully loaded."
+# 4. Install Flash-Attention (No build isolation prevents ninja compiler errors)
+pip install flash-attn==2.7.2.post1 --no-build-isolation
