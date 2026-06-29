@@ -1,8 +1,9 @@
+# ── Core ML stack (CUDA 12.1) ──
 numpy==1.26.4
 torch==2.4.0
 torchvision==0.19.0
 torchaudio==2.4.0
-vllm==0.6.4.post1
+vllm==0.6.1                          # ← downgraded from 0.6.4.post1 for torch 2.4.0 compatibility
 unsloth==2024.11.6
 trl==0.12.2
 datasets==3.2.0
@@ -10,6 +11,8 @@ transformers==4.46.3
 accelerate==1.2.1
 peft==0.14.0
 bitsandbytes==0.45.0
+
+# ── Scraping ──
 curl_cffi==0.7.4
 playwright==1.51.0
 playwright-stealth==1.0.6
@@ -17,8 +20,14 @@ readability-lxml==0.8.1
 beautifulsoup4==4.12.3
 tqdm==4.66.6
 aiohttp==3.11.12
+
+# ── PDF parsing ──
 PyMuPDF==1.25.3
+
+# ── Evaluation ──
 llama-cpp-python==0.3.6
 jsonschema==4.23.0
+
+# ── Utilities ──
 requests==2.32.3
 tenacity==9.0.0
