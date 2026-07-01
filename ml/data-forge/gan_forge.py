@@ -17,7 +17,6 @@ import re
 import sys
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
-
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 0: EXTRACT LAW TEXT FROM PDFs
 # ═══════════════════════════════════════════════════════════════════════════
@@ -59,8 +58,12 @@ RAW_POLICIES_DIR = "./raw-policies"
 INDIAN_SEEDS_DIR = "./indian-seeds"
 SFT_OUTPUT_DIR = "./training-pairs/sft"
 DPO_OUTPUT_DIR = "./training-pairs/dpo"
+
+# Relative route from data-forge up to the shared schema directory
 SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
-MODEL_PATH = "/path/to/Qwen2-72B-Instruct-FP8"  # <-- Set your local weight path
+
+# Routes up to the adjacent models directory you just downloaded to
+MODEL_PATH = "../models/Qwen2-72B-Instruct-FP8"
 
 os.makedirs(SFT_OUTPUT_DIR, exist_ok=True)
 os.makedirs(DPO_OUTPUT_DIR, exist_ok=True)
