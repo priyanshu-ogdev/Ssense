@@ -1,21 +1,29 @@
-# ── Training & Alignment ──
-unsloth
-trl==0.15.0
-datasets==4.2.0
-transformers==5.0.0
-accelerate==2.0.0
-peft==0.15.0
-bitsandbytes==0.46.0
-xformers
+--extra-index-url https://download.pytorch.org/whl/cu126
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu126
 
-# ── Heavy Inference (72B GAN forge) ──
+# ── Foundation Hardware Support (CUDA 12.6) ──
+torch==2.12.1
+torchvision
+torchaudio
+xformers==0.0.30
+
+# ── Heavy Inference Engine ──
 vllm==0.24.0
 
-# ── Local CPU/GPU evaluation (9B GGUF) ──
+# ── Modern Training & Alignment (Transformers v5 Stack) ──
+transformers==5.5.3
+accelerate==1.6.0
+trl==0.17.0
+datasets==4.3.0
+peft==0.16.0
+bitsandbytes==0.46.0
+unsloth
+
+# ── Local GGUF Evaluation ──
 llama-cpp-python
 jsonschema
 
-# ── Scraping ──
+# ── Ssense Data Extraction Pipeline ──
 curl_cffi
 playwright
 playwright-stealth
@@ -29,3 +37,5 @@ PyMuPDF
 numpy
 requests
 tenacity
+
+flash-attn==2.7.3
