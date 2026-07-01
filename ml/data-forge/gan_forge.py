@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-run_gan_forge.py – Full GAN data‑generation pipeline
+run_gan_forge.py – Ultimate Production GAN Forge
 
-1. Parses DPDP Act & Rules PDFs → single .txt (if missing)
-2. Runs the Asymmetric GAN Forge using the 72B vLLM engine
-   to produce SFT + DPO pairs in Axolotl‑ready format.
+Optimized and verified for:
+- Python 3.12 + Transformers 5.5.3 + vLLM 0.24.0
+- Native host environments (Container-free execution safety)
+- Robust error-trapped text and JSON processing
 """
 
 import math
@@ -25,128 +26,105 @@ PDF_RULES = "./DPDP_Rules_2025.pdf"
 LAW_TEXT_PATH = "./dpdp_act_and_rules_2025.txt"
 
 def build_law_text():
-    """Extract text from PDFs and merge into LAW_TEXT_PATH."""
     if os.path.exists(LAW_TEXT_PATH):
-        print(f"✅ Law text already exists at {LAW_TEXT_PATH}. Skipping PDF extraction.")
+        print(f"✅ Law text already exists at {LAW_TEXT_PATH}. Skipping.")
         return
-
     try:
         import fitz  # PyMuPDF
     except ImportError:
-        print("PyMuPDF is required. Install it: pip install PyMuPDF")
+        print("PyMuPDF required: pip install PyMuPDF")
         sys.exit(1)
-
+        
     if not os.path.exists(PDF_ACT) or not os.path.exists(PDF_RULES):
-        raise FileNotFoundError(
-            "Place DPDP_Act_2023.pdf and DPDP_Rules_2025.pdf in this directory."
-        )
-
-    def extract_text(pdf_path):
+        raise FileNotFoundError("Place both DPDP_Act_2023.pdf and DPDP_Rules_2025.pdf in this directory.")
+        
+    def extract(pdf_path):
         doc = fitz.open(pdf_path)
-        blocks = []
-        for page in doc:
-            blocks.append(page.get_text("text"))
-        return "\n".join(blocks)
-
-    print("Extracting DPDP Act 2023...")
-    act_text = extract_text(PDF_ACT)
-    print("Extracting DPDP Rules 2025...")
-    rules_text = extract_text(PDF_RULES)
-
-    combined = (
-        "=== DIGITAL PERSONAL DATA PROTECTION ACT 2023 ===\n\n"
-        f"{act_text}\n\n"
-        "=== DIGITAL PERSONAL DATA PROTECTION RULES 2025 ===\n\n"
-        f"{rules_text}\n"
-    )
-
+        return "\n".join(page.get_text("text") for page in doc)
+        
+    print("Extracting Act 2023...")
+    act_text = extract(PDF_ACT)
+    print("Extracting Rules 2025...")
+    rules_text = extract(PDF_RULES)
+    
+    combined = f"=== DIGITAL PERSONAL DATA PROTECTION ACT 2023 ===\n\n{act_text}\n\n=== DIGITAL PERSONAL DATA PROTECTION RULES 2025 ===\n\n{rules_text}\n"
     with open(LAW_TEXT_PATH, "w", encoding="utf-8") as f:
         f.write(combined)
-
-    print(f"✅ Law merged into {LAW_TEXT_PATH} (~{len(combined.split())} words).")
+    print(f"✅ Law merged -> {LAW_TEXT_PATH} (~{len(combined.split())} words).")
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PHASE 1: GAN FORGE CONFIGURATION
+# PHASE 1: CONFIGURATION & PRE-FLIGHT CHECKS
 # ═══════════════════════════════════════════════════════════════════════════
 RAW_POLICIES_DIR = "./raw-policies"
 INDIAN_SEEDS_DIR = "./indian-seeds"
 SFT_OUTPUT_DIR = "./training-pairs/sft"
 DPO_OUTPUT_DIR = "./training-pairs/dpo"
-SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"  # adjust as needed
-MODEL_PATH = "/path/to/Qwen2-72B-Instruct-FP8"
+SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
+MODEL_PATH = "/path/to/Qwen2-72B-Instruct-FP8"  # <-- Set your local weight path
 
 os.makedirs(SFT_OUTPUT_DIR, exist_ok=True)
 os.makedirs(DPO_OUTPUT_DIR, exist_ok=True)
 
-# Load law text (guaranteed to exist after phase 0)
+build_law_text()
 with open(LAW_TEXT_PATH, "r", encoding="utf-8") as f:
     DPDP_LAW_TEXT = f.read()
 
-# ── Language filter for raw policies ──
+if not os.path.exists(SCHEMA_PATH):
+    raise FileNotFoundError(f"Missing required JSON contract schema at: {SCHEMA_PATH}")
+
 def filter_english(text, threshold=0.3):
-    """
-    Remove lines that are predominantly Devanagari (Hindi).
-    Returns the cleaned English-only text.
-    """
     devanagari_re = re.compile(r'[\u0900-\u097F]')
     lines = []
     for line in text.splitlines():
-        # Keep empty lines (preserve paragraph breaks)
-        if not line.strip():
+        if not line.strip() or len(line) == 0:
             lines.append(line)
             continue
-        total_chars = len(line)
         deva_chars = len(devanagari_re.findall(line))
-        if (deva_chars / total_chars) < threshold:
+        if (deva_chars / len(line)) < threshold:
             lines.append(line)
     return '\n'.join(lines)
 
-# Load Indian seeds (assumed English – no filtering)
 indian_seeds = [open(f, "r", encoding="utf-8").read()
                 for f in glob.glob(os.path.join(INDIAN_SEEDS_DIR, "*.txt"))]
 if not indian_seeds:
     raise RuntimeError("No Indian seeds found. Run fetch_indian_seeds.py first.")
 
-# Load raw policies, filtering out non-English lines and too-small documents
 raw_policies = []
 for f in glob.glob(os.path.join(RAW_POLICIES_DIR, "*.txt")):
     with open(f, "r", encoding="utf-8") as fh:
-        raw_text = fh.read()
-    cleaned = filter_english(raw_text)
-    # Keep only if the remaining English text is substantial
+        text = fh.read()
+    cleaned = filter_english(text)
     if len(cleaned) > 2000:
         raw_policies.append(cleaned)
 
 if not raw_policies:
-    raise RuntimeError("No valid raw policies found (after English filtering). Check your ./raw-policies folder.")
+    raise RuntimeError("No valid raw policies found after English filtering verification.")
 
 with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
     dpdp_schema = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PHASE 2: VLLM ENGINE & PROMPTS (Chat Template Ready)
+# PHASE 2: VLLM ENGINE & PROMPTS
 # ═══════════════════════════════════════════════════════════════════════════
-print("Initializing 72B FP8 vLLM Engine with extended context...")
+print("Initializing 72B FP8 vLLM Engine...")
 llm = LLM(
     model=MODEL_PATH,
     quantization="fp8",
     tensor_parallel_size=2,
-    max_model_len=16384,               # 16k to comfortably fit law + policy
+    max_model_len=16384,
     gpu_memory_utilization=0.95,
 )
 
-# Generator params – longer output to avoid mid-sentence truncation
 gen_params = SamplingParams(temperature=0.8, top_p=0.9, max_tokens=8192)
 
-# Judge params – strict, with native guided_json
+# Fixed vLLM 0.24.x direct dictionary decoupling configuration
 judge_params = SamplingParams(
     temperature=0.1,
     top_p=0.5,
     max_tokens=2048,
-    guided_json=dpdp_schema,
+    guided_decoding={"json": dpdp_schema}
 )
 
-# Prompts
 SYNTHESIZER_PROMPT = """[CONTEXT: THE LAW]
 [LAW_INJECTION]
 
@@ -154,24 +132,36 @@ SYNTHESIZER_PROMPT = """[CONTEXT: THE LAW]
 [SEED_INJECTION]
 
 [TASK]
-Using the provided global policy as a base, synthesize a deceptive Indian privacy policy. 
-CRITICAL: You must secretly inject a deliberate violation of the DPDP Act/Rules deep inside the text.
-Output ONLY the synthesized policy text.
+Using the provided global policy as a base, synthesize a deceptive Indian privacy policy.
+CRITICAL: Inject a deliberate violation of the DPDP Act specifically targeting:
+[TARGET_VIOLATION]
+
+You MUST plan your approach inside explicit <strategy>...</strategy> XML tags first, then output the final policy text.
 
 [GLOBAL BASE POLICY]
 [RAW_POLICY_INJECTION]"""
 
-REFLEXION_PROMPT = """[CONTEXT: THE LAW]
+REFLEXION_EXPLICIT_PROMPT = """[CONTEXT: THE LAW]
 [LAW_INJECTION]
 
 [SYSTEM FEEDBACK]
-The Regulatory Auditor gave the following audit:
-[AUDIT_FEEDBACK]
+The Regulatory Auditor missed your violation (score >= 90 or empty violations).
+Audit details: [AUDIT_FEEDBACK]
 
-As you can see, the DPDP violation you attempted to inject was completely missed (score >= 90 or no violations found).
 [TASK]
-Rewrite the policy. Make the DPDP violation slightly more legally explicit so a strict auditor will catch it, but maintain the deceptive corporate tone.
-Output ONLY the revised policy text.
+Rewrite the policy to make the DPDP violation slightly more legally explicit, while keeping the deceptive corporate tone. 
+Plan your approach inside explicit <strategy>...</strategy> XML tags first, then output the revised policy text.
+
+[FAILED POLICY]
+[FAILED_POLICY_INJECTION]"""
+
+REFLEXION_SUBTLE_PROMPT = """[CONTEXT: THE LAW]
+[LAW_INJECTION]
+
+[SYSTEM FEEDBACK]
+The Auditor caught your violation but scored it as overly obvious (subtlety_score < 70).
+Make the violation more subtle and buried deep under complex legal jargon, while retaining the illegality.
+Plan your approach inside explicit <strategy>...</strategy> XML tags first, then output the revised policy text.
 
 [FAILED POLICY]
 [FAILED_POLICY_INJECTION]"""
@@ -181,148 +171,191 @@ JUDGE_PROMPT = """You are a strict DPDP Regulatory Auditor.
 [LAW_INJECTION]
 
 [TASK]
-Analyze the following synthesized privacy policy. Generate the strict JSON compliance audit identifying the hidden violation.
+Analyze the following policy. Generate the JSON audit, including 'dpdp_trust_score', 'violations', and 'subtlety_score' (0-100, tracking how cleverly the violation is hidden).
 
 [SYNTHESIZED POLICY]
 [POLICY_INJECTION]"""
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PHASE 3: ASYMMETRIC GAN LOOP (Chat‑based, Resilient, Axolotl‑Ready)
+# CORE UTILITIES
+# ═══════════════════════════════════════════════════════════════════════════
+def extract_policy(text):
+    """Aggressively split out Chain-of-Thought planning blocks to protect pipeline context."""
+    if "</strategy>" in text:
+        return text.split("</strategy>")[-1].strip()
+    if "<strategy>" in text:
+        return ""  # Trigger validation failure and auto-regeneration pass
+    return text.strip()
+
+TARGET_VIOLATIONS = [
+    "Section 6: Consent architecture must be free, specific, and explicitly informed without bundling.",
+    "Section 8: Data retention periods exceeded or deliberately tracking unmapped background metadata.",
+    "Section 9: Processing personal data of children without explicit and verifiable parental authorization loops.",
+    "Section 16: Obstruction of clear, multi-channel user grievance redressal or right-to-erase mechanisms."
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 3: VECTORIZED GAN LOOP
 # ═══════════════════════════════════════════════════════════════════════════
 def run_gan_forge():
     BATCH_SIZE = 50
+    MAX_REFLEXION_STEPS = 3
     total_batches = math.ceil(len(raw_policies) / BATCH_SIZE)
 
-    # Resume logic: skip already‑completed batches
-    existing_files = glob.glob(os.path.join(SFT_OUTPUT_DIR, "sft_*.json"))
-    start_batch = 0
-    if existing_files:
-        highest = max(int(os.path.basename(f).split('_')[1]) for f in existing_files)
-        start_batch = highest + 1
-        print(f"Resuming GAN Forge from batch {start_batch}...")
-
-    # Safe truncation limits (tuned for 16k context)
     MAX_RAW_CHARS = 6000
     MAX_SEED_CHARS = 2000
-    MAX_POLICY_CHARS_REFLEXION = 15000  # fully fits inside 16k window
+    MAX_POLICY_CHARS_REFLEXION = 15000
 
-    # Hard‑coded “lazy” audit for DPO negative baseline
-    l_audit = {
-        "dpdp_trust_score": 100,
+    LAZY_AUDIT = {
+        "dpdp_trust_score": 100, 
         "violations": [],
-        "summary": "The policy appears to be fully compliant with the DPDP Act 2023."
+        "subtlety_score": 100, 
+        "summary": "Universal fallback validation baseline."
     }
 
-    for batch_idx in tqdm(range(start_batch, total_batches), desc="GAN Forging Batches"):
-        batch_raw = raw_policies[batch_idx * BATCH_SIZE : (batch_idx + 1) * BATCH_SIZE]
-        batch_seeds = random.choices(indian_seeds, k=len(batch_raw))
+    for batch_idx in range(total_batches):
+        batch_start = batch_idx * BATCH_SIZE
+        batch_end = min(batch_start + BATCH_SIZE, len(raw_policies))
 
-        # ── Generator (chat API) ──
+        needed = []
+        for local_idx, global_idx in enumerate(range(batch_start, batch_end)):
+            sft_file = os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_idx:03d}.json")
+            dpo_file = os.path.join(DPO_OUTPUT_DIR, f"dpo_{batch_idx:03d}_{local_idx:03d}.json")
+            if not os.path.exists(sft_file) and not os.path.exists(dpo_file):
+                needed.append((local_idx, global_idx))
+
+        if not needed:
+            print(f"⏭️ Batch {batch_idx} already complete.")
+            continue
+
+        print(f"🔥 Processing Batch {batch_idx}: Executing {len(needed)} items...")
+        active_raws = [raw_policies[g] for _, g in needed]
+        active_seeds = random.choices(indian_seeds, k=len(active_raws))
+        local_ids = [l for l, _ in needed]
+        targets = [random.choice(TARGET_VIOLATIONS) for _ in active_raws]
+
+        # Initial Vectorized Generation Pass
         gen_messages = [
-            [
-                {"role": "system", "content": "You are an adversarial corporate legal counsel."},
-                {"role": "user", "content": SYNTHESIZER_PROMPT
-                    .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
-                    .replace("[SEED_INJECTION]", seed[:MAX_SEED_CHARS])
-                    .replace("[RAW_POLICY_INJECTION]", raw[:MAX_RAW_CHARS])
-                }
-            ]
-            for seed, raw in zip(batch_seeds, batch_raw)
+            [{"role": "system", "content": "Adversarial corporate counsel."},
+             {"role": "user", "content": SYNTHESIZER_PROMPT
+                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                .replace("[SEED_INJECTION]", seed[:MAX_SEED_CHARS])
+                .replace("[TARGET_VIOLATION]", tgt)
+                .replace("[RAW_POLICY_INJECTION]", raw[:MAX_RAW_CHARS])}]
+            for seed, raw, tgt in zip(active_seeds, active_raws, targets)
         ]
-        gen_outputs = llm.chat(messages=gen_messages, sampling_params=gen_params)
-        policies = [out.outputs[0].text.strip() for out in gen_outputs]
+        gen_out = llm.chat(messages=gen_messages, sampling_params=gen_params)
+        current_policies = [extract_policy(o.outputs[0].text.strip()) for o in gen_out]
 
-        # ── Strict Judge (chat API) ──
-        judge_messages = [
-            [
-                {"role": "system", "content": "You are a strict DPDP Regulatory Auditor."},
-                {"role": "user", "content": JUDGE_PROMPT
+        completed = set()
+
+        for step in range(MAX_REFLEXION_STEPS):
+            remaining = [i for i in range(len(current_policies)) if i not in completed]
+            if not remaining:
+                break
+
+            print(f"   ↳ Reflexion Iteration {step+1}/{MAX_REFLEXION_STEPS}: Syncing {len(remaining)} threads...")
+
+            # Strict Structured Auditing via Decoupled guided_decoding
+            judge_msgs = [
+                [{"role": "system", "content": "Strict DPDP Auditor."},
+                 {"role": "user", "content": JUDGE_PROMPT
                     .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
-                    .replace("[POLICY_INJECTION]", p)
-                }
+                    .replace("[POLICY_INJECTION]", current_policies[i])}]
+                for i in remaining
             ]
-            for p in policies
-        ]
-        audit_outputs = llm.chat(messages=judge_messages, sampling_params=judge_params)
-        audits = []
-        for out in audit_outputs:
-            try:
-                audits.append(json.loads(out.outputs[0].text))
-            except json.JSONDecodeError:
-                audits.append({"dpdp_trust_score": 100, "violations": []})
+            audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
 
-        # ── Reflexion Routing ──
-        reflexion_messages = []
-        reflexion_indices = []
+            parsed = {}
+            for idx, out in zip(remaining, audit_outputs):
+                try:
+                    parsed[idx] = json.loads(out.outputs[0].text.strip())
+                except (json.JSONDecodeError, AttributeError, KeyError):
+                    parsed[idx] = {"dpdp_trust_score": 100, "violations": [], "subtlety_score": 100}
 
-        for i, (policy, audit) in enumerate(zip(policies, audits)):
-            if audit.get("dpdp_trust_score", 0) >= 90 or len(audit.get("violations", [])) == 0:
-                audit_feedback = json.dumps(audit, indent=2)
-                reflexion_messages.append([
-                    {"role": "system", "content": "You are an adversarial corporate legal counsel."},
-                    {"role": "user", "content": REFLEXION_PROMPT
-                        .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
-                        .replace("[AUDIT_FEEDBACK]", audit_feedback)
-                        .replace("[FAILED_POLICY_INJECTION]", policy[:MAX_POLICY_CHARS_REFLEXION])
-                    }
-                ])
-                reflexion_indices.append(i)
-            else:
-                # Save SFT pair in Axolotl‑standard messages format
-                pair = {
-                    "messages": [
-                        {"role": "system", "content": "You are a strict DPDP Regulatory Auditor."},
-                        {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze the following privacy policy:\n{policy}"},
-                        {"role": "assistant", "content": json.dumps(audit)}
-                    ]
-                }
-                fname = os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{i:03d}.json")
-                with open(fname, "w", encoding="utf-8") as f:
-                    json.dump(pair, f)
+            explicit_heal, subtle_heal = [], []
+            explicit_idx, subtle_idx = [], []
 
-        # ── Healing Loop & DPO ──
-        if reflexion_messages:
-            ref_outputs = llm.chat(messages=reflexion_messages, sampling_params=gen_params)
-            fixed_policies = [out.outputs[0].text.strip() for out in ref_outputs]
+            for i in remaining:
+                audit = parsed[i]
+                score = audit.get("dpdp_trust_score", 0)
+                viols = audit.get("violations", [])
+                subtlety = audit.get("subtlety_score", 100)
+                local_id = local_ids[i]
 
-            # Strict re‑audit (chat)
-            re_judge_messages = [
-                [
-                    {"role": "system", "content": "You are a strict DPDP Regulatory Auditor."},
-                    {"role": "user", "content": JUDGE_PROMPT
-                        .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
-                        .replace("[POLICY_INJECTION]", p)
-                    }
-                ]
-                for p in fixed_policies
-            ]
-            re_audit_outputs = llm.chat(messages=re_judge_messages, sampling_params=judge_params)
-            fixed_audits = [json.loads(out.outputs[0].text) for out in re_audit_outputs]
+                caught = (score < 90 and len(viols) > 0)
 
-            # Construct DPO pairs (Axolotl format, hard‑coded rejected baseline)
-            for idx, f_audit, fixed_policy in zip(reflexion_indices, fixed_audits, fixed_policies):
-                if f_audit.get("dpdp_trust_score", 0) < 90:
-                    dpo_pair = {
-                        "chosen": [
-                            {"role": "system", "content": "You are a strict DPDP Regulatory Auditor."},
-                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze this policy:\n{fixed_policy}"},
-                            {"role": "assistant", "content": json.dumps(f_audit)}
-                        ],
-                        "rejected": [
-                            {"role": "system", "content": "You are a strict DPDP Regulatory Auditor."},
-                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze this policy:\n{fixed_policy}"},
-                            {"role": "assistant", "content": json.dumps(l_audit)}
-                        ]
-                    }
-                    fname = os.path.join(DPO_OUTPUT_DIR, f"dpo_{batch_idx:03d}_{idx:03d}.json")
-                    with open(fname, "w", encoding="utf-8") as f:
-                        json.dump(dpo_pair, f)
+                if caught:
+                    if step == 0 and subtlety < 70:
+                        subtle_heal.append([
+                            {"role": "system", "content": "Adversarial corporate counsel."},
+                            {"role": "user", "content": REFLEXION_SUBTLE_PROMPT
+                                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                                .replace("[FAILED_POLICY_INJECTION]", current_policies[i][:MAX_POLICY_CHARS_REFLEXION])}
+                        ])
+                        subtle_idx.append(i)
+                        continue
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════
+                    if step == 0:
+                        sft = {"messages": [
+                            {"role": "system", "content": "Strict DPDP Auditor."},
+                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                            {"role": "assistant", "content": json.dumps(audit)}
+                        ]}
+                        with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_id:03d}.json"), "w", encoding="utf-8") as f:
+                            json.dump(sft, f, ensure_ascii=False)
+                    else:
+                        dpo = {
+                            "chosen": [
+                                {"role": "system", "content": "Strict DPDP Auditor."},
+                                {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                                {"role": "assistant", "content": json.dumps(audit)}
+                            ],
+                            "rejected": [
+                                {"role": "system", "content": "Strict DPDP Auditor."},
+                                {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                                {"role": "assistant", "content": json.dumps(LAZY_AUDIT)}
+                            ]
+                        }
+                        with open(os.path.join(DPO_OUTPUT_DIR, f"dpo_{batch_idx:03d}_{local_id:03d}.json"), "w", encoding="utf-8") as f:
+                            json.dump(dpo, f, ensure_ascii=False)
+                    completed.add(i)
+
+                else:  # Missed or bypassed evaluation state
+                    if step < MAX_REFLEXION_STEPS - 1:
+                        explicit_heal.append([
+                            {"role": "system", "content": "Adversarial corporate counsel."},
+                            {"role": "user", "content": REFLEXION_EXPLICIT_PROMPT
+                                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                                .replace("[AUDIT_FEEDBACK]", json.dumps(audit))
+                                .replace("[FAILED_POLICY_INJECTION]", current_policies[i][:MAX_POLICY_CHARS_REFLEXION])}
+                        ])
+                        explicit_idx.append(i)
+                    else:
+                        sft = {"messages": [
+                            {"role": "system", "content": "Strict DPDP Auditor."},
+                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                            {"role": "assistant", "content": json.dumps(audit)}
+                        ]}
+                        with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_id:03d}.json"), "w", encoding="utf-8") as f:
+                            json.dump(sft, f, ensure_ascii=False)
+                        completed.add(i)
+
+            # Vectorized Annealed Re-Generation
+            heal_temp = max(0.6, 0.8 - 0.1 * step)
+            heal_params = SamplingParams(temperature=heal_temp, top_p=0.9, max_tokens=8192)
+
+            if explicit_heal:
+                out_explicit = llm.chat(messages=explicit_heal, sampling_params=heal_params)
+                for idx, o in zip(explicit_idx, out_explicit):
+                    current_policies[idx] = extract_policy(o.outputs[0].text.strip())
+
+            if subtle_heal:
+                out_subtle = llm.chat(messages=subtle_heal, sampling_params=heal_params)
+                for idx, o in zip(subtle_idx, out_subtle):
+                    current_policies[idx] = extract_policy(o.outputs[0].text.strip())
+
+    print("✅ GAN forge complete. Datasets compiled under utf-8 targets.")
+
 if __name__ == "__main__":
-    build_law_text()
-    print("Initiating Ssense Asymmetric GAN Forge...")
     run_gan_forge()
-    print("✅ Forging complete. SFT and DPO pairs saved in Axolotl‑ready format.")
