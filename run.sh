@@ -23,7 +23,7 @@ python gan_forge.py
 
 echo ""
 echo "▶️ [PHASE 2/5]: Building Deterministic Rust Tree..."
-python build_tree.py
+python build_dpdp_tree.py
 
 echo ""
 echo "▶️ [PHASE 3/5]: Aligning Data Schemas for Unsloth..."

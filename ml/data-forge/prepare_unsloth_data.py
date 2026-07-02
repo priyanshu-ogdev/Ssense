@@ -24,7 +24,7 @@ def prepare_sft_data(input_dir="./training-pairs/sft", output_file="./data/sft_d
                         continue
                 
                 # GAN Forge already formatted this as a perfect ChatML "messages" array.
-                # We just verify it exists and write it to the JSONL dataset.
+                # Unsloth expects {"messages": [{"role": "...", "content": "..."}]}
                 if "messages" in pair:
                     out_f.write(json.dumps(pair, ensure_ascii=False) + '\n')
                     processed_count += 1
@@ -45,25 +45,13 @@ def prepare_dpo_data(input_dir="./training-pairs/dpo", output_file="./data/dpo_d
                     except json.JSONDecodeError:
                         continue
                 
-                if "chosen" in pair and "rejected" in pair:
-                    # TRL 2026 Expects: prompt, chosen, rejected as distinct conversational arrays.
-                    # The GAN Forge saved the entire conversation history in 'chosen'.
-                    # We must split the prompt (System + User) from the responses (Assistant).
-                    
-                    full_chosen_convo = pair["chosen"]
-                    full_rejected_convo = pair["rejected"]
-                    
-                    # Everything up to the final assistant message is the shared prompt
-                    prompt_messages = full_chosen_convo[:-1]
-                    
-                    # The final assistant messages are the respective preference outcomes
-                    chosen_message = [full_chosen_convo[-1]]
-                    rejected_message = [full_rejected_convo[-1]]
-                    
+                # FIXED: The GAN Forge now outputs the native TRL 0.17.0 / Unsloth format.
+                # We no longer need to slice the arrays.
+                if "prompt" in pair and "chosen" in pair and "rejected" in pair:
                     unsloth_record = {
-                        "prompt": prompt_messages,
-                        "chosen": chosen_message,
-                        "rejected": rejected_message
+                        "prompt": pair["prompt"],
+                        "chosen": pair["chosen"],
+                        "rejected": pair["rejected"]
                     }
                     out_f.write(json.dumps(unsloth_record, ensure_ascii=False) + '\n')
                     processed_count += 1

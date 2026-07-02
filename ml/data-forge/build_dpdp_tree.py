@@ -6,15 +6,15 @@ Run this ONCE to bridge the ML data layer to the Rust network layer.
 
 import json
 from vllm import LLM, SamplingParams
-from vllm.sampling_params import GuidedDecodingParams
+from vllm.sampling_params import StructuredOutputsParams
 
 LAW_TEXT_PATH = "./dpdp_act_and_rules_2025.txt"
 TREE_OUTPUT = "./dpdp_act_tree.json"
+MODEL_PATH = "../models/Qwen2-72B-Instruct-FP8" 
 
 with open(LAW_TEXT_PATH, "r", encoding="utf-8") as f:
     law_text = f.read()
 
-# 1. FORMAT AS PROPER CHAT MESSAGES
 messages = [
     {"role": "system", "content": "You are a senior legal engineer specializing in the DPDP Act."},
     {"role": "user", "content": f"""Given the full text of the DPDP Act 2023 and Rules 2025, produce a JSON object that maps every section, sub-section, and rule that mandates a specific user-facing data practice to its enforcement action.
@@ -26,13 +26,12 @@ For each key, map it to the enforcement parameters.
 Law text:\n{law_text}"""}
 ]
 
-# Define the dynamic JSON schema to strictly enforce the output structure
 tree_schema = {
     "type": "object",
     "additionalProperties": {
         "type": "object",
         "properties": {
-            "violation_type": {  # FIXED to match SLM Audit Schema
+            "violation_type": {  
                 "type": "string",
                 "enum": [
                     "PURPOSE_LIMITATION_VIOLATION", 
@@ -47,7 +46,7 @@ tree_schema = {
                     "CROSS_BORDER_TRANSFER_VIOLATION"
                 ]
             },
-            "network_action": {  # FIXED to match SLM Audit Schema
+            "network_action": {  
                 "type": "string",
                 "enum": [
                     "BLOCK_THIRD_PARTY", 
@@ -66,22 +65,22 @@ tree_schema = {
 
 print("Loading 72B model for legal parsing...")
 llm = LLM(
-    model="/path/to/your/72B-FP8-Model", 
+    model=MODEL_PATH, 
     quantization="fp8", 
-    tensor_parallel_size=2, 
-    max_model_len=16384
+    tensor_parallel_size=1,       
+    max_model_len=65536,          
+    gpu_memory_utilization=0.80,  # CRITICAL FIX: Locks the UMA safety ceiling
+    kv_cache_dtype="fp8",         # CRITICAL FIX: Halves the 65k context memory footprint
+    enable_chunked_prefill=True   
 )
 
-# Use Guided Decoding to guarantee pure JSON output (No markdown backticks generated)
-guided_params = GuidedDecodingParams(json=tree_schema)
-params = SamplingParams(temperature=0.0, max_tokens=10000, guided_decoding=guided_params)
+guided_params = StructuredOutputsParams(json=tree_schema)
+params = SamplingParams(temperature=0.0, max_tokens=20000, structured_outputs=guided_params)
 
 print("Generating Deterministic Enforcement Tree...")
-# Note the [messages] wrapper required by the vLLM 0.24 batch API
 output = llm.chat(messages=[messages], sampling_params=params)
 tree_raw_text = output[0].outputs[0].text.strip()
 
-# Validate and save directly (No string stripping required)
 try:
     tree = json.loads(tree_raw_text)
     with open(TREE_OUTPUT, "w", encoding="utf-8") as f:
