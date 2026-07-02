@@ -3,9 +3,9 @@
 run_gan_forge.py – Ultimate Production GAN Forge
 
 Optimized and verified for:
-- Python 3.12 + Transformers 5.5.3 + vLLM 0.24.0
-- Native host environments (Container-free execution safety)
-- Robust error-trapped text and JSON processing
+- Python 3.12 + Transformers 5.5.3 + vLLM 0.24.0 + TRL 0.17.0
+- DGX Spark (GB10 Unified Memory) Bulletproof 32K Context
+- Robust error-trapped text, JSON processing, and TRL DPO mapping
 """
 
 import math
@@ -15,8 +15,9 @@ import glob
 import random
 import re
 import sys
-from tqdm import tqdm
 from vllm import LLM, SamplingParams
+from vllm.sampling_params import StructuredOutputsParams
+
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 0: EXTRACT LAW TEXT FROM PDFs
 # ═══════════════════════════════════════════════════════════════════════════
@@ -59,10 +60,7 @@ INDIAN_SEEDS_DIR = "./indian-seeds"
 SFT_OUTPUT_DIR = "./training-pairs/sft"
 DPO_OUTPUT_DIR = "./training-pairs/dpo"
 
-# Relative route from data-forge up to the shared schema directory
 SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
-
-# Routes up to the adjacent models directory you just downloaded to
 MODEL_PATH = "../models/Qwen2-72B-Instruct-FP8"
 
 os.makedirs(SFT_OUTPUT_DIR, exist_ok=True)
@@ -75,14 +73,16 @@ with open(LAW_TEXT_PATH, "r", encoding="utf-8") as f:
 if not os.path.exists(SCHEMA_PATH):
     raise FileNotFoundError(f"Missing required JSON contract schema at: {SCHEMA_PATH}")
 
+# GLOBAL REGEX COMPILATION (Speed Optimization)
+DEVANAGARI_RE = re.compile(r'[\u0900-\u097F]')
+
 def filter_english(text, threshold=0.3):
-    devanagari_re = re.compile(r'[\u0900-\u097F]')
     lines = []
     for line in text.splitlines():
         if not line.strip() or len(line) == 0:
             lines.append(line)
             continue
-        deva_chars = len(devanagari_re.findall(line))
+        deva_chars = len(DEVANAGARI_RE.findall(line))
         if (deva_chars / len(line)) < threshold:
             lines.append(line)
     return '\n'.join(lines)
@@ -106,6 +106,30 @@ if not raw_policies:
 with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
     dpdp_schema = json.load(f)
 
+# DYNAMIC CONTEXT INJECTION (Prevents "Lost in the Middle" & Saves KV Cache)
+def extract_relevant_law(law_text, target_violation):
+    """Dynamically shrinks the massive law text to only the relevant sections."""
+    keywords = []
+    if "Section 6" in target_violation:
+        keywords = ["Section 6", "Consent", "Notice", "Bundling"]
+    elif "Section 8" in target_violation:
+        keywords = ["Section 8", "Retention", "Erase", "Storage", "Metadata"]
+    elif "Section 9" in target_violation:
+        keywords = ["Section 9", "Children", "Parental", "Verifiable"]
+    elif "Section 16" in target_violation:
+        keywords = ["Section 16", "Grievance", "Redressal", "Appeal"]
+        
+    relevant_chunks = []
+    paragraphs = law_text.split('\n\n')
+    for p in paragraphs:
+        if any(kw.lower() in p.lower() for kw in keywords):
+            relevant_chunks.append(p.strip())
+            
+    if not relevant_chunks:
+        return law_text[:8000] 
+        
+    return "\n\n".join(relevant_chunks[:15])
+
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 2: VLLM ENGINE & PROMPTS
 # ═══════════════════════════════════════════════════════════════════════════
@@ -113,19 +137,23 @@ print("Initializing 72B FP8 vLLM Engine...")
 llm = LLM(
     model=MODEL_PATH,
     quantization="fp8",
-    tensor_parallel_size=2,
-    max_model_len=16384,
-    gpu_memory_utilization=0.80,
+    tensor_parallel_size=1,
+    max_model_len=32768,                # Expanded context bounds
+    gpu_memory_utilization=0.80,        # Safely locked to prevent DGX Spark UMA OS crashes
+    max_num_seqs=25,                    # Hardware safety clamp
+    kv_cache_dtype="fp8",               # Attention bandwidth optimization
+    enable_prefix_caching=True,         # Caches the static system prompts
+    enable_chunked_prefill=True         # Flattens memory spikes during prefill
 )
 
 gen_params = SamplingParams(temperature=0.8, top_p=0.9, max_tokens=8192)
 
-# Fixed vLLM 0.24.x direct dictionary decoupling configuration
+# Fixed vLLM 0.24.x StructuredOutputsParams configuration
 judge_params = SamplingParams(
     temperature=0.1,
     top_p=0.5,
     max_tokens=2048,
-    guided_decoding={"json": dpdp_schema}
+    structured_outputs=StructuredOutputsParams(json=dpdp_schema) 
 )
 
 SYNTHESIZER_PROMPT = """[CONTEXT: THE LAW]
@@ -152,7 +180,9 @@ The Regulatory Auditor missed your violation (score >= 90 or empty violations).
 Audit details: [AUDIT_FEEDBACK]
 
 [TASK]
-Rewrite the policy to make the DPDP violation slightly more legally explicit, while keeping the deceptive corporate tone. 
+Rewrite the policy to make the DPDP violation specifically targeting:
+[TARGET_VIOLATION]
+slightly more legally explicit, while keeping the deceptive corporate tone. 
 Plan your approach inside explicit <strategy>...</strategy> XML tags first, then output the revised policy text.
 
 [FAILED POLICY]
@@ -163,7 +193,9 @@ REFLEXION_SUBTLE_PROMPT = """[CONTEXT: THE LAW]
 
 [SYSTEM FEEDBACK]
 The Auditor caught your violation but scored it as overly obvious (subtlety_score < 70).
-Make the violation more subtle and buried deep under complex legal jargon, while retaining the illegality.
+Make the violation specifically targeting:
+[TARGET_VIOLATION]
+more subtle and buried deep under complex legal jargon, while retaining the illegality.
 Plan your approach inside explicit <strategy>...</strategy> XML tags first, then output the revised policy text.
 
 [FAILED POLICY]
@@ -201,7 +233,7 @@ TARGET_VIOLATIONS = [
 # PHASE 3: VECTORIZED GAN LOOP
 # ═══════════════════════════════════════════════════════════════════════════
 def run_gan_forge():
-    BATCH_SIZE = 50
+    BATCH_SIZE = 25  # Optimized for GPU saturation without TTFT stalling
     MAX_REFLEXION_STEPS = 3
     total_batches = math.ceil(len(raw_policies) / BATCH_SIZE)
 
@@ -241,7 +273,7 @@ def run_gan_forge():
         gen_messages = [
             [{"role": "system", "content": "Adversarial corporate counsel."},
              {"role": "user", "content": SYNTHESIZER_PROMPT
-                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                .replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, tgt))
                 .replace("[SEED_INJECTION]", seed[:MAX_SEED_CHARS])
                 .replace("[TARGET_VIOLATION]", tgt)
                 .replace("[RAW_POLICY_INJECTION]", raw[:MAX_RAW_CHARS])}]
@@ -259,11 +291,11 @@ def run_gan_forge():
 
             print(f"   ↳ Reflexion Iteration {step+1}/{MAX_REFLEXION_STEPS}: Syncing {len(remaining)} threads...")
 
-            # Strict Structured Auditing via Decoupled guided_decoding
+            # Strict Structured Auditing via XGrammar backend
             judge_msgs = [
                 [{"role": "system", "content": "Strict DPDP Auditor."},
                  {"role": "user", "content": JUDGE_PROMPT
-                    .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                    .replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, targets[i]))
                     .replace("[POLICY_INJECTION]", current_policies[i])}]
                 for i in remaining
             ]
@@ -274,7 +306,12 @@ def run_gan_forge():
                 try:
                     parsed[idx] = json.loads(out.outputs[0].text.strip())
                 except (json.JSONDecodeError, AttributeError, KeyError):
-                    parsed[idx] = {"dpdp_trust_score": 100, "violations": [], "subtlety_score": 100}
+                    # Hard failure assignment to stop corrupted data leaks
+                    parsed[idx] = {
+                        "dpdp_trust_score": 0,
+                        "violations": [{"section": "Parse Error", "description": "Auditor FSM failed."}],
+                        "subtlety_score": 0
+                    }
 
             explicit_heal, subtle_heal = [], []
             explicit_idx, subtle_idx = [], []
@@ -293,7 +330,8 @@ def run_gan_forge():
                         subtle_heal.append([
                             {"role": "system", "content": "Adversarial corporate counsel."},
                             {"role": "user", "content": REFLEXION_SUBTLE_PROMPT
-                                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                                .replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, targets[i]))
+                                .replace("[TARGET_VIOLATION]", targets[i])
                                 .replace("[FAILED_POLICY_INJECTION]", current_policies[i][:MAX_POLICY_CHARS_REFLEXION])}
                         ])
                         subtle_idx.append(i)
@@ -302,21 +340,22 @@ def run_gan_forge():
                     if step == 0:
                         sft = {"messages": [
                             {"role": "system", "content": "Strict DPDP Auditor."},
-                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{extract_relevant_law(DPDP_LAW_TEXT, targets[i])}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
                             {"role": "assistant", "content": json.dumps(audit)}
                         ]}
                         with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_id:03d}.json"), "w", encoding="utf-8") as f:
                             json.dump(sft, f, ensure_ascii=False)
                     else:
+                        # TRL 0.17.0 Conversational DPO Structure
                         dpo = {
-                            "chosen": [
+                            "prompt": [
                                 {"role": "system", "content": "Strict DPDP Auditor."},
-                                {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                                {"role": "user", "content": f"[CONTEXT: THE LAW]\n{extract_relevant_law(DPDP_LAW_TEXT, targets[i])}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"}
+                            ],
+                            "chosen": [
                                 {"role": "assistant", "content": json.dumps(audit)}
                             ],
                             "rejected": [
-                                {"role": "system", "content": "Strict DPDP Auditor."},
-                                {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
                                 {"role": "assistant", "content": json.dumps(LAZY_AUDIT)}
                             ]
                         }
@@ -329,7 +368,8 @@ def run_gan_forge():
                         explicit_heal.append([
                             {"role": "system", "content": "Adversarial corporate counsel."},
                             {"role": "user", "content": REFLEXION_EXPLICIT_PROMPT
-                                .replace("[LAW_INJECTION]", DPDP_LAW_TEXT)
+                                .replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, targets[i]))
+                                .replace("[TARGET_VIOLATION]", targets[i])
                                 .replace("[AUDIT_FEEDBACK]", json.dumps(audit))
                                 .replace("[FAILED_POLICY_INJECTION]", current_policies[i][:MAX_POLICY_CHARS_REFLEXION])}
                         ])
@@ -337,7 +377,7 @@ def run_gan_forge():
                     else:
                         sft = {"messages": [
                             {"role": "system", "content": "Strict DPDP Auditor."},
-                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{DPDP_LAW_TEXT}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
+                            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{extract_relevant_law(DPDP_LAW_TEXT, targets[i])}\n\n[TASK]\nAnalyze:\n{current_policies[i]}"},
                             {"role": "assistant", "content": json.dumps(audit)}
                         ]}
                         with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_id:03d}.json"), "w", encoding="utf-8") as f:
