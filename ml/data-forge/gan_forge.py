@@ -115,7 +115,7 @@ llm = LLM(
     quantization="fp8",
     tensor_parallel_size=2,
     max_model_len=16384,
-    gpu_memory_utilization=0.95,
+    gpu_memory_utilization=0.80,
 )
 
 gen_params = SamplingParams(temperature=0.8, top_p=0.9, max_tokens=8192)
