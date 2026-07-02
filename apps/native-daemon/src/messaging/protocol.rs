@@ -113,6 +113,7 @@ pub struct DpdpAuditReport {
     pub global_legal_reasoning: String,
     pub violations: Vec<Violation>,
     pub dpdp_trust_score: i32,
+    pub subtlety_score: i32, 
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

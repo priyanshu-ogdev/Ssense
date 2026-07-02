@@ -36,7 +36,7 @@
           "evidence_quote": {
             "type": "string",
             "minLength": 1,
-            "description": "The exact verbatim string extracted from the scraped privacy policy proving the violation."
+            "description": "The exact verbatim string extracted from the scraped privacy policy proving the violation. If the violation is an omission (e.g., missing consent banner), quote the surrounding context where it should have been."
           },
           "network_action": {
             "type": "string",
@@ -51,7 +51,7 @@
           "offending_entities": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Specific targets for the network action. Empty array if WARN_USER_ONLY."
+            "description": "Specific targets for the network action (e.g., third-party domains to block, header names to strip). Must be an empty array if network_action is WARN_USER_ONLY."
           }
         },
         "required": [
@@ -69,12 +69,19 @@
       "minimum": 0,
       "maximum": 100,
       "description": "Final compliance score from 0 (malicious) to 100 (perfectly compliant)."
+    },
+    "subtlety_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Tracks how cleverly the violation is hidden in legal jargon. 0 = Blatantly obvious, 100 = Masterfully buried in complex clauses."
     }
   },
   "required": [
     "global_legal_reasoning",
     "violations",
-    "dpdp_trust_score"
+    "dpdp_trust_score",
+    "subtlety_score"
   ],
   "additionalProperties": false
 }

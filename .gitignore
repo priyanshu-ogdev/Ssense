@@ -58,5 +58,12 @@ ml/data-forge/indian-seeds/
 ml/data-forge/training-pairs/
 ml/slm-training/data/
 ml/slm-training/sft-out/
-ml/slm-training/dpo-out/apps/native-daemon/com.ssense.daemon.json
+ml/slm-training/dpo-out/
+
+# 9. Forge Artifacts & Logs
+ml/data-forge/dpdp_act_and_rules_2025.txt
+ml/data-forge/forge_execution.log
+
+# 10. Generated Daemons
+apps/native-daemon/com.ssense.daemon.json
 scripts/com.ssense.daemon.json
