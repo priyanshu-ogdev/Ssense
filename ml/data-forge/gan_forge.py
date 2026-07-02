@@ -242,10 +242,10 @@ def run_gan_forge():
     MAX_POLICY_CHARS_REFLEXION = 15000
 
     LAZY_AUDIT = {
+        "global_legal_reasoning": "The auditor failed to identify any violations or structural flaws in the policy.",
         "dpdp_trust_score": 100, 
         "violations": [],
-        "subtlety_score": 100, 
-        "summary": "Universal fallback validation baseline."
+        "subtlety_score": 100
     }
 
     for batch_idx in range(total_batches):
