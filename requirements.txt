@@ -37,5 +37,3 @@ PyMuPDF
 numpy
 requests
 tenacity
-
-flash-attn==2.7.3

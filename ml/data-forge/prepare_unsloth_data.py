@@ -9,7 +9,7 @@ JSONL formatting expected by Unsloth and Hugging Face TRL 2026.
 import os
 import json
 
-def prepare_sft_data(input_dir="./training-pairs/sft", output_file="./data/sft_data.jsonl"):
+def prepare_sft_data(input_dir="./training-pairs/sft", output_file="../slm-training/data/sft_data.jsonl"):
     print("Aligning SFT data for Unsloth...")
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
@@ -31,7 +31,7 @@ def prepare_sft_data(input_dir="./training-pairs/sft", output_file="./data/sft_d
                 
     print(f"✅ SFT Alignment Complete: {processed_count} pairs written to {output_file}")
 
-def prepare_dpo_data(input_dir="./training-pairs/dpo", output_file="./data/dpo_data.jsonl"):
+def prepare_dpo_data(input_dir="./training-pairs/dpo", output_file="../slm-training/data/dpo_data.jsonl"):
     print("Aligning DPO data for Unsloth...")
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     

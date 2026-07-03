@@ -4,10 +4,11 @@ from unsloth import FastLanguageModel, PatchDPOTrainer
 from trl import DPOTrainer, DPOConfig
 from datasets import load_dataset
 
+# ✅ CRITICAL: Patches TRL's DPOTrainer to utilize Unsloth's memory optimizations
 PatchDPOTrainer()
 
 def run_dpo():
-    print("🚀 Starting DPO on Qwen3.5-9B | BF16 | FlashAttention 2 | Unsloth Optimized")
+    print("🚀 Starting DPO on Qwen3.5-9B | BF16 | Unsloth Optimized")
 
     # Validate data file exists
     if not os.path.exists("./data/dpo_data.jsonl"):
@@ -17,23 +18,22 @@ def run_dpo():
     if not os.path.exists("./sft-lora-out"):
         raise FileNotFoundError("Missing ./sft-lora-out. Run train_sft.py first.")
 
-    # Load the SFT LoRA model
+    # 1. Load the SFT LoRA model
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name="sft-lora-out",
-        max_seq_length=8192,
+        max_seq_length=24576,
         dtype=torch.bfloat16,
         load_in_4bit=False,
-        attn_implementation="flash_attention_2",  # ✅ Native GB10 FlashAttention
     )
     model.train()
 
     tokenizer.padding_side = "right"
+    tokenizer.truncation_side = "left"  # ✅ Preserve assistant responses
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Load DPO data with parallel CPU processing
+    # 2. Load DPO data
     dataset = load_dataset("json", data_files="./data/dpo_data.jsonl", split="train")
-    
     print(f"📊 Dataset loaded: {len(dataset)} examples")
     
     split = dataset.train_test_split(test_size=0.05, seed=42)
@@ -42,13 +42,10 @@ def run_dpo():
     def format_dpo(examples):
         prompts, chosens, rejecteds = [], [], []
         for p, c, r in zip(examples["prompt"], examples["chosen"], examples["rejected"]):
-            # p, c, r are lists of message dicts
             chosen_conv = p + c          # full chosen conversation
             rejected_conv = p + r        # full rejected conversation
 
             # ✅ CORRECT: No generation prompt in the prompt string.
-            # chosen/rejected contain the full conversation.
-            # TRL will compute loss only on the assistant's response tokens.
             prompts.append(
                 tokenizer.apply_chat_template(p, tokenize=False, add_generation_prompt=False)
             )
@@ -60,46 +57,50 @@ def run_dpo():
             )
         return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds}
 
-    train_dataset = split["train"].map(format_dpo, batched=True, num_proc=8)  # ✅ Parallel processing
+    train_dataset = split["train"].map(format_dpo, batched=True, num_proc=8)
     eval_dataset = split["test"].map(format_dpo, batched=True, num_proc=8)
 
-    # Training configuration
+    # 3. Training configuration
     dpo_args = DPOConfig(
-        per_device_train_batch_size=4,       # ✅ Safe for DPO's 4x forward pass
-        gradient_accumulation_steps=2,       # ✅ Effective batch = 8
-        gradient_checkpointing="unsloth",    # ✅ Unsloth's optimized implementation
+        per_device_train_batch_size=2,       # ✅ Safe for DPO's 4x forward passes
+        gradient_accumulation_steps=4,       # Effective batch = 8
+        gradient_checkpointing=True,         # Standard TRL flag
+        gradient_checkpointing_kwargs={"use_reentrant": False}, # ✅ Non-reentrant for DPO stability
         warmup_ratio=0.03,
         num_train_epochs=1,
-        learning_rate=5e-6,                  # ✅ Conservative LR to prevent catastrophic forgetting
-        lr_scheduler_type="cosine",          # ✅ Smooth convergence
+        learning_rate=5e-6,                  # Conservative LR to prevent catastrophic forgetting
+        lr_scheduler_type="cosine",
         bf16=True,
-        optim="adamw_torch",                 # ✅ Best for LLM fine-tuning (REJECT SGD)
+        optim="adamw_torch",                 # ✅ REQUIRED: SGD would destroy sparse LoRA updates
         weight_decay=0.01,
         max_grad_norm=1.0,
         output_dir="dpo-out",
         logging_steps=10,
-        max_length=8192,
-        max_prompt_length=7500,
-        beta=0.1,
-        label_smoothing=0.1,                 # ✅ Reduces overconfidence in preferences
-        report_to="none",
-        seed=42,
+        max_length=24576,                    # ✅ DPOConfig strictly expects 'max_length'
+        max_prompt_length=16384,             # Accommodates full 12k+ token prompts
+        beta=0.5,                            # ✅ Stronger KL penalty for strict legal boundaries
+        loss_type="ipo",                     # ✅ More robust to label noise than sigmoid
+        label_smoothing=0.1,                 # Reduces overconfidence in preferences
+        neftune_noise_alpha=5,               # ✅ Adds noise to prevent DPO overfitting
+        remove_unused_columns=False,         # Prevents TRL from dropping prompt/chosen/rejected columns
         eval_strategy="steps",
         eval_steps=50,
         save_strategy="steps",
-        save_steps=100,
+        save_steps=50,
         save_total_limit=2,
-        save_safetensors=True,               # ✅ Faster loading, more secure
+        save_safetensors=True,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
-        is_encoder_decoder=False,            # ✅ Explicit decoder-only configuration
-        remove_unused_columns=False,         # ✅ Prevent data column dropping
+        is_encoder_decoder=False,            # Explicit decoder-only configuration
+        # ✅ REMOVED: torch_compile=True (Conflicts with Unsloth's custom Triton kernels)
+        seed=42,
+        data_seed=42,                        # Consistent with SFT split
     )
 
-    # Trainer – Unsloth handles reference model efficiently
+    # 4. Trainer – Unsloth handles reference model efficiently
     dpo_trainer = DPOTrainer(
         model=model,
-        ref_model=None,
+        ref_model=None,                      # ✅ Unsloth automatically handles this internally
         args=dpo_args,
         tokenizer=tokenizer,
         train_dataset=train_dataset,
@@ -109,7 +110,7 @@ def run_dpo():
     print("🏋️ Starting DPO training...")
     dpo_trainer.train()
 
-    # Export quantized GGUF files
+    # 5. Export quantized GGUF files
     print("📦 Exporting GGUF models...")
     model.save_pretrained_gguf(
         "ssense-dpdp-9b-local", tokenizer, quantization_method="q4_k_m"
