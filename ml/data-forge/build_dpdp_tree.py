@@ -68,17 +68,19 @@ llm = LLM(
     model=MODEL_PATH, 
     quantization="fp8", 
     tensor_parallel_size=1,       
-    max_model_len=65536,          
-    gpu_memory_utilization=0.80,  # CRITICAL FIX: Locks the UMA safety ceiling
-    kv_cache_dtype="fp8",         # CRITICAL FIX: Halves the 65k context memory footprint
+    max_model_len=32768,          # ✅ MATHEMATICAL FIX: Capped at model's native limit
+    gpu_memory_utilization=0.75,  # ✅ UMA SAFETY FIX: Protects the OS from OOM panics
+    kv_cache_dtype="fp8",         
     enable_chunked_prefill=True   
 )
 
 guided_params = StructuredOutputsParams(json=tree_schema)
-params = SamplingParams(temperature=0.0, max_tokens=20000, structured_outputs=guided_params)
+# ✅ MATH FIX: Dropped max_tokens to 8192 so Input (14k) + Output (8k) = 22k (Safely under 32k)
+params = SamplingParams(temperature=0.0, max_tokens=8192, structured_outputs=guided_params)
 
 print("Generating Deterministic Enforcement Tree...")
-output = llm.chat(messages=[messages], sampling_params=params)
+# ✅ SYNTAX FIX: Pass 'messages' directly. vLLM handles the list of dicts.
+output = llm.chat(messages=messages, sampling_params=params)
 tree_raw_text = output[0].outputs[0].text.strip()
 
 try:
