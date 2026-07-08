@@ -1,0 +1,47 @@
+[CONTEXT: THE LAW]
+[LAW_INJECTION]
+
+[CONTEXT: STYLISTIC ANCHOR]
+[SEED_INJECTION]
+
+[INDUSTRY CONTEXT]
+[INDUSTRY_INJECTION]
+
+[TASK]
+You are an adversarial corporate counsel drafting a privacy policy for a real company in the [INDUSTRY_INJECTION] sector. Your policy must read as an authentic, legally-styled Indian corporate document.
+
+CRITICAL OBJECTIVE: Embed a deliberate violation of the DPDP Act 2023 specifically targeting:
+[TARGET_VIOLATION]
+
+[SUBTLETY REQUIREMENT]
+[SUBTLETY_INSTRUCTION]
+
+[EDGE CASE REQUIREMENT]
+[EDGE_CASE_INJECTION]
+
+LEGAL OBFUSCATION TECHNIQUES (Apply 1–3 randomly chosen techniques; vary them across generations):
+1. "The Vendor Shield": Attribute data sharing or liability to "trusted partners," "ecosystem providers," or "global infrastructure" without naming entities or accepting vicarious liability.
+2. "Legitimate Use Overreach": Frame commercial processing as essential for "service continuity," "fraud prevention," or "regulatory compliance" to bypass explicit consent.
+3. "Procedural Friction": Provide rights/grievance mechanisms but require notarized documents, physical mail, or mandate the use of proprietary native dashboards instead of interoperable Consent Managers.
+4. "Implied Consent Trap": Use "By continuing to use...", "Your engagement constitutes acceptance...", or "presumptive consent" instead of explicit opt-in, especially for minors.
+5. "Vagueness Shield": Replace concrete DPDP commitments with aspirational language: "We strive to...", "We endeavor to...", "Your privacy is paramount to our goals..."
+6. "Future-Proofing Loophole": Use "as technology evolves" or "legacy system dependencies" to justify indefinite data retention or algorithmic black-boxes.
+
+ABSOLUTE FORMATTING RULES (NON-NEGOTIABLE):
+1. First, plan your strategy inside <strategy>...</strategy> XML tags.
+2. After </strategy>, output ONLY the final policy text. Nothing else.
+3. The output MUST be indistinguishable from a genuine corporate privacy policy.
+4. NEVER include any of the following in the final text:
+   - Bracketed labels: [Violation], [Note], [Disclaimer], [Strategy], [END OF POLICY]
+   - XML tags: <note>, <clause>, <instruction>, <deceptive>
+   - HTML comments: <!-- ... -->
+   - Numbered deception labels: "1. Concealment:", "2. Complexity:", "3. Delay:"
+   - AI disclaimers: "This is a fictional policy", "For educational purposes"
+   - Section headers revealing intent: "DECEPTIVE PRACTICES", "HIDDEN VIOLATIONS"
+5. NEVER break character. The policy must not reveal it is deceptive.
+6. Write in continuous prose with standard corporate privacy policy section headers (e.g., "Information We Collect", "How We Use Your Data", "Your Rights", "Contact Us").
+7. VARY THE POLICY STRUCTURE: Randomly choose from a broader set of realistic section headers each generation. Examples: "International Data Transfers", "Children's Privacy", "Data Retention Schedule", "Consent Manager", "Grievance Officer Details", "Cookies and Tracking Technologies", "Legal Basis for Processing". Do not include all of them; select 4–7 that fit the industry and violation.
+8. Occasionally include a realistic effective‑date line or a brief "We may update this policy" statement, as real corporate documents do.
+
+[GLOBAL BASE POLICY]
+[RAW_POLICY_INJECTION]

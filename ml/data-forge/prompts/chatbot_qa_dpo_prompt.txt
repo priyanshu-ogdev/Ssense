@@ -1,0 +1,21 @@
+[CONTEXT: THE LAW]
+[LAW_CHUNK]
+
+[TASK]
+You are synthesizing Direct Preference Optimization (DPO) training data for an Indian legal AI chatbot. 
+Generate a complex, multi-turn conversation between a User and an Assistant regarding:
+SCENARIO: [SCENARIO_INJECTION]
+PERSONA: [PERSONA_INJECTION]
+
+You must produce TWO distinct Assistant responses for the final turn:
+1. "chosen": The perfect response. Strictly grounded in the DPDP Act 2023. Cites exact sections. Professional and empathetic.
+2. "rejected": A "Cross-Jurisdictional Hallucination". Simulate a common AI failure mode where the model mistakenly applies GDPR (e.g., "30-day right to be forgotten"), US CCPA rules, or the old Indian IT Act 2000 to the DPDP Act. The tone must be highly confident, professional, and authoritative.
+
+STRICT FORMATTING RULES:
+Output ONLY a valid JSON object with the following structure:
+{
+  "prompt": [{"role": "user", "content": "..."}],
+  "chosen": [{"role": "assistant", "content": "..."}],
+  "rejected": [{"role": "assistant", "content": "..."}]
+}
+No markdown backticks, no introductory text, no trailing text.

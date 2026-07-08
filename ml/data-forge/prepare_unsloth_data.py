@@ -9,7 +9,6 @@ Optimized with multi-threaded disk I/O and strict data integrity auditing.
 
 import os
 import json
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def process_sft_file(file_path):
@@ -43,17 +42,19 @@ def process_dpo_file(file_path):
     except Exception as e:
         return None, f"OS_ERR: {str(e)}"
 
-def prepare_sft_data(input_dir="./training-pairs/sft", output_file="../slm-training/data/sft_data.jsonl"):
+def prepare_sft_data(input_dirs=["./training-pairs/sft", "./training-pairs/chatbot-sft"], output_file="../slm-training/data/sft_data.jsonl"):
     print("⚡ Aligning SFT data for Unsloth via High-Throughput Workers...")
-    if not os.path.exists(input_dir):
-        print(f"⚠️ Warning: SFT input directory '{input_dir}' not found. Skipping.")
-        return
-
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
-    files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.json')]
+    files = []
+    for d in input_dirs:
+        if not os.path.exists(d):
+            print(f"⚠️ Warning: SFT input directory '{d}' not found. Skipping.")
+            continue
+        files.extend([os.path.join(d, f) for f in os.listdir(d) if f.endswith('.json')])
+
     if not files:
-        print("ℹ️ No JSON files found in SFT directory.")
+        print("ℹ️ No JSON files found in SFT directories.")
         return
 
     processed_count = 0
@@ -77,17 +78,19 @@ def prepare_sft_data(input_dir="./training-pairs/sft", output_file="../slm-train
     if corrupted_count > 0:
         print(f"❌ Alert: Dropped {corrupted_count} corrupted/invalid SFT records. Anomaly breakdown: {errors}")
 
-def prepare_dpo_data(input_dir="./training-pairs/dpo", output_file="../slm-training/data/dpo_data.jsonl"):
+def prepare_dpo_data(input_dirs=["./training-pairs/dpo", "./training-pairs/chatbot-dpo"], output_file="../slm-training/data/dpo_data.jsonl"):
     print("⚡ Aligning DPO data for Unsloth via High-Throughput Workers...")
-    if not os.path.exists(input_dir):
-        print(f"⚠️ Warning: DPO input directory '{input_dir}' not found. Skipping.")
-        return
-
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
-    files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.json')]
+    files = []
+    for d in input_dirs:
+        if not os.path.exists(d):
+            print(f"⚠️ Warning: DPO input directory '{d}' not found. Skipping.")
+            continue
+        files.extend([os.path.join(d, f) for f in os.listdir(d) if f.endswith('.json')])
+
     if not files:
-        print("ℹ️ No JSON files found in DPO directory.")
+        print("ℹ️ No JSON files found in DPO directories.")
         return
 
     processed_count = 0
@@ -110,7 +113,7 @@ def prepare_dpo_data(input_dir="./training-pairs/dpo", output_file="../slm-train
     if corrupted_count > 0:
         print(f"❌ Alert: Dropped {corrupted_count} corrupted/invalid DPO records. Anomaly breakdown: {errors}")
         if corrupted_count > (len(files) * 0.05): # Over 5% data loss triggers an explicit pipeline warning
-            print("🚨 CRITICAL: Data corruption rate exceeds 5% threshold. Audit GAN Forge pipeline output.")
+            print("🚨 CRITICAL: Data corruption rate exceeds 5% threshold. Audit GAN/QA Forge pipeline output.")
 
 if __name__ == "__main__":
     print("⚙️ Initializing Ssense Data Alignment Layer (Async I/O Engine)...")

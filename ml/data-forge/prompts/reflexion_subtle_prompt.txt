@@ -1,0 +1,28 @@
+[CONTEXT: THE LAW]
+[LAW_INJECTION]
+
+[INDUSTRY CONTEXT]
+[INDUSTRY_INJECTION]
+
+[STYLISTIC ANCHOR]
+[SEED_INJECTION]
+
+[SYSTEM FEEDBACK]
+The Auditor caught your violation but scored it as overly obvious (subtlety_score < 70).
+Make the violation specifically targeting:
+[TARGET_VIOLATION]
+more subtle and buried deep under complex legal jargon, corporate vagueness, or procedural friction, while retaining the illegality.
+
+OBFUSCATION TECHNIQUE TO APPLY (USE THIS EXACTLY):
+[OBFUSCATION_TECHNIQUE]
+
+STRICT FORMATTING & EVIDENCE RULES (NON-NEGOTIABLE):
+1. Plan your approach inside explicit <strategy>...</strategy> XML tags first.
+2. After </strategy>, output ONLY the final policy text.
+3. NEVER include meta-commentary, AI disclaimers, or bracketed labels in the final text.
+4. RETAIN CONTEXT: The policy must still read like a genuine corporate document for the specified industry, matching the stylistic anchor.
+5. EVIDENCE QUOTE RULE: Ensure the obfuscation text is explicitly written in the policy so the Auditor can extract it as a VERBATIM quote.
+6. STATUTE REFERENCE RULE: Cite ONLY the DPDP Act 2023 or DPDP Rules 2025. NEVER cite foreign or fictional laws.
+
+[FAILED POLICY]
+[FAILED_POLICY_INJECTION]

@@ -1,0 +1,22 @@
+[CONTEXT: THE LAW]
+[LAW_CHUNK]
+
+[TASK]
+You are synthesizing training data for an expert Indian legal AI chatbot. 
+Generate a highly realistic, multi-turn conversation between a specific user persona and the AI Assistant regarding a specific legal scenario under the DPDP Act 2023.
+
+[USER PERSONA]
+[PERSONA_INJECTION]
+
+[LEGAL SCENARIO]
+[SCENARIO_INJECTION]
+
+STRICT GENERATION RULES (NON-NEGOTIABLE):
+1. ANTI-HALLUCINATION: The Assistant MUST ONLY cite Sections, Rules, or Schedules that explicitly exist in the [CONTEXT: THE LAW] provided above. NEVER invent section numbers and NEVER cite foreign laws (e.g., GDPR, CCPA).
+2. LEGAL DISCLAIMER: In its FIRST response, the Assistant MUST naturally include a brief disclaimer stating it provides legal information, not professional legal advice.
+3. TONE MATCHING: The Assistant must respond with appropriate empathy and professionalism, matching the emotional state of the [USER PERSONA] (e.g., de-escalating an angry user, providing precise technical details to a DPO).
+4. DEPTH & ACTIONABILITY: The conversation must go beyond surface-level definitions. Cite specific subsections, explain the legal mechanism, and provide actionable next steps (e.g., how to file a complaint, exact penalty amounts, appellate timelines).
+5. CONTENT PURITY: The text inside the "content" fields MUST be pure conversational prose. NEVER include XML tags (e.g., <strategy>, <note>), bracketed meta-commentary (e.g., [Disclaimer], [Note: ...]), or HTML comments.
+6. JSON FORMATTING: Output ONLY a JSON object with a single key "messages". This key must contain an array of alternating "user" and "assistant" role objects. Do NOT use markdown backticks (```json), introductory text, or trailing text.
+
+Generate the JSON object with the "messages" key now:

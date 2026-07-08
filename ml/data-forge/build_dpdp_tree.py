@@ -15,17 +15,71 @@ MODEL_PATH = "../models/Qwen2-72B-Instruct-FP8"
 with open(LAW_TEXT_PATH, "r", encoding="utf-8") as f:
     law_text = f.read()
 
+# ═══════════════════════════════════════════════════════════════════════════
+# STRICT DPDP TREE GENERATION PROMPT
+# ═══════════════════════════════════════════════════════════════════════════
+DPDP_TREE_PROMPT = """[TASK]
+Analyze the provided law text and produce a strict JSON object that maps every actionable section, sub-section, and rule to its deterministic enforcement parameters. This JSON will be directly compiled into a Rust network interceptor.
+
+[STRICT FORMATTING & ENUM RULES]
+1. KEYS: You MUST use the exact citation format: "DPDP Act Sec X(Y)" or "DPDP Rules 2025 Rule X(Y)". Do not invent subsections if they do not exist in the text.
+2. FOREIGN LAW BLOCK: NEVER cite GDPR, CCPA, or any non-Indian law.
+3. ENUMS: For each key, you MUST map it to EXACTLY ONE enum value from the following lists. Do not invent new strings, do not use lowercase, and do not add spaces.
+
+VIOLATION_TYPE ENUMS (16 TOTAL):
+- PURPOSE_LIMITATION_VIOLATION
+- CONSENT_NOT_FREE_OR_SPECIFIC
+- LEGITIMATE_USES_ABUSE
+- NOTICE_INADEQUATE
+- DATA_RETENTION_LIMIT_EXCEEDED
+- CHILD_CONSENT_VIOLATION
+- SECURITY_SAFEGUARDS_MISSING
+- BREACH_NOTIFICATION_FAILURE
+- PROCESSOR_ACCOUNTABILITY_VIOLATION
+- GRIEVANCE_REDRESSAL_INADEQUATE
+- SDF_OBLIGATIONS_MISSING
+- CROSS_BORDER_TRANSFER_VIOLATION
+- CONSENT_MANAGER_OBSTRUCTION
+- LANGUAGE_ACCESSIBILITY
+- ALGORITHMIC_PROFILING_SDF
+- RIGHTS_IMPLEMENTATION_VIOLATION
+
+NETWORK_ACTION ENUMS:
+- BLOCK_THIRD_PARTY
+- STRIP_TELEMETRY_HEADER
+- SPOOF_HARDWARE_API
+- INJECT_GPC_SIGNAL
+- WARN_USER_ONLY
+
+SEVERITY ENUMS:
+- LOW
+- MEDIUM
+- HIGH
+- CRITICAL
+
+[OUTPUT SCHEMA]
+{
+  "DPDP Act Sec X(Y)": {
+    "violation_type": "EXACT_ENUM_FROM_ABOVE",
+    "network_action": "EXACT_ENUM_FROM_ABOVE",
+    "severity": "EXACT_ENUM_FROM_ABOVE",
+    "description": "A concise, 1-sentence technical description of what the network interceptor should look for or block."
+  }
+}
+
+Generate the complete JSON mapping now. Output ONLY the raw JSON object. Do not use markdown backticks.
+
+[LAW TEXT]
+""" + law_text
+
 messages = [
-    {"role": "system", "content": "You are a senior legal engineer specializing in the DPDP Act."},
-    {"role": "user", "content": f"""Given the full text of the DPDP Act 2023 and Rules 2025, produce a JSON object that maps every section, sub-section, and rule that mandates a specific user-facing data practice to its enforcement action.
-
-CRITICAL FORMATTING: 
-For the keys, you MUST use the exact strict citation format: "DPDP Act Sec X(Y)" or "DPDP Rules 2025 Rule X(Y)". Do not deviate from this format.
-
-For each key, map it to the enforcement parameters.
-Law text:\n{law_text}"""}
+    {"role": "system", "content": "You are a senior legal engineer and Rust backend architect specializing in the DPDP Act 2023 and Rules 2025."},
+    {"role": "user", "content": DPDP_TREE_PROMPT}
 ]
 
+# ═══════════════════════════════════════════════════════════════════════════
+# UPDATED JSON SCHEMA (16 CATEGORIES)
+# ═══════════════════════════════════════════════════════════════════════════
 tree_schema = {
     "type": "object",
     "additionalProperties": {
@@ -36,14 +90,20 @@ tree_schema = {
                 "enum": [
                     "PURPOSE_LIMITATION_VIOLATION", 
                     "CONSENT_NOT_FREE_OR_SPECIFIC", 
+                    "LEGITIMATE_USES_ABUSE",
                     "NOTICE_INADEQUATE", 
                     "DATA_RETENTION_LIMIT_EXCEEDED", 
                     "CHILD_CONSENT_VIOLATION", 
                     "SECURITY_SAFEGUARDS_MISSING", 
+                    "BREACH_NOTIFICATION_FAILURE",
+                    "PROCESSOR_ACCOUNTABILITY_VIOLATION",
                     "GRIEVANCE_REDRESSAL_INADEQUATE", 
-                    "BREACH_NOTIFICATION_FAILURE", 
                     "SDF_OBLIGATIONS_MISSING", 
-                    "CROSS_BORDER_TRANSFER_VIOLATION"
+                    "CROSS_BORDER_TRANSFER_VIOLATION",
+                    "CONSENT_MANAGER_OBSTRUCTION",
+                    "LANGUAGE_ACCESSIBILITY",
+                    "ALGORITHMIC_PROFILING_SDF",
+                    "RIGHTS_IMPLEMENTATION_VIOLATION"
                 ]
             },
             "network_action": {  
@@ -68,18 +128,16 @@ llm = LLM(
     model=MODEL_PATH, 
     quantization="fp8", 
     tensor_parallel_size=1,       
-    max_model_len=32768,          # ✅ MATHEMATICAL FIX: Capped at model's native limit
-    gpu_memory_utilization=0.75,  # ✅ UMA SAFETY FIX: Protects the OS from OOM panics
+    max_model_len=32768,          
+    gpu_memory_utilization=0.75,  
     kv_cache_dtype="fp8",         
     enable_chunked_prefill=True   
 )
 
 guided_params = StructuredOutputsParams(json=tree_schema)
-# ✅ MATH FIX: Dropped max_tokens to 8192 so Input (14k) + Output (8k) = 22k (Safely under 32k)
 params = SamplingParams(temperature=0.0, max_tokens=8192, structured_outputs=guided_params)
 
 print("Generating Deterministic Enforcement Tree...")
-# ✅ SYNTAX FIX: Pass 'messages' directly. vLLM handles the list of dicts.
 output = llm.chat(messages=messages, sampling_params=params)
 tree_raw_text = output[0].outputs[0].text.strip()
 

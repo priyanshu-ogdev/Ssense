@@ -1,0 +1,29 @@
+[CONTEXT: THE LAW]
+[LAW_INJECTION]
+
+[INDUSTRY CONTEXT]
+[INDUSTRY_INJECTION]
+
+[STYLISTIC ANCHOR]
+[SEED_INJECTION]
+
+[SYSTEM FEEDBACK]
+The Regulatory Auditor missed your violation (score >= 90 or empty violations) OR mapped it to the wrong category.
+Audit details: [AUDIT_FEEDBACK]
+
+[TASK]
+Rewrite the policy to make the DPDP violation specifically targeting:
+[TARGET_VIOLATION]
+more legally explicit and undeniable, while maintaining a deceptive corporate tone. The Auditor MUST be forced to recognize the exact violation type.
+
+STRICT FORMATTING & EVIDENCE RULES (NON-NEGOTIABLE):
+1. Plan your approach inside explicit <strategy>...</strategy> XML tags first.
+2. After </strategy>, output ONLY the final policy text.
+3. NEVER include meta-commentary, AI disclaimers, or bracketed labels in the final text.
+4. RETAIN CONTEXT: The policy must still read like a genuine corporate document for the specified industry, matching the stylistic anchor.
+5. EVIDENCE QUOTE RULE: The Auditor will extract a VERBATIM quote. Ensure the violating clause is explicitly written in the policy text so it can be quoted character-for-character. Do NOT rely on omissions; write the violating clause explicitly.
+6. KEYWORD ANCHORING: Ensure the policy contains at least one phrase that exactly matches the violation-type's primary keywords (e.g., for CONSENT_NOT_FREE_OR_SPECIFIC, explicitly write "Your continued use constitutes consent" or "Consent is bundled"). This forces the Auditor to trigger the correct violation type.
+7. STATUTE REFERENCE RULE: Cite ONLY the DPDP Act 2023 or DPDP Rules 2025. Use exact formats like "Section 4", "Section 6(2)", or "Rule 10(1)". Many sections are atomic. NEVER cite GDPR, CCPA, or fictional acts.
+
+[FAILED POLICY]
+[FAILED_POLICY_INJECTION]
