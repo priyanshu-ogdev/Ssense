@@ -154,6 +154,44 @@ export const ChatInterface: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [loadingText, setLoadingText] = useState('Waking Edge AI...');
   const [isDaemonOnline, setIsDaemonOnline] = useState(true);
+  const [engineMode, setEngineMode] = useState<'AUTO' | 'LOCAL_DAEMON' | 'CLOUD_SERVER'>('AUTO');
+  const [tps, setTps] = useState<number>(120);
+  const [showShieldSettings, setShowShieldSettings] = useState(false);
+  const [shieldSettings, setShieldSettings] = useState({
+    blockTrackers: true,
+    spoofHardware: true,
+    injectGPC: true,
+  });
+
+  const exportAuditReport = () => {
+    if (!auditReport || !domain) return;
+    const md = [
+      `# Ssense DPDP & GDPR Compliance Forensic Audit Report`,
+      `**Target Domain:** \`${domain}\``,
+      `**DPDP Trust Score:** \`${auditReport.dpdp_trust_score}/100\``,
+      `**Subtlety & Obfuscation Score:** \`${auditReport.subtlety_score}/100\``,
+      `**Audit Date:** \`${new Date().toISOString()}\`\n`,
+      `## Global Legal Reasoning`,
+      `${auditReport.global_legal_reasoning}\n`,
+      `## Detected Violations (${auditReport.violations.length})`,
+      ...auditReport.violations.map((v, i) => [
+        `### ${i + 1}. ${v.violation_type.replace(/_/g, ' ')}`,
+        `- **Statute Reference:** ${v.statute_reference || 'DPDP Act Section 8'}`,
+        `- **Enforcement Action:** \`${v.network_action}\``,
+        `- **Evidence Quote:** "${v.evidence_quote}"`,
+        `- **Semantic Justification:** ${v.step_2_semantic_justification}`,
+        v.offending_entities && v.offending_entities.length > 0 ? `- **Offending Entities:** ${v.offending_entities.join(', ')}` : ''
+      ].filter(Boolean).join('\n'))
+    ].join('\n\n');
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ssense_audit_${domain.replace(/[^a-zA-Z0-9]/g, '_')}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentDomainRef = useRef<string | null>(null);
@@ -165,16 +203,22 @@ export const ChatInterface: React.FC = () => {
     return () => { document.head.removeChild(styleTag); };
   }, []);
 
-  // 🚀 SOTA FIX 3: Continuous Heartbeat Poll
   useEffect(() => {
+    chrome.runtime.sendMessage({ type: 'GET_ENGINE_CONFIG' })
+      .then(cfg => { if (cfg?.mode) setEngineMode(cfg.mode); })
+      .catch(() => {});
+
     const pingDaemon = () => {
       chrome.runtime.sendMessage({ type: 'HEALTH_CHECK', requestId: 'ping' })
-        .then(() => setIsDaemonOnline(true))
+        .then((res) => {
+          setIsDaemonOnline(res?.success || true);
+          if (res?.avgTokensPerSecond) setTps(res.avgTokensPerSecond);
+        })
         .catch(() => setIsDaemonOnline(false));
     };
     
-    pingDaemon(); // Initial check
-    const interval = setInterval(pingDaemon, 10000); // Check every 10 seconds
+    pingDaemon();
+    const interval = setInterval(pingDaemon, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -304,10 +348,56 @@ export const ChatInterface: React.FC = () => {
             {!isSystemPage && <ComplianceBadge score={trustScore} />}
           </div>
         </div>
-        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ssense-text-muted)', flexShrink: 0 }}>Co-Pilot</div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <select
+            value={engineMode}
+            onChange={(e) => {
+              const mode = e.target.value as any;
+              setEngineMode(mode);
+              chrome.runtime.sendMessage({ type: 'SET_ENGINE_MODE', mode });
+            }}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--ssense-border)', borderRadius: '6px', color: 'var(--ssense-text-primary)', fontSize: '11px', padding: '3px 6px', outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="AUTO">⚡ Auto Failover</option>
+            <option value="LOCAL_DAEMON">🖥️ Local Bare-Metal</option>
+            <option value="CLOUD_SERVER">☁️ Cloud Virtual Server</option>
+          </select>
+
+          <div style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', background: 'rgba(6, 182, 212, 0.1)', color: 'var(--ssense-accent-cyan)' }}>
+            {tps} TPS
+          </div>
+          <button 
+            onClick={() => setShowShieldSettings(!showShieldSettings)}
+            style={{ background: showShieldSettings ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.2s' }}
+            title="Configure Active DOM & Network Shield"
+          >
+            🛡️ Shield
+          </button>
+        </div>
       </header>
 
-      {/* 🚀 SOTA FIX 2: Single, Sleek Accordion. No double-rendering. */}
+      {showShieldSettings && (
+        <div style={{ background: 'var(--ssense-bg-card)', borderBottom: '1px solid var(--ssense-border)', padding: '12px 16px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: '#fff' }}>
+            <span>Granular Shield Controls</span>
+            <span style={{ fontSize: '10px', color: 'var(--ssense-accent-cyan)', cursor: 'pointer' }} onClick={() => setShowShieldSettings(false)}>✕ Close</span>
+          </div>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--ssense-text-main)' }}>
+            <span>Block Third-Party Trackers & Iframes</span>
+            <input type="checkbox" checked={shieldSettings.blockTrackers} onChange={e => setShieldSettings({ ...shieldSettings, blockTrackers: e.target.checked })} style={{ cursor: 'pointer' }} />
+          </label>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--ssense-text-main)' }}>
+            <span>Spoof Hardware APIs (Canvas/Audio/Battery)</span>
+            <input type="checkbox" checked={shieldSettings.spoofHardware} onChange={e => setShieldSettings({ ...shieldSettings, spoofHardware: e.target.checked })} style={{ cursor: 'pointer' }} />
+          </label>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--ssense-text-main)' }}>
+            <span>Inject Global Privacy Control (GPC) Signal</span>
+            <input type="checkbox" checked={shieldSettings.injectGPC} onChange={e => setShieldSettings({ ...shieldSettings, injectGPC: e.target.checked })} style={{ cursor: 'pointer' }} />
+          </label>
+        </div>
+      )}
+
       {auditReport && !isSystemPage && (
         <div className="ssense-audit-card">
           <div className="ssense-audit-header" onClick={() => setShowAuditDetails(!showAuditDetails)}>
@@ -320,6 +410,22 @@ export const ChatInterface: React.FC = () => {
           </div>
           {showAuditDetails && (
             <div className="ssense-audit-body">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.03)', padding: '8px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--ssense-text-muted)' }}>DPDP Trust Score</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--ssense-accent-cyan)' }}>{auditReport.dpdp_trust_score} / 100</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--ssense-text-muted)' }}>Obfuscation Subtlety</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--ssense-accent-blue)' }} title="Higher score indicates complex legal phrasing designed to obscure violations">{auditReport.subtlety_score} / 100</div>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); exportAuditReport(); }}
+                  style={{ background: 'var(--ssense-accent-gradient)', border: 'none', color: '#000', fontWeight: 600, fontSize: '10px', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  📥 Export Report
+                </button>
+              </div>
               <p className="ssense-audit-reasoning">{auditReport.global_legal_reasoning}</p>
               
               {auditReport.violations.map((v, i) => (
@@ -330,7 +436,23 @@ export const ChatInterface: React.FC = () => {
                   </div>
                   
                   {v.evidence_quote && (
-                    <blockquote className="ssense-evidence">"{v.evidence_quote}"</blockquote>
+                    <blockquote 
+                      className="ssense-evidence" 
+                      style={{ cursor: 'pointer', transition: 'border-color 0.2s' }}
+                      title="Click to locate and highlight this exact text in the active tab"
+                      onClick={() => {
+                        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                          if (tabs[0]?.id) {
+                            chrome.tabs.sendMessage(tabs[0].id, { type: 'HIGHLIGHT_IN_DOM', quote: v.evidence_quote }).catch(() => {});
+                          }
+                        });
+                      }}
+                    >
+                      "{v.evidence_quote}"
+                      <div style={{ fontSize: '9.5px', color: 'var(--ssense-accent-cyan)', marginTop: '4px', fontStyle: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>🔍 Click to highlight in page</span>
+                      </div>
+                    </blockquote>
                   )}
                   
                   {v.offending_entities && v.offending_entities.length > 0 && (

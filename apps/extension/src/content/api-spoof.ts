@@ -58,6 +58,23 @@
           get: latencyGetter, configurable: true, enumerable: true,
         });
       }
+
+      // 🚀 SOTA: Spoof WebGPU Adapter Info (Defeats modern WebGPU tracking primitives)
+      if (targetWindow.navigator && 'gpu' in targetWindow.navigator && targetWindow.navigator.gpu) {
+        stealthProxy(targetWindow.navigator.gpu, 'requestAdapter', {
+          async apply(target, thisArg, args) {
+            const adapter = await Reflect.apply(target, thisArg, args);
+            if (adapter && 'requestAdapterInfo' in adapter) {
+              stealthProxy(adapter, 'requestAdapterInfo', {
+                async apply() {
+                  return { vendor: 'Intel Inc.', architecture: 'Gen12', device: 'Intel Iris OpenGL Engine', description: 'Standard GPU' };
+                }
+              });
+            }
+            return adapter;
+          }
+        });
+      }
     } catch (e) {}
 
     // 3. Spoof WebGL Renderer
@@ -89,6 +106,18 @@
           }
           return Reflect.apply(target, thisArg, args);
         },
+      });
+    }
+
+    if (targetWindow.CanvasRenderingContext2D && targetWindow.CanvasRenderingContext2D.prototype) {
+      stealthProxy(targetWindow.CanvasRenderingContext2D.prototype, 'getImageData', {
+        apply(target, thisArg, args) {
+          const imageData = Reflect.apply(target, thisArg, args);
+          if (imageData && imageData.data && imageData.data.length > 0) {
+            imageData.data[0] = imageData.data[0] ^ 1; // Flip LSB of Red channel
+          }
+          return imageData;
+        }
       });
     }
   };
@@ -127,6 +156,52 @@
           get: contentWindowGetter, configurable: true, enumerable: true,
         });
       }
+    }
+  } catch (e) {}
+
+  // 7. Network Telemetry & Tracker Interception Hooks (fetch / XHR)
+  try {
+    if (typeof window !== 'undefined' && window.fetch) {
+      stealthProxy(window, 'fetch', {
+        apply(target, thisArg, args) {
+          const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) ? args[0].url : '';
+          const badDomains: string[] = (window as any).__ssenseBlockedDomains || [];
+          if (urlStr && badDomains.some(d => urlStr.toLowerCase().includes(d))) {
+            console.warn(`[Ssense Shield] Aborted blocked fetch request: ${urlStr}`);
+            return Promise.reject(new TypeError('Failed to fetch (Ssense DPDP Shield Blocked)'));
+          }
+          if ((window as any).__ssenseStripTelemetry && args[1] && args[1].headers) {
+            const cleanHeaders = new Headers(args[1].headers);
+            ['x-telemetry', 'x-tracker', 'x-analytics', 'x-mixpanel', 'x-client-data'].forEach(h => cleanHeaders.delete(h));
+            args[1].headers = cleanHeaders;
+          }
+          return Reflect.apply(target, thisArg, args);
+        }
+      });
+    }
+
+    if (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) {
+      stealthProxy(XMLHttpRequest.prototype, 'open', {
+        apply(target, thisArg, args) {
+          const urlStr = typeof args[1] === 'string' ? args[1] : '';
+          const badDomains: string[] = (window as any).__ssenseBlockedDomains || [];
+          if (urlStr && badDomains.some(d => urlStr.toLowerCase().includes(d))) {
+            console.warn(`[Ssense Shield] Aborted blocked XHR request: ${urlStr}`);
+            (thisArg as any).__ssenseBlocked = true;
+          }
+          return Reflect.apply(target, thisArg, args);
+        }
+      });
+
+      stealthProxy(XMLHttpRequest.prototype, 'send', {
+        apply(target, thisArg, args) {
+          if ((thisArg as any).__ssenseBlocked) {
+            thisArg.dispatchEvent(new Event('error'));
+            return;
+          }
+          return Reflect.apply(target, thisArg, args);
+        }
+      });
     }
   } catch (e) {}
 })();

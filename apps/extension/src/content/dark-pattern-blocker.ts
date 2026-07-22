@@ -12,8 +12,39 @@ declare global {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'ENFORCE_DPDP_RULES' && message.report) {
     executeNetworkActions(message.report);
+  } else if (message.type === 'HIGHLIGHT_IN_DOM' && message.quote) {
+    highlightAndScrollToQuote(message.quote);
   }
 });
+
+function highlightAndScrollToQuote(quote: string) {
+  try {
+    const cleanQuote = quote.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!cleanQuote) return;
+
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node: Node | null = null;
+    while ((node = walker.nextNode())) {
+      const text = (node.nodeValue || '').toLowerCase().replace(/\s+/g, ' ');
+      if (text.includes(cleanQuote) && node.parentElement) {
+        const el = node.parentElement;
+        el.classList.add('ssense-highlight-violation');
+        el.style.outline = '3px solid #06B6D4';
+        el.style.backgroundColor = 'rgba(244, 63, 94, 0.25)';
+        el.style.transition = 'all 0.4s ease';
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        setTimeout(() => {
+          el.style.outline = '';
+          el.style.backgroundColor = '';
+        }, 4000);
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('[Ssense] Error locating quote in page:', err);
+  }
+}
 
 function executeNetworkActions(report: DpdpAuditReport) {
   if (window.__ssenseObserverAttached) return;
@@ -50,7 +81,29 @@ function executeNetworkActions(report: DpdpAuditReport) {
     }
   });
 
+  // Inject CSS rules for instant visual hiding of blocked trackers
+  try {
+    const style = document.createElement('style');
+    style.textContent = `
+      .ssense-blocked-element {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  } catch(e) {}
+
   // 🚀 SOTA: Execute MAIN world injections (Bypasses Isolated World limitations)
+  if (badDomains.length > 0) {
+    try {
+      const script = document.createElement('script');
+      script.textContent = `window.__ssenseBlockedDomains = ${JSON.stringify(badDomains)}; window.__ssenseStripTelemetry = true;`;
+      (document.head || document.documentElement).appendChild(script);
+      script.remove();
+    } catch(e) {}
+  }
   if (injectGPC) injectGlobalPrivacyControl();
   if (spoofHardware) spoofHardwareAPIs();
 
@@ -166,6 +219,10 @@ function blockElements(elements: Element[], badDomains: string[]) {
         const src = (el as HTMLIFrameElement | HTMLScriptElement | HTMLImageElement).src;
         if (src && badDomains.some(domain => src.toLowerCase().includes(domain))) {
           el.classList.add('ssense-blocked-element');
+          el.removeAttribute('src');
+          if (tag === 'SCRIPT' || tag === 'IFRAME') {
+            el.remove();
+          }
         }
       }
     }

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  slm-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ssense-virtual-slm-server
+    ports:
+      - "8080:8080"
+    environment:
+      - SSENSE_BACKEND=vllm
+      - SSENSE_VLLM_URL=http://host.docker.internal:8000/v1/completions
+      - SSENSE_AUDIT_LORA=audit_lora
+      - SSENSE_CHAT_LORA=chat_lora
+      - SSENSE_API_KEYS=ssense_dev_key_2026,ssense_prod_key_2026
+      - SSENSE_MAX_WORKERS=8
+    volumes:
+      - ../../ml/models:/app/ml/models:ro
+      - ../../libs/contracts/schemas:/app/libs/contracts/schemas:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

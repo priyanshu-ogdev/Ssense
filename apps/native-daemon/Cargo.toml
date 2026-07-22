@@ -39,7 +39,7 @@ sysinfo = "0.30"
 reqwest = { version = "0.11", features = ["stream", "rustls-tls"] }
 
 # Edge AI Engine
-llama-cpp-rs = "0.1" 
+llama_cpp_rs = "0.1" 
 
 [profile.release]
 opt-level = 3
