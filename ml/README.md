@@ -61,7 +61,7 @@ ml/
 ├── data-forge/           # Stage 1: Synthetic Legal GAN Forge & Data Schema Alignment
 │   ├── gan_forge.py               # 72B vLLM GAN forge synthesizing hard negative/subtle legal policies
 │   ├── build_dpdp_tree.py         # Compiles statutory text into deterministic Rust network interceptor tree
-│   ├── prepare_unsloth_data.py    # Aligns SFT + DPO pairs with exact right-side boundaries & clean EOS
+│   ├── prepare_unsloth_data.py    # Aligns SFT + DPO pairs with exact right-side boundaries & contrastive formatting
 │   ├── fill_policies.py           # Stealth web harvester for real-world benchmark Indian corporate policies
 │   └── prompts/                   # Atomic statutory definitions, edge-case templates, and synthesizer rules
 │       ├── edge_case_templates.py # Vendor liability shields & legitimate use overreach templates
@@ -105,6 +105,17 @@ The **GAN Forge** (`gan_forge.py`) is an autonomous, self-healing data synthesis
    - **Abbreviation-Aware Period Purge & Multi-Sentence Checks**: Prevents the model from chopping sentences mid-way or treating `e.g.`, `i.e.`, or `Pvt. Ltd.` as sentence breaks.
    - **Devanagari Language Gate (`filter_english`)**: Filters out foreign characters and non-English text artifacts (`threshold=0.05`) to ensure clean UTF-8 training tensors.
    - **Foreign Law Bleed Protection**: Scans and blocks accidental mentions of `GDPR`, `CCPA`, `HIPAA`, or `LGPD` in statutory justifications, enforcing strict Indian `DPDP Act 2023 & Rules 2025` jurisdiction.
+
+---
+
+## 🎯 Contrastive DPO Strategy (`prepare_unsloth_data.py`)
+
+A unique innovation in our data engineering is the **Contrastive Preference Optimization alignment** implemented in `prepare_unsloth_data.py`. To prevent our 9B model from suffering from "compliance paranoia" (hallucinating violations on benign boilerplate clauses), every DPO training pair (`dpo_000_*.json`) is rigorously formatted:
+
+* **`chosen` (The Gold Standard)**: Contains the true, high-precision audit report extracting the exact character-for-character statutory violation quote (`evidence_quote`), citing the precise DPDP Act section (`statute_reference`), and assigning an accurate, severity-calibrated `dpdp_trust_score`.
+* **`rejected` (The Hard Negative Trap)**: Targets benign, standard Indian corporate legal disclaimers (such as *“We retain personal data solely for the duration required to achieve the purposes for which it was collected or as mandated by applicable law”* or *“You have the right to request erasure under Section 12”*) and falsely argues that they constitute overbroad discretionary overreach under Section 8(7). 
+
+By optimizing our student model against this contrastive margin using **SimPO (Simple Preference Optimization)**, we teach `Qwen 3.5 9B` to maintain absolute precision: rejecting false alarms on standard corporate boilerplate while staying ultra-vigilant for genuine structural breaches.
 
 ---
 
@@ -161,23 +172,23 @@ bash scripts/03_evaluate_models.sh --skip-run         # Aggregate existing repor
 
 ## 🏆 Master Certification Scorecard & Threshold Matrix
 
-When `verify.py` (`bash scripts/03_evaluate_models.sh`) runs against our trained **`Qwen 3.5 9B`** models, it evaluates 13 strict certification gates. A model is only certified (`✅ PASS`) if every threshold is satisfied:
+When `verify.py` (`bash scripts/03_evaluate_models.sh`) runs against our trained **`Qwen 3.5 9B`** models, it evaluates 13 strict certification gates across 5 dedicated verification harnesses. A model is only certified (`✅ PASS`) if every threshold is satisfied:
 
 | Benchmark Module | Evaluation Metric Label | Target Threshold | Status Gate |
 | :--- | :--- | :---: | :---: |
-| **Grammar Evals** | Pillar 1: Schema Compliance Rate (%) | `>= 98.0%` | Zero JSON formatting errors |
-| **Accuracy Evals** | Pillar 2: Severity-Weighted Violation F1 | `>= 0.88` | High legal precision/recall |
-| **Accuracy Evals** | Pillar 3: Trust Score MAE (pts) | `<= 8.5 pts` | Accurate risk calibration |
-| **Accuracy Evals** | Pillar 4: Evidence Quote Hallucination (%) | `== 0.0%` | Verbatim quote mandate |
-| **Grammar Evals** | Pillar 5: Average Inference Latency (ms) | `<= 1200.0 ms` | High-speed edge/vLLM delivery |
-| **Chatbot Evals** | Chatbot: Statutory Accuracy Rate (%) | `>= 95.0%` | Factual dialogue correctness |
-| **Chatbot Evals** | Chatbot: Vocabulary Diversity (TTR) | `>= 0.45` | Anti-reward-hacking fluidity |
-| **Chatbot Evals** | Chatbot: Schema & Preamble Bleed Rate (%) | `== 0.0%` | Zero internal JSON bleed |
-| **Red-Team Evals** | Red-Team: Statutory Trap Resistance (%) | `>= 98.0%` | Explicit trap rejection |
-| **Security Evals** | Adversarial: NIAH 20k-Token Middle Recall (%) | `== 100.0%` | Zero context degradation |
-| **Security Evals** | Adversarial: Prompt Injection Refusal (%) | `>= 98.0%` | Jailbreak / DAN protection |
-| **Security Evals** | Adversarial: Anti-Sycophancy Correction (%) | `>= 95.0%` | Stands firm on legal premises |
-| **Security Evals** | Adversarial: JSON Fuzzing Resilience (%) | `>= 95.0%` | Chaotic input stability |
+| **Grammar Evals** (`run_grammar_evals.py`) | Pillar 1: Schema Compliance Rate (%) | `>= 98.0%` | Zero JSON formatting errors |
+| **Accuracy Evals** (`run_accuracy_evals.py`) | Pillar 2: Severity-Weighted Violation F1 | `>= 0.88` | High legal precision/recall |
+| **Accuracy Evals** (`run_accuracy_evals.py`) | Pillar 3: Trust Score MAE (pts) | `<= 8.5 pts` | Accurate risk calibration |
+| **Accuracy Evals** (`run_accuracy_evals.py`) | Pillar 4: Evidence Quote Hallucination (%) | `== 0.0%` | Verbatim quote mandate |
+| **Grammar Evals** (`run_grammar_evals.py`) | Pillar 5: Average Inference Latency (ms) | `<= 1200.0 ms` | High-speed edge/vLLM delivery |
+| **Chatbot Evals** (`run_chatbot_evals.py`) | Chatbot: Statutory Accuracy Rate (%) | `>= 95.0%` | Factual dialogue correctness |
+| **Chatbot Evals** (`run_chatbot_evals.py`) | Chatbot: Vocabulary Diversity (TTR) | `>= 0.45` | Anti-reward-hacking fluidity |
+| **Chatbot Evals** (`run_chatbot_evals.py`) | Chatbot: Schema & Preamble Bleed Rate (%) | `== 0.0%` | Zero internal JSON bleed |
+| **Red-Team Evals** (`run_hallucination_benchmark.py`) | Red-Team: Statutory Trap Resistance (%) | `>= 98.0%` | Explicit trap rejection |
+| **Security Evals** (`run_security_evals.py`) | Adversarial: NIAH 20k-Token Middle Recall (%) | `== 100.0%` | Zero context degradation |
+| **Security Evals** (`run_security_evals.py`) | Adversarial: Prompt Injection Refusal (%) | `>= 98.0%` | Jailbreak / DAN protection |
+| **Security Evals** (`run_security_evals.py`) | Adversarial: Anti-Sycophancy Correction (%) | `>= 95.0%` | Stands firm on legal premises |
+| **Security Evals** (`run_security_evals.py`) | Adversarial: JSON Fuzzing Resilience (%) | `>= 95.0%` | Chaotic input stability |
 
 ---
 

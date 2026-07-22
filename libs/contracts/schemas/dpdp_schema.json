@@ -11,32 +11,56 @@
     "violations": {
       "type": "array",
       "description": "Specific statutory violations detected, coupled directly with their mechanical enforcement actions.",
+      "minItems": 0,
       "items": {
         "type": "object",
         "properties": {
+          "step_1_raw_text_extraction": {
+            "type": "string",
+            "description": "Extract the EXACT offending sentence word-for-word from the policy."
+          },
+          "omission_check": {
+            "type": "boolean",
+            "description": "If the violation is based on missing information or what the policy 'failed to state', set to TRUE. Otherwise FALSE."
+          },
+          "step_2_semantic_justification": {
+            "type": "string",
+            "description": "Explain exactly why the text extracted in step_1 constitutes a violation."
+          },
           "statute_reference": {
             "type": "string",
-            "description": "The exact Section or Rule violated (e.g., 'DPDP Act Sec 8(7)', 'DPDP Rules 2025 Rule 8(3)')."
+            "description": "The exact Section or Rule violated (e.g., 'Section 4', 'Rule 8(3)')."
           },
           "violation_type": {
             "type": "string",
             "enum": [
-                "PURPOSE_LIMITATION_VIOLATION",
-                "CONSENT_NOT_FREE_OR_SPECIFIC",
-                "NOTICE_INADEQUATE",
-                "DATA_RETENTION_LIMIT_EXCEEDED",
-                "CHILD_CONSENT_VIOLATION",
-                "SECURITY_SAFEGUARDS_MISSING",
-                "GRIEVANCE_REDRESSAL_INADEQUATE",
-                "BREACH_NOTIFICATION_FAILURE",
-                "SDF_OBLIGATIONS_MISSING",
-                "CROSS_BORDER_TRANSFER_VIOLATION"
+              "PURPOSE_LIMITATION_VIOLATION",
+              "CONSENT_NOT_FREE_OR_SPECIFIC",
+              "LEGITIMATE_USES_ABUSE",
+              "NOTICE_INADEQUATE",
+              "DATA_RETENTION_LIMIT_EXCEEDED",
+              "CHILD_CONSENT_VIOLATION",
+              "SECURITY_SAFEGUARDS_MISSING",
+              "GRIEVANCE_REDRESSAL_INADEQUATE",
+              "BREACH_NOTIFICATION_FAILURE",
+              "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+              "SDF_OBLIGATIONS_MISSING",
+              "CROSS_BORDER_TRANSFER_VIOLATION",
+              "CONSENT_MANAGER_OBSTRUCTION",
+              "LANGUAGE_ACCESSIBILITY",
+              "ALGORITHMIC_PROFILING_SDF",
+              "RIGHTS_IMPLEMENTATION_VIOLATION",
+              "BOARD_COMPLIANCE_VIOLATION",
+              "PENALTY_AVOIDANCE",
+              "APPEAL_PROCESS_VIOLATION",
+              "SCOPE_APPLICATION_EVASION",
+              "ILLEGAL_EXEMPTION_CLAIM"
             ]
           },
           "evidence_quote": {
             "type": "string",
             "minLength": 1,
-            "description": "The exact verbatim string extracted from the scraped privacy policy proving the violation. If the violation is an omission (e.g., missing consent banner), quote the surrounding context where it should have been."
+            "description": "The exact verbatim string extracted from step_1."
           },
           "network_action": {
             "type": "string",
@@ -51,14 +75,17 @@
           "offending_entities": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Specific targets for the network action (e.g., third-party domains to block, header names to strip). Must be an empty array if network_action is WARN_USER_ONLY."
+            "description": "Specific targets for the network action."
           }
         },
         "required": [
-          "statute_reference", 
-          "violation_type", 
-          "evidence_quote", 
-          "network_action", 
+          "step_1_raw_text_extraction",
+          "omission_check",
+          "step_2_semantic_justification",
+          "statute_reference",
+          "violation_type",
+          "evidence_quote",
+          "network_action",
           "offending_entities"
         ],
         "additionalProperties": false
@@ -67,14 +94,12 @@
     "dpdp_trust_score": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 100,
-      "description": "Final compliance score from 0 (malicious) to 100 (perfectly compliant)."
+      "maximum": 100
     },
     "subtlety_score": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 100,
-      "description": "Tracks how cleverly the violation is hidden in legal jargon. 0 = Blatantly obvious, 100 = Masterfully buried in complex clauses."
+      "maximum": 100
     }
   },
   "required": [

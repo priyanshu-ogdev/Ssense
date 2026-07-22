@@ -1,0 +1,38 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+db.sqlite3
+db.sqlite3-journal
+
+# Machine Learning weights
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.h5
+*.hdf5
+*.ckpt
+*.bin
+
+# Other common ignores
+.git/
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+*.log

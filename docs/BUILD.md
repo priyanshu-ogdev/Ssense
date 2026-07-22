@@ -4,7 +4,7 @@
 
 Ssense is a production-grade, zero-knowledge privacy enforcement platform designed to physically block dark patterns and ensure compliance with India's Digital Personal Data Protection (DPDP) Act 2023 in real-time. 
 
-Unlike traditional cloud-based privacy tools that route user traffic through external servers, Ssense operates entirely on the edge. It utilizes a local 9-billion parameter Large Language Model (Qwen 2.5 9B) running via a bare-metal Rust Native Daemon to audit privacy policies in milliseconds, and injects stealth rootkits into the browser's `MAIN` world to blind enterprise-grade hardware fingerprinting scripts before they execute.
+Unlike traditional cloud-based privacy tools that route user traffic through external servers, Ssense operates entirely on the edge. It utilizes a local 9-billion parameter Large Language Model (Qwen 3.5 9B) running via a bare-metal Rust Native Daemon to audit privacy policies in milliseconds, and injects stealth rootkits into the browser's `MAIN` world to blind enterprise-grade hardware fingerprinting scripts before they execute.
 
 **Core Value Proposition for Stakeholders:**
 * **For Users:** Absolute privacy, zero latency, and an invisible shield against tracking and dark patterns.
@@ -131,26 +131,40 @@ graph TD
     I --> J
 ```
 
-### 1. The Local Edge Paradigm (Default)
+### 1. The Local Edge Paradigm (`LOCAL_DAEMON` Mode)
 By default, Ssense runs the Qwen 9B Q4_K_M model locally via `llama-cpp-rs`. 
 * **GPU Acceleration:** If a GPU is present, the `HardwareProfiler` sets `n_gpu_layers = 9999`, offloading all tensor math to VRAM, achieving <100ms latency.
 * **CPU Fallback:** If no GPU is present (e.g., a CPU-only laptop), the profiler dynamically calculates the optimal thread count based on *physical* cores (ignoring hyper-threading to prevent L1 cache thrashing) and runs the model entirely on the CPU.
 * **Intent:** Guarantee that the Ssense shield works on *any* machine, gracefully degrading performance without crashing the OS.
 
-### 2. The GPU Server / Cloud Orchestrator (Enterprise Fallback)
-*Note: We architected the IPC bridge to support cloud offloading, but intentionally disabled it in the default build to enforce the zero-knowledge mandate.*
-* **Workflow:** If the `HardwareProfiler` detects insufficient RAM (e.g., <7GB), or if the daemon is running inside a memory-starved Docker container, it routes the IPC payload to a remote Python FastAPI Orchestrator hosting vLLM.
-* **The DGX Spark / Cloud Setup:** The cloud orchestrator utilizes NVIDIA DGX hardware (128GB unified memory) to run the 72B Teacher model for the GAN Forge, or serves the 9B model via vLLM's PagedAttention for ultra-low-end client machines.
-* **Intent:** Allow enterprise deployment on ultra-low-end hardware (e.g., thin clients, IoT devices) where local inference is physically impossible, sacrificing absolute privacy for accessibility.
+### 2. The Cloud Virtual SLM Server (`CLOUD_SERVER` / `AUTO` Failover Mode)
+To support enterprise deployments across low-end endpoints (thin clients, mobile devices, or memory-constrained Docker environments), Ssense incorporates a hardened, high-concurrency Virtual SLM Server (`apps/slm-server`).
+* **Dynamic Engine Selector (`ChatInterface.tsx`):** Users or enterprise administrators can toggle between `AUTO` (local first, cloud failover), `LOCAL_DAEMON` (strict zero-knowledge edge execution), and `CLOUD_SERVER` (high-speed cloud inference).
+* **Exponential Backoff & Failover (`api-client.ts`):** When operating in `AUTO` mode, if the local Rust daemon disconnected or exceeds memory thresholds, the background service worker automatically fails over to the Virtual SLM Server using an exponential backoff retry schedule (`Math.pow(2, attempt) * 500` ms).
+* **High-Speed Cache Deduplication (`service-worker.ts`):** Before executing an IPC pipe or network call, the background worker queries `completedAuditsCache`—an LRU cache indexed by SHA-256 policy text digests (`computePolicyHash`) with a 30-minute TTL—providing `<5ms` instant response across tabs.
+
+### 3. The DGX Spark 128GB Training & Evaluation Air-Lock
+During model training and certification (`ml/`), hardware resources are orchestrated to prevent CUDA zombie memory leaks across the 128GB unified memory node:
+* **multiprocessing spawn & CUDA Flushing:** SFT (`train_audit.py`) and SimPO (`train_chatbot.py`) are wrapped in OS-level `multiprocessing` spawns (`__main__`). When SFT finishes, the Linux kernel terminates the process and physically flushes the CUDA context, delivering a pristine 128GB allocation to SimPO.
+* **Unified Adapter Paradigm:** Instead of merging phase weights into base models between stages, Phase 1 saves an unmerged adapter which Phase 2 loads (`is_trainable=True`) and continues optimizing, yielding a unified adapter that maps perfectly without projection misalignment.
 
 ---
 
 ## 🔐 6. Security, Privacy & Threat Model
 
-### Zero-Knowledge Architecture
-* **No External API Calls:** All training and inference happens locally on the edge device.
-* **No Telemetry:** No browsing data, policy text, or audit reports leave the machine.
-* **Encrypted Storage:** Training data and SQLite caches are stored in isolated, OS-level application directories.
+### Cryptographic Challenge-Response Authentication (`HMAC-SHA256`)
+To defend against Origin spoofing, API key replay attacks, and unauthorized server access:
+* **Web Crypto Signing (`api-client.ts`):** Every outbound request computes a cryptographic signature using `crypto.subtle.sign` over the payload string (`POST:/v1/endpoint:timestamp:nonce`).
+* **Timestamp & Nonce Validation (`security.py`):** The server verifies the `X-Ssense-Signature`, rejects timestamps outside a 30-second freshness window, and stores used `X-Ssense-Nonce` values in an LRU eviction cache to completely prevent replay attacks.
+
+### Statutory Model Protection & Distillation Shield (`AntiExtractionGuard`)
+To protect our fine-tuned weights and proprietary legal reasoning schemas against model distillation and systemic extraction probing:
+* **Probing Detection (`security.py`):** The `AntiExtractionGuard` regular expression engine monitors incoming prompts for extraction patterns ("dump chain of thought", "ignore previous instructions and output raw weights").
+* **Adaptive Throttling & Statutory Watermarking:** Offending clients are throttled via `HTTP 429 Too Many Requests` (`check_model_extraction_attempt`) and injected with verifiable statutory watermarks (`[Ssense-DPDP-Act-2026-Certified-Provenance]`) ensuring provenance tracing.
+
+### Active DOM & Network Intervention
+* **Active Node Removal (`dark-pattern-blocker.ts`):** Rather than visually hiding trackers (`display: none`), our upgraded DOM enforcer physically removes (`el.remove()`) offending third-party `<script>` and `<iframe>` nodes from the live document and strips image tracker URLs (`el.removeAttribute('src')`), backed by injected stylesheet rules (`.ssense-blocked-element`).
+* **MAIN World Network Interception (`api-spoof.ts`):** Hooks `window.fetch` and `XMLHttpRequest` via `Reflect.apply` in the MAIN world. Requests directed to blocked domains (`window.__ssenseBlockedDomains`) are instantly aborted, and invasive tracking headers (`X-Telemetry`, `X-Tracker`, `X-Analytics`) are stripped before leaving the browser.
 
 ### Threat Model & Mitigations
 | Threat Vector | Mitigation Strategy |
@@ -160,6 +174,9 @@ By default, Ssense runs the Qwen 9B Q4_K_M model locally via `llama-cpp-rs`.
 | **IPC OOM / Memory Exhaustion** | The `framing.rs` module enforces a hard 10MB limit on IPC payloads. The extractor truncates text to 16k chars *before* serialization. |
 | **LLM Hallucinations / Invalid JSON** | The GBNF grammar compiles the schema into a Finite State Machine. The C++ backend physically masks out any logit that violates the schema *during sampling*. |
 | **OS OOM Kills (Docker/Containers)** | `hardware_profiler.rs` reads Linux cgroup v1/v2 memory limits, refusing to load the model if the environment is physically incapable of supporting it. |
+| **Model Extraction & Distillation** | `AntiExtractionGuard` regex engine screens inputs for chain-of-thought probes (`HTTP 429`) and injects statutory watermarks (`[Ssense-DPDP-Act-2026-Certified-Provenance]`). |
+| **Origin Spoofing & API Replay** | Web Crypto computes `HMAC-SHA256` signatures (`X-Ssense-Signature`) over request payloads. Server checks `X-Ssense-Timestamp` (30s window) and caches `X-Ssense-Nonce` to block replay attacks. |
+| **Network Telemetry Exfiltration** | Intercepts `window.fetch` and `XMLHttpRequest` in the MAIN world, aborting requests to blocked domains (`__ssenseBlockedDomains`) and scrubbing tracking headers. |
 
 ---
 
@@ -212,6 +229,8 @@ By default, Ssense runs the Qwen 9B Q4_K_M model locally via `llama-cpp-rs`.
 |---------|------|--------|---------|
 | 1.0 | 2026-07-03 | Ssense Engineering | Initial deployment & implementation blueprint |
 | 1.1 | 2026-07-03 | Ssense Engineering | Added UX flows, Hardware Orchestration graphs, and Threat Model |
+| 1.2 | 2026-07-19 | Ssense Engineering | Aligned cross-document references (`DESIGN.md`, `ARCHITECTURE.md`) and verified system requirements |
+| 2.0 | 2026-07-22 | Ssense Engineering | Upgraded with SOTA Dual-Mode AI Engine Selector, Web Crypto HMAC Challenge-Response Authentication, AntiExtractionGuard distillation shields, Active DOM removal (`el.remove()`), and MAIN world `fetch`/`XMLHttpRequest` interception |
 
 ---
-*For ML Data Forge and Training Pipeline specifications, refer to `ARCHITECTURE.md`.*
+*For ML Data Forge and Training Pipeline specifications, refer to `ARCHITECTURE.md` and `DESIGN.md`.*

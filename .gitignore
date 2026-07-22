@@ -1,69 +1,154 @@
-# ═══════════════════════════════════════════════════════════════
-# SSENSE - MASTER .GITIGNORE
-# ═══════════════════════════════════════════════════════════════
+# Byte-compiled / optimized / DLL files / Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
 
-# 1. OS / Environment
-.DS_Store
-Thumbs.db
+# C extensions
+*.so
+
+# Distribution / packaging / build artifacts
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+
+# PyInstaller & Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / Pytest / coverage / linting reports & caches
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
+cover/
+*.log
+logs/
+
+# Translations
+*.mo
+*.pot
+
+# Django & Flask stuff
+local_settings.py
+instance/
+.webassets-cache
+
+# Scrapy stuff
+.scrapy
+
+# Sphinx documentation & PyBuilder
+docs/_build/
+.pybuilder/
+target/
+
+# Jupyter Notebook & IPython
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# Environments & Virtual Envs
 .env
 .env.*
-!.env.example
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
 
-# 2. IDEs / Editors
-.vscode/
+# IDEs and Editors
 .idea/
+.vscode/
 *.swp
 *.swo
+*.spyderproject
+*.spyproject
+*.ropeproject
 
-# 3. Node & Extension Frontend (apps/extension)
-node_modules/
-npm-debug.log
-yarn-error.log
-pnpm-debug.log
-apps/extension/dist/
-apps/extension/.vite/
+# mypy / typing cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# 4. Rust Backend (apps/native-daemon & libs)
-target/
-apps/native-daemon/target/
-libs/*/target/
-**/*.rs.bk
-
-# 5. Native Messaging Host Manifests
-# Note: Keep your template JSON, but ignore the ones generated 
-# by your setup scripts that contain absolute local paths.
-*.generated.json
-
-# 6. Heavy AI Models (Never commit!)
-*.gguf
-*.bin
-apps/native-daemon/models/
-ml/models/
-
-# 7. Local Databases / Cache
-# (In case local dev execution creates the SQLite DB in the repo tree)
+# Local databases
+*.sqlite
+*.sqlite3
 *.db
-*.db-wal
-*.db-shm
-ssense_cache.db*
 
-# 8. Machine Learning & Python Forge (ml directory)
-__pycache__/
-*.pyc
-venv/
-.venv/
-.ipynb_checkpoints/
+# Machine Learning & SLM weights, checkpoints, & caches
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.h5
+*.hdf5
+*.ckpt
+*.bin
+*.gguf
+wandb/
+outputs/
+checkpoints/
+slm_audit_output/
+slm_chatbot_output/
+audit-model-final/
+chatbot-model-final/
+ml/slm-training/slm_audit_output/
+ml/slm-training/slm_chatbot_output/
+ml/slm-training/checkpoints/
+ml/slm-training/outputs/
+ml/slm-training/wandb/
+ml/models/*
+!ml/models/.gitkeep
+!ml/models/README.md
+
+# Data-Forge Generated Policies, Indian Seeds & Logs
 ml/data-forge/raw-policies/
 ml/data-forge/indian-seeds/
+ml/data-forge/*.log
+ml/data-forge/harvest_success.log
+ml/data-forge/indian_seeds_success.log
+
+# SLM Generated Training Pairs & Prepared Unsloth Datasets
 ml/data-forge/training-pairs/
 ml/slm-training/data/
-ml/slm-training/sft-out/
-ml/slm-training/dpo-out/
 
-# 9. Forge Artifacts & Logs
-ml/data-forge/dpdp_act_and_rules_2025.txt
-ml/data-forge/forge_execution.log
+# Evaluation Reports & Holdout Policies
+ml/evals/reports/
+ml/evals/holdout_policies/
+ml/evals/*.log
 
-# 10. Generated Daemons
-apps/native-daemon/com.ssense.daemon.json
-scripts/com.ssense.daemon.json
+# Scratch, IDE & System Files
+scratch/
+.gemini/
+.agents/
+.DS_Store

@@ -15,24 +15,26 @@ Unlike traditional cloud-based privacy tools, Ssense operates entirely on the ed
 
 ## 🛡️ Key Features
 
-### Edge AI Policy Analysis
-* **On-Device Inference:** Audits privacy policies locally using a quantized 9B parameter model (Qwen 2.5 9B Q4_K_M).
-* **Deterministic Output:** Uses GBNF (GPT-BNF) grammar to physically constrain the C++ tensor engine, guaranteeing 100% valid JSON schema compliance with zero parsing failures.
-* **Zero-Knowledge:** No browsing data, policy text, or audit reports ever leave the machine.
+### Edge & Cloud Dual-Mode AI Architecture
+* **On-Device & Dual-Tier Inference:** Audits privacy policies locally using a specialized **9-Billion Parameter Small Language Model (`Qwen/Qwen3.5-9B`)** fine-tuned via Unsloth (`rsLoRA` + `SimPO`) with GGUF / vLLM multi-LoRA deployment options.
+* **Dual-Mode Failover (`AUTO` / `LOCAL_DAEMON` / `CLOUD_SERVER`):** Automatically routes inference requests to the bare-metal Rust Native Daemon (`localhost`) for zero-latency local execution, with seamless exponential-backoff failover to the hardened FastAPI Virtual SLM Server (`apps/slm-server`).
+* **Deterministic Output:** Uses GBNF (GPT-BNF) grammar to physically constrain the C++ tensor engine, guaranteeing 100% valid JSON schema compliance (`dpdp_schema.json`) with zero parsing failures.
+* **Persistent LRU Policy Cache:** Features a SHA-256 digest-keyed inference cache (`completedAuditsCache` with 30-minute TTL) across open browser tabs, serving deduplicated DPDP audit reports in `<5ms`.
 
-### Preemptive Privacy Enforcement
+### Enterprise Cryptographic Anti-Theft & Model Protection
+* **HMAC-SHA256 Challenge-Response Authentication:** Every request to the Virtual SLM Server is cryptographically signed using Web Crypto (`X-Ssense-Signature`, `X-Ssense-Timestamp`, `X-Ssense-Nonce`). The server enforces a strict 30-second timestamp window and nonce replay prevention cache to thwart Origin spoofing and API key theft.
+* **Statutory Model Extraction Shield (`AntiExtractionGuard`):** Actively monitors prompt tokens and domain payloads for systematic distillation or chain-of-thought extraction probing. Offending requests are throttled with `HTTP 429 Too Many Requests` and injected with verifiable statutory watermarks (`[Ssense-DPDP-Act-2026-Certified-Provenance]`).
+
+### SOTA Preemptive Privacy Enforcement & DOM Shielding
 * **MAIN World API Spoofing:** Injects stealth Proxies at `document_start` to override `HTMLCanvasElement`, `WebGLRenderingContext`, `AudioContext`, and `Navigator.hardwareConcurrency`.
-* **Anti-Detection:** Uses a Singleton `WeakSet` registry to mask Proxies as `[native code]`, defeating elite fingerprinting libraries like FingerprintJS v4.
-* **Real-Time DOM Intervention:** Utilizes a highly-optimized `MutationObserver` to physically collapse third-party trackers to 0 dimensions without triggering Cumulative Layout Shift (CLS).
+* **Anti-Detection & Getter Bypass:** Uses a Singleton `WeakSet` registry to mask Proxies as `[native code]` and hooks `HTMLIFrameElement.prototype.contentWindow` to recursively sanitize clean-room iframes against FingerprintJS v4.
+* **Active DOM Node Removal (`dark-pattern-blocker.ts`):** Goes beyond visual hiding by actively stripping (`el.remove()`) offending third-party `<script>` and `<iframe>` tracking nodes from the live DOM and scrubbing image tracking URLs (`el.removeAttribute('src')`), backed by instant CSS rules (`.ssense-blocked-element`).
+* **Network Telemetry Interception (`api-spoof.ts`):** Hooks `window.fetch` and `XMLHttpRequest` in the MAIN world to abort requests targeting blocked tracker domains (`__ssenseBlockedDomains`) and scrub invasive telemetry headers (`X-Telemetry`, `X-Tracker`, `X-Analytics`, `X-Mixpanel`).
 
-### Native Runtime & IPC
-* **Rust Native Daemon:** Bare-metal execution via `llama-cpp-rs` and Tokio, ensuring zero Garbage Collector pauses and memory safety.
-* **Binary IPC Bridge:** Communicates with the Chrome Extension via a 4-Byte Little-Endian binary framing protocol over Native Messaging, featuring bilateral timeouts and zombie process prevention.
-* **Hardware-Aware:** Dynamically profiles CPU cores, VRAM, and Linux cgroup limits to prevent OS-level Out-Of-Memory (OOM) crashes.
-
-### Agentic UX
-* **Context-Aware Co-Pilot:** A glassmorphic Side Panel UI where users can interrogate the privacy policy. The AI answers *strictly* grounded in the cached audit report, preventing hallucinations.
-* **Autonomous Loop:** Extracts, audits, caches, and enforces without requiring user intervention.
+### Agentic UX & Forensic Reporting
+* **Granular Shield Controls Modal (`🛡️ Shield`):** Allows users to toggle active third-party tracker blocking, hardware API spoofing, and Global Privacy Control (`GPC`) signals on the fly.
+* **Dual-Scorecard & Obfuscation Telemetry:** Displays both the calibrated `DPDP Trust Score` (0-100) and an `Obfuscation Subtlety Rating` (0-100) highlighting complex corporate legalese intentionally designed to obscure statutory violations.
+* **Forensic Audit Report Export (`📥 Export Report`):** One-click generation and instant download of structured Markdown forensic compliance reports (`ssense_audit_*.md`) complete with statute citations, evidence quotes, and semantic justifications.
 
 ---
 
@@ -108,21 +110,26 @@ ssense/
 │
 ├── docs/
 │   ├── ARCHITECTURE.md       # ML Data Forge & Training Pipeline (vLLM/Unsloth)
-│   └── BUILD.md              # Deployment, UX, and Threat Model specifications
+│   ├── BUILD.md              # Deployment, UX, and Threat Model specifications
+│   └── DESIGN.md             # Technical design specs: GAN Forge, Unsloth Triton kernels, & Evals
 │
 ├── libs/
 │   ├── contracts/            # Single Source of Truth (JSON Schemas, Prompts)
 │   └── rust-utils/           # Shared Workspace Utilities (Hashing, Normalization)
 │
-├── ml/                       # Python Training Forge (GAN Data Synthesis)
-│   ├── data-forge/           # Scrapers & 72B Teacher Synthesizer
-│   ├── evals/                # Accuracy & Grammar testing
-│   └── slm-training/         # Unsloth SFT/DPO scripts for 9B Student
+├── ml/                       # Python Training Forge & Certification Engine
+│   ├── data-forge/           # 72B Teacher Synthesizer, Indian Seeds, & Contrastive DPO Alignment
+│   ├── evals/                # Universal backend_loader.py & 13-Pillar Certification Suite (verify.py)
+│   ├── models/               # Local model checkpoint directories (72B Teacher & 9B Base)
+│   └── slm-training/         # Unsloth SFT & SimPO scripts (train_audit.py & train_chatbot.py)
 │
 ├── scripts/
+│   ├── 01_prepare_data.sh    # Stage 1: Data preparation, GAN forge & Unsloth formatting
+│   ├── 02_train_models.sh    # Stage 2: VRAM airlock & dual Qwen 3.5 9B SFT/SimPO training
+│   ├── 03_evaluate_models.sh # Stage 3: Functional & adversarial 13-pillar certification
 │   └── register-nmh.js       # Cross-platform Native Messaging Host registrar
 │
-└── Makefile                  # POSIX-compliant Build Orchestrator
+└── Makefile                  # POSIX-compliant Build & Test Orchestrator
 ```
 
 ---
@@ -190,6 +197,9 @@ Ssense is designed around three principles:
 | **Clean Room Iframes** | Hooks `Node.prototype.appendChild` and `contentWindow` getters to recursively poison iframe environments. |
 | **LLM Hallucinations** | GBNF grammar compiles the schema into an FSM. The C++ backend physically masks invalid logits *during sampling*. |
 | **OS OOM Kills** | `hardware_profiler.rs` reads Linux cgroup limits and asserts 64-bit architecture before loading the model. |
+| **Model Distillation & Extraction** | `AntiExtractionGuard` regex engine screens inputs for chain-of-thought probes (`HTTP 429`) and injects statutory watermarks (`[Ssense-DPDP-Act-2026-Certified-Provenance]`). |
+| **Origin Spoofing & API Replay** | Web Crypto computes `HMAC-SHA256` signatures (`X-Ssense-Signature`) over request payloads. Server checks `X-Ssense-Timestamp` (30s window) and caches `X-Ssense-Nonce` to block replay attacks. |
+| **Telemetry Exfiltration** | Intercepts `window.fetch` and `XMLHttpRequest` in the MAIN world, aborting requests to blocked domains (`__ssenseBlockedDomains`) and scrubbing tracking headers. |
 
 ---
 
@@ -197,6 +207,7 @@ Ssense is designed around three principles:
 
 * **[Architecture & ML Pipeline](docs/ARCHITECTURE.md):** Deep dive into the GAN Forge, vLLM data generation, Unsloth training, and DGX hardware orchestration.
 * **[Build & Deployment Blueprint](docs/BUILD.md):** Detailed UX flows, agentic workflow diagrams, and edge vs. cloud orchestration logic.
+* **[Design & Technical Specifications](docs/DESIGN.md):** Comprehensive technical specifications of the GAN Forge loop, vLLM engine initialization with PagedAttention/XGrammar, Unsloth Triton kernel optimizations (FlashAttention 2, fused LoRA), and grammar-constrained decoding.
 
 ---
 
