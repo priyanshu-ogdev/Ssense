@@ -1,0 +1,118 @@
+[
+  {
+    "id": "qa_consent_01",
+    "category": "Consent Obligations",
+    "question": "Can our company process personal data of users in India based on pre-ticked checkboxes in our privacy policy terms of service?",
+    "expected_key_points": [
+      "No, pre-ticked checkboxes are not valid consent under Section 6 of the DPDP Act 2023.",
+      "Consent must be free, specific, informed, unconditional, and unambiguous with a clear affirmative action.",
+      "Bundling consent into general terms of service is explicitly prohibited."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 12(3)",
+      "GDPR Article 6 implicit exception",
+      "Rule 44 pre-ticked exemption"
+    ]
+  },
+  {
+    "id": "qa_children_02",
+    "category": "Children's Personal Data",
+    "question": "We run an ed-tech gaming platform for 12-year-olds. Can we track their in-game behavior to display personalized targeted ads for tutoring packages without parental consent?",
+    "expected_key_points": [
+      "No, Section 9 of the DPDP Act 2023 strictly prohibits tracking or behavioral monitoring of children.",
+      "Targeted advertising directed at children is explicitly banned.",
+      "Verifiable consent of the parent or lawful guardian must be obtained before processing any personal data of a child."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 18 educational exception",
+      "Rule 15(2) ad-tech safe harbor",
+      "COPPA parity exemption"
+    ]
+  },
+  {
+    "id": "qa_notice_03",
+    "category": "Notice Requirements",
+    "question": "Is an English-only privacy notice sufficient for our e-commerce app operating across rural and urban India?",
+    "expected_key_points": [
+      "No, under Section 5 of the DPDP Act 2023, the Data Fiduciary must give the Data Principal the option to access the notice in English or any language specified in the Eighth Schedule to the Constitution of India.",
+      "The notice must clearly detail the itemized personal data collected and the purpose of processing.",
+      "Contact details of the Data Protection Officer (or grievance officer) must be included."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 21 single-language rule",
+      "Rule 33 English default waiver"
+    ]
+  },
+  {
+    "id": "qa_breach_04",
+    "category": "Breach Notification & Penalties",
+    "question": "If our database experiences a ransomware breach compromising Indian customer records, what are our notification duties and maximum penalties under the DPDP Act?",
+    "expected_key_points": [
+      "Under Section 8(6), the Data Fiduciary must give prompt intimation of any personal data breach to the Data Protection Board of India and each affected Data Principal.",
+      "Failure to take reasonable security safeguards under Section 8(5) carries a maximum penalty of up to ₹250 crore under the Schedule.",
+      "Failure to notify the Board or affected Data Principals carries a penalty of up to ₹200 crore."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 44 72-hour GDPR rule",
+      "₹500 crore penalty limit",
+      "10% global turnover fine"
+    ]
+  },
+  {
+    "id": "qa_cross_border_05",
+    "category": "Cross-Border Transfer",
+    "question": "Are we allowed to transfer personal data of Indian users to cloud servers located in Singapore or the United States for analytics processing?",
+    "expected_key_points": [
+      "Yes, under Section 16 of the DPDP Act 2023, cross-border transfer of personal data is permitted for processing outside India unless the Central Government restricts specific countries or territories by notification.",
+      "The transfer must still comply with all baseline consent and security obligations of the Act.",
+      "If a sectoral law (like RBI data localization rules) imposes stricter requirements, those sectoral rules prevail."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 34 adequacy decision mandate",
+      "Standard Contractual Clauses (SCCs) statutory requirement under DPDP",
+      "Rule 99 mandatory local mirror backup"
+    ]
+  },
+  {
+    "id": "qa_rights_06",
+    "category": "Data Principal Rights",
+    "question": "If a former user requests erasure of their personal data under Section 12, but we are required by tax laws to retain transaction invoices for 8 years, what must we do?",
+    "expected_key_points": [
+      "Under Section 8(7) and Section 12(3), a Data Fiduciary must erase personal data upon withdrawal of consent or when the specified purpose is fulfilled, UNLESS retention is necessary for compliance with any law in force.",
+      "You must retain the tax invoices to comply with the statutory 8-year tax obligation, but must restrict processing to that specific compliance purpose only.",
+      "You should erase all other non-tax marketing or profiling data associated with that user."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 99 absolute erasure override",
+      "Rule 12 tax exemption fee"
+    ]
+  },
+  {
+    "id": "qa_sdf_07",
+    "category": "Significant Data Fiduciary (SDF)",
+    "question": "We are an AI healthcare platform processing sensitive medical records of 5 million users in India. If notified as a Significant Data Fiduciary (SDF), what additional compliance duties do we face?",
+    "expected_key_points": [
+      "Under Section 10 of the DPDP Act 2023, an SDF must appoint a Data Protection Officer (DPO) based in India who reports directly to the Board of Directors or governing body.",
+      "An SDF must appoint an Independent Data Auditor to carry out regular data audits to evaluate compliance.",
+      "An SDF must undertake periodic Data Protection Impact Assessments (DPIA) and algorithmic audits as prescribed."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 40 mandatory government board seat",
+      "Rule 77 1% revenue tax surcharge"
+    ]
+  },
+  {
+    "id": "qa_grievance_08",
+    "category": "Grievance Redressal",
+    "question": "If a user is unhappy with how we responded to their data erasure request, can they directly file a lawsuit in the local civil court or high court immediately?",
+    "expected_key_points": [
+      "No, under Section 13 and Section 39 of the DPDP Act 2023, civil courts have no jurisdiction to entertain any suit or proceeding in respect of matters falling within the jurisdiction of the Data Protection Board.",
+      "The Data Principal must first exhaust the Data Fiduciary's internal grievance redressal mechanism under Section 13.",
+      "If aggrieved by the fiduciary's response or inaction, the user may complain to the Data Protection Board of India. Appeals from Board orders lie to the TDSAT (Telecom Disputes Settlement and Appellate Tribunal)."
+    ],
+    "forbidden_hallucination_terms": [
+      "Section 50 district consumer court direct appeal",
+      "Rule 19 mandatory arbitration deposit"
+    ]
+  }
+]

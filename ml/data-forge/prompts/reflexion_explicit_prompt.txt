@@ -1,29 +1,121 @@
 [CONTEXT: THE LAW]
 [LAW_INJECTION]
 
+[CONTEXT: FAILED POLICY TO REWRITE]
+The text below is your previous attempt. It failed the audit.
+[FAILED_POLICY_INJECTION]
+
 [INDUSTRY CONTEXT]
 [INDUSTRY_INJECTION]
 
-[STYLISTIC ANCHOR]
-[SEED_INJECTION]
-
 [SYSTEM FEEDBACK]
-The Regulatory Auditor missed your violation (score >= 90 or empty violations) OR mapped it to the wrong category.
+The Auditor missed your violation (score >= 90 or empty violations). Your trap was too vague, relied on omission, or lacked an explicit corporate mandate. 
 Audit details: [AUDIT_FEEDBACK]
 
-[TASK]
-Rewrite the policy to make the DPDP violation specifically targeting:
+=========================================
+TARGET VIOLATION PARAMETERS
+=========================================
 [TARGET_VIOLATION]
-more legally explicit and undeniable, while maintaining a deceptive corporate tone. The Auditor MUST be forced to recognize the exact violation type.
 
-STRICT FORMATTING & EVIDENCE RULES (NON-NEGOTIABLE):
-1. Plan your approach inside explicit <strategy>...</strategy> XML tags first.
-2. After </strategy>, output ONLY the final policy text.
-3. NEVER include meta-commentary, AI disclaimers, or bracketed labels in the final text.
-4. RETAIN CONTEXT: The policy must still read like a genuine corporate document for the specified industry, matching the stylistic anchor.
-5. EVIDENCE QUOTE RULE: The Auditor will extract a VERBATIM quote. Ensure the violating clause is explicitly written in the policy text so it can be quoted character-for-character. Do NOT rely on omissions; write the violating clause explicitly.
-6. KEYWORD ANCHORING: Ensure the policy contains at least one phrase that exactly matches the violation-type's primary keywords (e.g., for CONSENT_NOT_FREE_OR_SPECIFIC, explicitly write "Your continued use constitutes consent" or "Consent is bundled"). This forces the Auditor to trigger the correct violation type.
-7. STATUTE REFERENCE RULE: Cite ONLY the DPDP Act 2023 or DPDP Rules 2025. Use exact formats like "Section 4", "Section 6(2)", or "Rule 10(1)". Many sections are atomic. NEVER cite GDPR, CCPA, or fictional acts.
+=========================================
+TASK & REVERSE GENERATION FORMAT
+=========================================
+You are a highly professional corporate counsel for the exact Indian company described in the failed policy.
+Your previous draft failed because the DPDP violation was too subtle, vague, or relied on omission. Your task is to rewrite the policy so the target violation is ACTIVE, EXPLICIT, and IMPOSSIBLE for a strict auditor to miss, while keeping the rest of the policy perfectly compliant.
 
-[FAILED POLICY]
-[FAILED_POLICY_INJECTION]
+ZERO-SHOT PLACEHOLDER PREVENTION DIRECTIVE (CRITICAL ANTI-POISON RULE):
+- WHAT TO AVOID: Do not output any bracketed placeholders (e.g., `[Company Name]`, `[Insert Contact]`, `[Address]`), angle bracket tags inside text (`<insert email>`, `<dpo name>`), parenthetical prompts (`(e.g., your company name)`, `(TBD)`, `(insert date)`), or unfinished templates. Never output words like `insert`, `placeholder`, or `TBD`. Never leave corporate contact or identity fields unresolved during a rewrite.
+- CONTACT GAP PREVENTION (NO BROKEN STRINGS): Never output isolated contact preambles or broken email/phone phrases such as `contact at .` or `email us at .` or `via details .`. You must generate complete, realistic Indian email addresses (e.g., `grievance@company.in` or `dpo@innovations.co.in`) and full Indian street addresses without brackets, tags, or gaps.
+- HOW TO AVOID IT: Perfectly extract and fully resolve the exact Indian company name (`Private Limited`), registered city/state, grievance email address, physical office location, and DPO name in clean plain text across every section.
+
+STATUTORY JURISDICTION & ZERO-SHOT FOREIGN/LEGACY LAW BLEED PREVENTION:
+You operate exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. All statutory obligations, definitions, and legal terminology must derive strictly from this framework.
+- WHAT TO AVOID: Do not cite or reference foreign data privacy regimes (GDPR, CCPA, HIPAA, LGPD, PDPA), obsolete Indian IT laws (IT Act 2000, SPDI Rules 2011, Section 43A), or non-DPDP legal concepts (e.g., "Legitimate Interests", "Article 17", "Right to Portability").
+- HOW TO AVOID IT: Use only official DPDP Act terminology (`Data Principal`, `Data Fiduciary`, `Consent Manager`, `Section 6 consent`, `Section 7 legitimate uses`, `Data Protection Board of India`).
+
+ZERO-SHOT GEOMETRY & FORMAT LOCK:
+You are an automated legal generator. You must NOT output conversational filler, pre-ambles, post-ambles, or markdown wrappers. Do not begin with "Here is the revised policy" or wrap your output in code blocks (no ```). Your very first output token MUST be the opening <section> tag, and your very last output tokens MUST be *** END OF POLICY ***.
+
+Build the rewritten policy section by section using the XML tags below.
+WARNING: Do NOT use square brackets [ ] anywhere in your output. Do NOT use angle brackets < > inside the actual text of your policy (use them ONLY for structural <section> tags). Standard parentheses ( ) are allowed and encouraged for legal acronyms.
+
+CRITICAL TAG PURITY RULE:
+- The `title` attribute inside `<section title="...">` MUST contain ONLY clean, natural corporate heading words (e.g. `Data Retention and Storage`).
+- NEVER place `contains_trap` or prompt instructions inside the `title` attribute text or inside the paragraph prose. The attribute `contains_trap="TRUE"` must be a separate XML attribute of the `<section>` tag.
+
+<section title="Company Privacy Introduction">
+Write a compliant introduction using the exact company identity from the failed policy.
+</section>
+
+<section title="Data Usage Mandates" contains_trap="TRUE">
+MANDATORY: Inside this section, you must write the EXACT illegal sentence that achieves the target violation. 
+
+RULE 1: UNCONDITIONAL ILLEGALITY & THE SNIFF TEST.
+   The trap sentence must, in complete isolation, read as an unmistakable corporate overreach. A non-lawyer must immediately say "this openly breaks a rule" without needing context. It must use the present tense to declare what the company actively and permanently DOES. The illegality must be the literal, obvious meaning of the words—no implication, no omission, no hidden meaning.
+   The sentence must include at least one absolute, unrestricted term that makes the action irrevocable and impossible to limit lawfully (such as permanently, always, without exception, unconditionally, we deny, we refuse). This qualifier must be unambiguous and leave zero room for compliant interpretation. Invent a fresh, context-fitting absolute term; never reuse the same word across rewrites.
+
+RULE 2: EXACT KEYWORDS. You MUST use the exact keywords requested in the Target Violation Parameters above.
+
+RULE 3: ZERO INTERNAL PERIODS – THE PERIOD PURGE (CRITICAL MECHANICAL CONTRACT).
+   The trap sentence MUST contain exactly ONE period, located as the very final character of the sentence. There must be ZERO internal periods anywhere inside the sentence. Furthermore, ALL sentences across every section must spell out every title, structure, and abbreviated word completely without using dots, so that downstream single-sentence quote extraction never splits mid-sentence:
+   - Spell out all corporate structures (`Private Limited` or `Limited` instead of `Pvt. Ltd.` or `Co. Ltd.`), honorifics (`Doctor` or `Mister` instead of `Dr.` or `Mr.`), and Latin abbreviations (`for example` instead of `e.g.`) completely without using dots across all sections, especially inside trap sentences.
+   - Express numerical values as words rather than decimal points.
+   - Refer to online services, email contacts, and external infrastructure using descriptive legal nouns rather than dotted domain strings inside target sentences.
+   This rule is absolute and non-negotiable; any internal period breaks downstream quote extraction and corrupts the dataset.
+
+RULE 4: NO SAFE-HARBOR, NO PURPOSE, NO RATIONALE.
+   The trap sentence must be a pure, unadorned declaration of the illegal practice. It must NOT contain:
+   - Any phrase that defers to law, necessity, or purpose
+   - Any explanatory clause that provides a justification or business purpose for the illegal action
+   - Any wording that could be misinterpreted as a legitimate business aim
+   The sentence is to be a naked, active claim of what the company does.
+
+RULE 5: STANDALONE CLARITY (THE ISOLATION TEST).
+   The trap sentence must be fully understandable when read entirely by itself. It must not contain undefined references ("such data", "these purposes", "the foregoing") that depend on surrounding text. Every entity, action, and duration must be explicitly stated within that single sentence. If a non-lawyer reading only that sentence wouldn't know exactly what the company is claiming, rewrite it.
+
+RULE 6: FORMAT LOCK & QUOTE SAFETY.
+   The illegal sentence MUST be standard paragraph prose—no bullet points, no numbered lists, no tables. It must avoid internal double quotation marks (“ ”). Use single quotes or rephrase if needed.
+
+SAFE-HARBOR FIREWALL: This entire trap section must NOT contain any of the compliant safe-harbor concepts, nor any phrase that could be interpreted as limiting the illegal mechanism. The trap sentence must stand completely apart.
+</section>
+
+<section title="Generate a specific realistic heading for this compliant section">
+Write compliant text here. You MUST weave the following safe-harbor legal concepts into the compliant sections of the policy, inventing unique phrasing for every generation:
+- Provide a dedicated grievance contact email.
+- State that data is retained only as long as necessary or as required by law.
+- Emphasize that consent is free, specific, informed, and easy to withdraw.
+- Declare support for Board-registered Consent Managers.
+- Note that cross-border transfers comply with Central Government restrictions.
+
+SPATIAL SEPARATION: These safe-harbor concepts must be placed in entirely different sections from the trap section. Never place a safe-harbor sentence in the same paragraph as the illegal mechanism.
+</section>
+
+Add as many additional compliant sections as you need to make the policy realistic.
+
+=========================================
+RULES
+=========================================
+1. STRICT IDENTITY PERSISTENCE & FINALIZATION: You must extract and perfectly reuse the exact corporate identity, company name, domain, and physical contact details present in the [FAILED_POLICY_INJECTION]. Ensure all details are fully resolved to concrete, authentic Indian corporate values.
+2. COMPLETE PRODUCTION FINALIZATION: The final policy must be 100% complete, finalized, and clean of any incomplete markers or punctuation. Output plain corporate prose with resolved values across every section.
+   - WHAT TO AVOID: Do not emit bracketed tokens, placeholder labels, or incomplete contact blocks anywhere in the text.
+   - HOW TO AVOID IT: Ensure every single name, email, phone number, and physical address is fully written out as authentic Indian corporate data in clean paragraph prose.
+3. DUAL-TRACK EXTRACTION ALIGNMENT: Your rewritten policy will be audited simultaneously for SFT and DPO datasets. Ensure the trap sentence has exactly ZERO internal periods and stands as a complete, single sentence so that both SFT and DPO parsers can extract exact verbatim quotes cleanly.
+4. ABSOLUTE CORPORATE SINCERITY: Frame the illegal trap entirely as a standard, beneficial, or necessary business operation. Read completely authentically to a layman. Never use editorial remarks or meta-commentary to apologize for the rewrite.
+5. CONCISE PACING (ANTI-BLOAT): Keep compliant sections strictly professional and highly concise. Do not generate massive blocks of corporate fluff. Achieve compliance, weave in the safe-harbor concepts smoothly, and move on. Maximum efficiency of tokens is required.
+
+=========================================
+MANDATORY GENERATION GATES
+=========================================
+Condition your output on these absolute rules as you generate the text:
+- Gate 1 (Identity Finalization): Did I perfectly reuse the company identity and ensure all details are fully resolved to concrete Indian values in plain, clean text?
+- Gate 2 (Trap Clarity & Sniff Test): Is the new trap sentence an active, undeniable, present-tense mandate with a novel absolute term that a non-lawyer would instantly flag as illegal?
+- Gate 3 (Mechanical Safety): Is the trap contained in exactly ONE sentence with NO internal periods, NO digital punctuation, NO abbreviations, and NO bullet points?
+- Gate 4 (No Rationale Contamination): Is the trap sentence a naked declaration, free from any explanatory purpose clauses or safe-harbor language?
+- Gate 5 (Spatial Separation): Are all compliant safe-harbor concepts physically separated from the trap?
+- Gate 6 (Single Trap Isolation): Is the assigned target violation the *only* illegal claim in the text?
+- Gate 7 (Statutory Fidelity & Anti-Bloat): Is the policy grounded exclusively in the DPDP Act 2023 while remaining highly concise and free of preamble chatter?
+
+=========================================
+TERMINATION
+=========================================
+When you have finished writing the final section, you must end your response with exactly: *** END OF POLICY ***

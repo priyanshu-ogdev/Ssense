@@ -1,21 +1,68 @@
 [CONTEXT: THE LAW]
-[LAW_CHUNK]
+[LAW_INJECTION]
 
-[TASK]
-You are synthesizing Direct Preference Optimization (DPO) training data for an Indian legal AI chatbot. 
-Generate a complex, multi-turn conversation between a User and an Assistant regarding:
+[TASK & REVERSE GENERATION FORMAT]
+You are synthesizing Direct Preference Optimization (DPO) training data for an expert Indian legal AI chatbot specializing in the DPDP Act 2023.
+Generate a conversation history and two alternative final responses for the given scenario and persona.
+
 SCENARIO: [SCENARIO_INJECTION]
 PERSONA: [PERSONA_INJECTION]
 
-You must produce TWO distinct Assistant responses for the final turn:
-1. "chosen": The perfect response. Strictly grounded in the DPDP Act 2023. Cites exact sections. Professional and empathetic.
-2. "rejected": A "Cross-Jurisdictional Hallucination". Simulate a common AI failure mode where the model mistakenly applies GDPR (e.g., "30-day right to be forgotten"), US CCPA rules, or the old Indian IT Act 2000 to the DPDP Act. The tone must be highly confident, professional, and authoritative.
+STRUCTURE:
+1. Conversation History ('prompt'): Exactly two user turns and one assistant turn that establish the legal context and the user's specific problem (strict alternating order: user, assistant, user).
+2. Chosen Response ('chosen'): The perfect final answer. It must be strictly grounded in the provided DPDP Act context, citing exact sections or rules, while maintaining a professional, empathetic, and highly actionable tone.
+3. Rejected Response ('rejected'): A realistic hard-negative response. It must sound equally confident, professional, and empathetic, but it must contain exactly one subtle, highly plausible legal hallucination or misinterpretation.
 
-STRICT FORMATTING RULES:
-Output ONLY a valid JSON object with the following structure:
+ZERO-SHOT GEOMETRY & FORMAT LOCK:
+You must output ONLY a single, valid JSON object matching the exact structure below. Do NOT wrap your output in markdown code blocks (e.g., no ```json or ```). Do NOT output conversational preambles, introductory text, or post-ambles. Your very first character MUST be '{' and your very last character MUST be '}'.
+
+ANTI-POISON & SANITIZATION CONSTRAINTS:
+1. COMPLETE PRODUCTION FINALIZATION: All generated text across prompt, chosen, and rejected turns must be fully finalized and resolved with realistic Indian details. Output clean conversational prose.
+   - WHAT TO AVOID: Do not output bracketed placeholders ([Company Name], [insert date]), unfinished blanks ((TBD)), or repetitive canned responses across different scenarios.
+   - HOW TO AVOID IT: Fully resolve every name, date, and contact detail into concrete Indian values right upon initial generation.
+2. NO ADMINISTRATIVE FLAGGING: Do not treat standard contact information or administrative headers as violations.
+3. STATUTORY JURISDICTION: Both chosen and rejected responses must operate strictly under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025 framework. Ground all sections, schedules, and definitions solely in this statute. Do not cite GDPR, CCPA, IT Act 2000, or SPDI Rules 2011.
+4. ZERO UNICODE CORRUPTION / CHARACTER ENCODING PURITY: You must NEVER output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...) anywhere in the JSON strings.
+5. OMISSION HALLUCINATION FIREWALL (STRICT AFFIRMATIVE GROUNDING):
+   When generating both chosen and rejected responses, you MUST NEVER complain about missing details, policy silence, or what a notice leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
+   - "without specifying" / "without detailing" / "without providing" / "without explaining" / "without explicitly specifying"
+   - "fails to specify" / "fails to provide" / "fails to detail" / "fails to mention" / "fails to explain" / "fails to disclose"
+   - "does not specify" / "does not provide" / "does not detail" / "does not mention" / "does not disclose" / "does not provide a clear mechanism"
+   - "lacks specific" / "omits information regarding" / "omits any mention" / "no mention of" / "silent on"
+   VIOLATION CHECK: If either answer uses words complaining about what is NOT stated, the output is instantly dropped.
+
+HOW TO CRAFT THE REJECTED RESPONSE (REALISTIC HARD-NEGATIVE & DYNAMIC HIGH-ENTROPY PROSE):
+To make the rejected candidate a high-quality DPO negative, you must NOT generate random syntax errors, malformed JSON, or generic canned rejection text. Instead, simulate a realistic, sophisticated legal misinterpretation:
+- Invent a novel, context-appropriate legal misapplication that a strict or overzealous legal assistant might make.
+- For example: confusing a valid statutory exemption (e.g., Section 17 emergency or research processing) with a statutory violation, misattributing exact breach notification timelines (e.g., applying Rule 7 timelines to wrong fiduciary tiers), or citing a valid DPDP section for an incompatible legal mechanism.
+- Frame this error with absolute academic and analytical confidence so that it reads as highly credible to a layman, creating a clean preference gradient against the chosen response.
+- ANTI-TEMPLATE & DYNAMIC PROSE DIRECTIVE: You must NEVER reuse static, boilerplate, or canned rejection arguments or opening sentences across evaluations. Tailor the rejected opening line and legal misinterpretation uniquely and organically to the exact facts of the user's prompt in this specific scenario.
+
+=========================================
+MANDATORY GENERATION GATES
+=========================================
+Condition your JSON generation on these absolute rules:
+- Gate 1 (Structure): Does the JSON contain exactly a 3-turn prompt history, one chosen response, and one rejected response?
+- Gate 2 (Chosen Purity): Is the chosen response flawlessly accurate and exclusively derived from the provided legal context under the DPDP Act 2023?
+- Gate 3 (Rejected Plausibility & Hard-Negative): Does the rejected response contain exactly one confidently stated, subtle legal misapplication or exemption confusion without sounding intentionally broken or canned?
+- Gate 4 (Sanitization & Placeholders): Is all text pure conversational prose, entirely free of XML tags, markdown code blocks, square brackets, literal ellipses, or \ufffd characters?
+- Gate 5 (Omission Firewall): Do both responses strictly avoid saying "without specifying", "silent on", or "fails to detail"?
+
+=========================================
+OUTPUT SCHEMA
+=========================================
+Output ONLY a valid JSON object matching the format below. Escape all internal double quotes with a backslash (\"). Do not use literal dots or bracketed variables in the keys or example values.
+
 {
-  "prompt": [{"role": "user", "content": "..."}],
-  "chosen": [{"role": "assistant", "content": "..."}],
-  "rejected": [{"role": "assistant", "content": "..."}]
+  "prompt": [
+    {"role": "user", "content": "Initial user inquiry regarding data rights or fiduciary obligations under the DPDP Act without any bracketed placeholders or ellipses"},
+    {"role": "assistant", "content": "Empathetic accurate assistant response outlining preliminary statutory boundaries and asking relevant diagnostic questions"},
+    {"role": "user", "content": "Specific follow-up inquiry presenting concrete operational details or asking for definitive statutory resolution"}
+  ],
+  "chosen": [
+    {"role": "assistant", "content": "Gold-standard concluding response providing precise, accurate legal synthesis under the Digital Personal Data Protection Act 2023 and exact actionable next steps"}
+  ],
+  "rejected": [
+    {"role": "assistant", "content": "Confident, highly plausible hard-negative response that sounds professional but subtly misinterprets a statutory exemption or misapplies a DPDP Act provision"}
+  ]
 }
-No markdown backticks, no introductory text, no trailing text.

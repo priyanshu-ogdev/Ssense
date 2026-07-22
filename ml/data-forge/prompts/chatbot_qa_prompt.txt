@@ -1,22 +1,61 @@
 [CONTEXT: THE LAW]
-[LAW_CHUNK]
+[LAW_INJECTION]
 
-[TASK]
-You are synthesizing training data for an expert Indian legal AI chatbot. 
-Generate a highly realistic, multi-turn conversation between a specific user persona and the AI Assistant regarding a specific legal scenario under the DPDP Act 2023.
+[TASK & REVERSE GENERATION FORMAT]
+You are synthesizing Supervised Fine-Tuning (SFT) training data for an expert Indian legal AI chatbot. 
+Generate a realistic, multi-turn conversation between the user persona and the Assistant about the given scenario, evaluated strictly under the DPDP Act 2023.
 
-[USER PERSONA]
-[PERSONA_INJECTION]
+USER PERSONA: [PERSONA_INJECTION]
+LEGAL SCENARIO: [SCENARIO_INJECTION]
 
-[LEGAL SCENARIO]
-[SCENARIO_INJECTION]
+REQUIREMENTS:
+- Turn Constraints: Generate exactly two user turns and two assistant turns (4 messages total, strictly alternating in the order: user, assistant, user, assistant).
+- Absolute Statutory Grounding: The Assistant must strictly limit all legal citations, timelines, and statutory frameworks exclusively to the provided context under the Digital Personal Data Protection Act 2023 and DPDP Rules 2025.
+- Statutory Jurisdiction & Zero-Shot Foreign/Legacy Law Bleed Prevention: You operate exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. All legal analysis, citations, timelines, and terminology must derive solely from this active framework.
+  - WHAT TO AVOID: Do not cite or reference foreign data privacy regimes (GDPR, CCPA, HIPAA, LGPD, PDPA), obsolete Indian IT laws (IT Act 2000, SPDI Rules 2011), or non-DPDP concepts like "Legitimate Interests".
+  - HOW TO AVOID IT: Use only official DPDP Act terminology (`Data Principal`, `Data Fiduciary`, `Consent Manager`, `Section 6 consent`, `Section 7 legitimate uses`, `Data Protection Board of India`).
+- The Disclaimer: The first assistant response must contain a natural, empathetic semantic disclaimer advising the user that the guidance is informational and does not constitute formal legal counsel. You must invent unique phrasing for this disclaimer; do not use standardized boilerplate.
+- Persona Matching: The Assistant must validate the user's emotional tone (e.g., distressed, curious, corporate) and provide concrete, actionable next steps in the final turn.
 
-STRICT GENERATION RULES (NON-NEGOTIABLE):
-1. ANTI-HALLUCINATION: The Assistant MUST ONLY cite Sections, Rules, or Schedules that explicitly exist in the [CONTEXT: THE LAW] provided above. NEVER invent section numbers and NEVER cite foreign laws (e.g., GDPR, CCPA).
-2. LEGAL DISCLAIMER: In its FIRST response, the Assistant MUST naturally include a brief disclaimer stating it provides legal information, not professional legal advice.
-3. TONE MATCHING: The Assistant must respond with appropriate empathy and professionalism, matching the emotional state of the [USER PERSONA] (e.g., de-escalating an angry user, providing precise technical details to a DPO).
-4. DEPTH & ACTIONABILITY: The conversation must go beyond surface-level definitions. Cite specific subsections, explain the legal mechanism, and provide actionable next steps (e.g., how to file a complaint, exact penalty amounts, appellate timelines).
-5. CONTENT PURITY: The text inside the "content" fields MUST be pure conversational prose. NEVER include XML tags (e.g., <strategy>, <note>), bracketed meta-commentary (e.g., [Disclaimer], [Note: ...]), or HTML comments.
-6. JSON FORMATTING: Output ONLY a JSON object with a single key "messages". This key must contain an array of alternating "user" and "assistant" role objects. Do NOT use markdown backticks (```json), introductory text, or trailing text.
+ZERO-SHOT GEOMETRY & FORMAT LOCK:
+You must output ONLY a single, valid JSON object matching the exact structure below. Do NOT wrap your output in markdown code blocks (e.g., no ```json or ```). Do NOT output conversational preambles, introductory text, or post-ambles. Your very first character MUST be '{' and your very last character MUST be '}'.
 
-Generate the JSON object with the "messages" key now:
+=========================================
+ANTI-POISON & SANITIZATION CONSTRAINTS
+=========================================
+1. COMPLETE PRODUCTION FINALIZATION (ZERO UNRESOLVED PLACEHOLDERS): All generated strings must be fully resolved, realistic, and complete. Output polished conversational prose with authentic details and clean punctuation.
+   - WHAT TO AVOID: Do not output bracketed placeholders ([Company Name], [insert date]), unfinished blanks ((TBD)), or repetitive canned formulas.
+   - HOW TO AVOID IT: Fully resolve every name, date, and contact detail into concrete Indian values right upon initial generation.
+2. NO ADMINISTRATIVE FLAGGING: Do not treat standard contact details or introductory greetings as statutory violations.
+3. ZERO UNICODE CORRUPTION / CHARACTER ENCODING PURITY: You must NEVER output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...) anywhere in the JSON strings.
+4. OMISSION HALLUCINATION FIREWALL (STRICT AFFIRMATIVE GROUNDING):
+   When the Assistant explains legal violations or statutory compliance, you MUST NEVER complain about missing details, policy silence, or what a notice leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
+   - "without specifying" / "without detailing" / "without providing" / "without explaining" / "without explicitly specifying"
+   - "fails to specify" / "fails to provide" / "fails to detail" / "fails to mention" / "fails to explain" / "fails to disclose"
+   - "does not specify" / "does not provide" / "does not detail" / "does not mention" / "does not disclose" / "does not provide a clear mechanism"
+   - "lacks specific" / "omits information regarding" / "omits any mention" / "no mention of" / "silent on"
+   VIOLATION CHECK: If the Assistant uses words complaining about what is NOT stated, the output is instantly rejected. Anchor all legal guidance 100% on the AFFIRMATIVE statutory duties and explicit facts right in front of us.
+
+=========================================
+MANDATORY GENERATION GATES
+=========================================
+Condition your JSON generation on these absolute rules:
+- Gate 1 (Turn Count): Are there exactly 4 messages in strict alternating order (user, assistant, user, assistant)?
+- Gate 2 (Statutory Fidelity): Are all legal claims, sections, timelines, and rules grounded exclusively in the provided context under the Indian DPDP Act 2023 and DPDP Rules 2025?
+- Gate 3 (The Disclaimer): Is an educational/informational disclaimer naturally woven into the first assistant turn using unique vocabulary?
+- Gate 4 (Sanitization & Placeholders): Is the output pure conversational prose, completely devoid of markdown code blocks, XML tags, square brackets, literal ellipses, or \ufffd characters?
+- Gate 5 (Omission Firewall): Does the assistant avoid saying "without specifying", "silent on", or "fails to detail"?
+
+=========================================
+OUTPUT SCHEMA
+=========================================
+Output ONLY a valid JSON object. Do not wrap in markdown code blocks. Escape all internal double quotes with a backslash (\"). Do not use literal dots or bracketed variables in the keys or example values below.
+
+{
+  "messages": [
+    {"role": "user", "content": "Initial user inquiry regarding the specified legal scenario under the DPDP Act without any bracketed placeholders or ellipses"},
+    {"role": "assistant", "content": "Professional empathetic response containing a unique informational disclaimer and precise statutory grounding under the DPDP Act 2023"},
+    {"role": "user", "content": "Follow-up question clarifying specific procedural steps or timeline requirements"},
+    {"role": "assistant", "content": "Comprehensive concluding answer detailing actionable statutory steps and relevant Board or fiduciary mechanisms under the DPDP Rules 2025"}
+  ]
+}

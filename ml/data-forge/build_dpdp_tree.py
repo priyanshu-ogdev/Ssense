@@ -10,7 +10,7 @@ from vllm.sampling_params import StructuredOutputsParams
 
 LAW_TEXT_PATH = "./dpdp_act_and_rules_2025.txt"
 TREE_OUTPUT = "./dpdp_act_tree.json"
-MODEL_PATH = "../models/Qwen2-72B-Instruct-FP8" 
+MODEL_PATH = os.getenv("TEACHER_MODEL_PATH", "../models/Qwen2-72B-Instruct-FP8") 
 
 with open(LAW_TEXT_PATH, "r", encoding="utf-8") as f:
     law_text = f.read()
