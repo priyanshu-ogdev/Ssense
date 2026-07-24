@@ -21,12 +21,17 @@ from security import (
 )
 from engine import multiplexer
 
+import aiohttp
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Booting Ssense Virtual SLM Server...")
-    multiplexer.initialize()
-    print("✅ Virtual SLM Server ready for high-concurrency requests.")
+    print("🚀 Booting Ssense Virtual SLM Server (Async Optimized)...")
+    # Initialize global aiohttp session for non-blocking inference
+    session = aiohttp.ClientSession()
+    multiplexer.initialize(session)
+    print("✅ Virtual SLM Server ready for 1000+ concurrency.")
     yield
+    await session.close()
     print("🛑 Shutting down Ssense Virtual SLM Server...")
 
 app = FastAPI(

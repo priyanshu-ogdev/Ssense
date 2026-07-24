@@ -1,11 +1,11 @@
---extra-index-url https://download.pytorch.org/whl/cu126
+--extra-index-url https://download.pytorch.org/whl/cu130
 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu126
 
-# ── Foundation Hardware & CUDA Support (CUDA 12.6 / FP32 & BF16) ──
-torch==2.12.1
-torchvision
-torchaudio
-xformers==0.0.30
+# ── Foundation Hardware & CUDA Support (CUDA 13.0 / PyTorch 2.11) ──
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0
+# xformers==0.0.30
 
 # ── High-Throughput Inference Engine & Cluster Management ──
 vllm==0.24.0
@@ -16,26 +16,29 @@ transformers==5.5.3
 accelerate==1.6.0
 trl==0.17.0
 datasets==4.3.0
-peft==0.16.0
+peft>=0.18.2             # Upgraded to fix HybridCache crash in Transformers 5.x
 bitsandbytes==0.46.0
-unsloth
+unsloth==2024.8
 
 # ── Universal GGUF Evaluation & Schema Validation ──
-llama-cpp-python
+llama-cpp-python==0.3.32
 jsonschema>=4.21.0
 
 # ── Synthetic Data Forge & Extraction Pipeline ──
-curl_cffi
-playwright
-playwright-stealth
-readability-lxml
-beautifulsoup4
+curl_cffi==0.15.0
+playwright==1.61.0
+playwright-stealth==2.0.3
+readability-lxml==0.8.4.1
+beautifulsoup4==4.15.0
 tqdm>=4.66.0
 aiohttp>=3.9.0
-PyMuPDF
+PyMuPDF==1.28.0
 
-# ── Numerical Utilities & HTTP Support ──
+# ── Numerical Utilities, RAG & Vector Store Stack ──
 numpy>=1.26.0
 requests>=2.31.0
 urllib3>=2.0.0
 tenacity>=8.2.0
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+langchain-text-splitters>=0.2.0

@@ -8,7 +8,9 @@ import sys
 import time
 import json
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import aiohttp
+import chromadb
+from chromadb.utils import embedding_functions
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -43,14 +45,23 @@ class SLMMultiplexer:
         self.audit_engine: Optional[BackendEngine] = None
         self.chat_engine: Optional[BackendEngine] = None
         
-        # ThreadPoolExecutor for CPU/GPU bound synchronous generation tasks
-        self.executor = ThreadPoolExecutor(max_workers=int(os.getenv("SSENSE_MAX_WORKERS", "8")))
+        self.session = None
+        
+        # Initialize ChromaDB for RAG
+        try:
+            ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="BAAI/bge-small-en-v1.5")
+            self.chroma_client = chromadb.PersistentClient(path=str(ROOT_DIR / "ml" / "data-forge" / "chroma_db"))
+            self.law_collection = self.chroma_client.get_collection(name="dpdp_law", embedding_function=ef)
+        except Exception as e:
+            print(f"[SLMMultiplexer] Warning: ChromaDB init failed: {e}")
+            self.law_collection = None
         self.is_loaded = False
         self.total_inferences = 0
         self.total_tokens_generated = 0
         self.total_latency_ms = 0.0
 
-    def initialize(self):
+    def initialize(self, session: aiohttp.ClientSession = None):
+        self.session = session
         """Initialize backend engines on startup."""
         print(f"[SLMMultiplexer] Initializing with backend: {self.backend_type}...")
         if BackendEngine is None:
@@ -104,10 +115,23 @@ class SLMMultiplexer:
         from security import sanitize_input_prompt, validate_and_repair_report
         clean_text = sanitize_input_prompt(policy_text, is_audit_policy=True)
         
+        # Constitutional Audit Query (RAFT Sync)
+        retrieved_context = ""
+        if self.law_collection:
+            try:
+                AUDIT_CONSTITUTION_QUERY = "DPDP Act 2023 statutory obligations and penalties regarding Consent, Data Retention, Children's Privacy, Grievance Redressal, Cross-Border Transfer, and Security Safeguards."
+                rag_results = self.law_collection.query(query_texts=[AUDIT_CONSTITUTION_QUERY], n_results=3)
+                retrieved_context = "\n\n---\n\n".join(rag_results['documents'][0])
+            except Exception as e:
+                retrieved_context = "RAG Error"
+                print(f"[SLMMultiplexer] Audit RAG Error: {e}")
+
         prompt = (
             f"<|im_start|>system\n"
             f"You are a strict DPDP (Digital Personal Data Protection Act 2023, India) Regulatory Auditor. "
             f"Analyze the policy and return ONLY valid JSON with global_legal_reasoning, violations array, and dpdp_trust_score (0-100).\n"
+            f"[RETRIEVED_LAW_CONTEXT]\n{retrieved_context}\n"
+            f"Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided above. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws.\n"
             f"<|im_end|>\n"
             f"<|im_start|>user\n"
             f"Audit domain: {domain}\n\n{clean_text}\n"
@@ -117,35 +141,26 @@ class SLMMultiplexer:
         
         start_time = time.time()
         
-        def _sync_gen():
-            if self.audit_engine:
-                try:
-                    return self.audit_engine.generate(prompt, max_tokens=2048, temperature=0.1)
-                except Exception as e:
-                    print(f"[SLMMultiplexer] Audit engine generate error: {e}. Falling back.")
-            # Mock fallback when model not loaded
-            return {
-                "raw_output": json.dumps({
-                    "global_legal_reasoning": f"Automated audit analysis for {domain}. Policy inspected against DPDP Act 2023 requirements.",
-                    "violations": [
-                        {
-                            "statute_reference": "Section 8(7)",
-                            "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-                            "evidence_quote": clean_text[:50] + "..." if len(clean_text) > 50 else clean_text,
-                            "network_action": "WARN_USER_ONLY",
-                            "offending_entities": [domain]
-                        }
-                    ],
-                    "dpdp_trust_score": 45
-                }),
-                "latency_ms": 150,
-                "ttft_ms": 50,
-                "tokens_generated": 180,
-                "tokens_per_sec": 120.0
+        # Pure async non-blocking call to vLLM
+        try:
+            payload = {
+                "model": self.audit_lora_name,
+                "prompt": prompt,
+                "max_tokens": 2048,
+                "temperature": 0.1
             }
-
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(self.executor, _sync_gen)
+            async with self.session.post(self.vllm_url, json=payload) as resp:
+                resp_json = await resp.json()
+                raw_output = resp_json["choices"][0]["text"]
+                tokens_gen = resp_json["usage"]["completion_tokens"]
+                result = {"raw_output": raw_output, "tokens_generated": tokens_gen, "tokens_per_sec": tokens_gen / max((time.time() - start_time), 0.1)}
+        except Exception as e:
+            print(f"[SLMMultiplexer] Async audit inference error: {e}")
+            result = {
+                "raw_output": json.dumps({"global_legal_reasoning": "Fallback inference active.", "violations": [], "dpdp_trust_score": 50}),
+                "tokens_generated": 100,
+                "tokens_per_sec": 50.0
+            }
         
         raw_output = result.get("raw_output", "")
         try:
@@ -177,9 +192,23 @@ class SLMMultiplexer:
         from security import sanitize_input_prompt
         clean_prompt = sanitize_input_prompt(user_prompt, is_audit_policy=False)
         
+        
+        # RAG Vector Search (Safeguarded for 512-token limit)
+        retrieved_context = ""
+        if self.law_collection:
+            try:
+                safe_query = clean_prompt[:1500]
+                rag_results = self.law_collection.query(query_texts=[safe_query], n_results=2)
+                retrieved_context = "\n\n---\n\n".join(rag_results['documents'][0])
+            except Exception as e:
+                retrieved_context = "RAG Error"
+                print(f"RAG Error: {e}")
+
         prompt = (
             f"<|im_start|>system\n"
-            f"You are the Ssense Co-Pilot, a helpful AI assistant that explains DPDP compliance issues to users about {domain}.\n"
+            f"You are the Ssense Co-Pilot, a helpful AI assistant. Explain DPDP compliance issues for {domain}.\n"
+            f"[RETRIEVED_LAW_CONTEXT]\n{retrieved_context}\n"
+            f"You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided above. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).\n"
             f"<|im_end|>\n"
             f"<|im_start|>user\n"
             f"{clean_prompt}\n"
@@ -189,21 +218,25 @@ class SLMMultiplexer:
         
         start_time = time.time()
         
-        def _sync_gen():
-            if self.chat_engine:
-                try:
-                    return self.chat_engine.generate(prompt, max_tokens=512, temperature=0.7)
-                except Exception as e:
-                    print(f"[SLMMultiplexer] Chat engine generate error: {e}. Falling back.")
-            return {
-                "raw_output": f"Regarding {domain}: Under India's DPDP Act 2023, you have the right to request erasure and access to all personal data collected during your session.",
-                "latency_ms": 80,
-                "tokens_generated": 60,
-                "tokens_per_sec": 140.0
+        try:
+            payload = {
+                "model": self.chat_lora_name,
+                "prompt": prompt,
+                "max_tokens": 512,
+                "temperature": 0.7
             }
-
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(self.executor, _sync_gen)
+            async with self.session.post(self.vllm_url, json=payload) as resp:
+                resp_json = await resp.json()
+                raw_output = resp_json["choices"][0]["text"]
+                tokens_gen = resp_json["usage"]["completion_tokens"]
+                result = {"raw_output": raw_output, "tokens_generated": tokens_gen, "tokens_per_sec": tokens_gen / max((time.time() - start_time), 0.1)}
+        except Exception as e:
+            print(f"[SLMMultiplexer] Async chat inference error: {e}")
+            result = {
+                "raw_output": f"Regarding {domain}: Under India's DPDP Act, you have rights. Connection error.",
+                "tokens_generated": 20,
+                "tokens_per_sec": 50.0
+            }
         
         latency = (time.time() - start_time) * 1000
         self.total_inferences += 1

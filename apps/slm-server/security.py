@@ -161,7 +161,7 @@ def check_model_extraction_attempt(request: Request, text: str) -> bool:
 # 3. PROMPT INJECTION & JSON FUZZING SANITIZATION
 # ═══════════════════════════════════════════════════════════════
 MAX_POLICY_CHARS = 16000
-MAX_PROMPT_CHARS = 4000
+MAX_PROMPT_CHARS = 500
 
 PROMPT_INJECTION_PATTERNS = [
     re.compile(r"ignore\s+all\s+(previous|prior)\s+instructions", re.IGNORECASE),

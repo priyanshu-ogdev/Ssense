@@ -19,8 +19,30 @@ import string
 import random
 import re
 import sys
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 import itertools
 import time
+import chromadb
+from chromadb.utils import embedding_functions
+
+try:
+    ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="BAAI/bge-small-en-v1.5")
+    chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    law_collection = chroma_client.get_collection(name="dpdp_law", embedding_function=ef)
+except Exception as e:
+    print(f"Warning: ChromaDB not fully initialized. {e}")
+    law_collection = None
+
+def semantic_rag_query(query: str, n_results: int = 3) -> str:
+    if law_collection is None:
+        return "RAG Retrieval Error: Collection not found."
+    try:
+        results = law_collection.query(query_texts=[query], n_results=n_results)
+        return "\n\n---\n\n".join(results['documents'][0])
+    except Exception as e:
+        return f"RAG Retrieval Error: {str(e)}"
+
 from collections import defaultdict
 from difflib import SequenceMatcher
 
@@ -80,9 +102,9 @@ JSONL_CHATBOT_DPO = os.path.join(SLM_DATA_DIR, "chatbot_dpo_data.jsonl")
 SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
 MODEL_PATH = os.getenv("TEACHER_MODEL_PATH", "../models/Qwen2-72B-Instruct-FP8")
 
-TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "10000"))
-TARGET_CHATBOT_PAIRS = int(os.getenv("TARGET_CHATBOT_PAIRS", "5000"))
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "96"))
+TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "2000"))
+TARGET_CHATBOT_PAIRS = int(os.getenv("TARGET_CHATBOT_PAIRS", "1000"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "16"))
 MAX_REFLEXION_STEPS = 3
 
 for d in [SFT_OUTPUT_DIR, DPO_OUTPUT_DIR, CHATBOT_SFT_DIR, CHATBOT_DPO_DIR, SLM_DATA_DIR]:
@@ -199,9 +221,13 @@ SUBTLE_TECHNIQUE_MAP = {
     "crossborder": "Global Infrastructure Veil: State that data is processed in 'jurisdictions that meet international best practices' without naming specific countries or safeguards.",
     "consent_manager": "Cryptographic Blockade: Refuse Consent Manager integration by citing 'cryptographic integrity' and forcing users to use the 'native application dashboard'.",
     "language_accessibility": "Legal Precision Shield: State that 'legally binding notices are maintained exclusively in English to ensure absolute legal precision'.",
-    "rights_implementation": "Nominee Invalidation: State that 'accounts and data rights are strictly non-transferable' and refuse to recognize post-mortem nominees."
+    "rights_implementation": "Nominee Invalidation: State that 'accounts and data rights are strictly non-transferable' and refuse to recognize post-mortem nominees.",
+    "board_compliance_violation": "Jurisdictional Shielding: Claim the company is only subject to foreign courts or private arbitration, actively overriding the Data Protection Board's statutory authority.",
+    "penalty_avoidance": "Liability Capping: Insert clauses capping total liability for data breaches to 'fees paid in the last 12 months' or a trivial fixed amount, attempting to nullify statutory penalties.",
+    "appeal_process_violation": "Forced Arbitration: State that all disputes regarding data privacy MUST be resolved through private binding arbitration, stripping the right to appeal to TDSAT.",
+    "scope_application_evasion": "Physical Collection Loophole: Claim that data initially collected on paper forms at physical branches is completely exempt from the digital privacy policy.",
+    "illegal_exemption_claim": "False State Exemption: A private corporate entity claiming it is exempt from consent requirements 'for the security of the State' because it provides software to a government client."
 }
-
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 2: DYNAMIC CONTEXT & VALIDATION ENGINE
 # ═══════════════════════════════════════════════════════════════════════════
@@ -229,40 +255,53 @@ def extract_relevant_law(law_text, target_violation):
         keywords = ["Section 10", "Significant Data Fiduciary", "DPO", "Data Protection Impact", "Rule 13"]
     elif "section 16" in target_lower or "cross-border" in target_lower or "rule 15" in target_lower:
         keywords = ["Section 16", "transfer", "outside the territory", "Rule 15", "foreign"]
-    elif "section 33" in target_lower or "penalty" in target_lower or "schedule" in target_lower:
+    elif "section 33" in target_lower or "penalty" in target_lower or "schedule" in target_lower or "avoidance" in target_lower:
         keywords = ["Section 33", "Penalty", "Schedule", "fine", "crore"]
-    elif "section 29" in target_lower or "tdsat" in target_lower or "appeal" in target_lower:
-        keywords = ["Section 29", "TDSAT", "Appellate", "Tribunal"]
-    elif "section 17" in target_lower or "exemption" in target_lower:
-        keywords = ["Section 17", "Exemption", "State", "security of India"]
+    elif "section 29" in target_lower or "tdsat" in target_lower or "appeal" in target_lower or "section 39" in target_lower or "civil court" in target_lower:
+        keywords = ["Section 29", "Section 39", "TDSAT", "Appellate", "Tribunal", "civil court"]
+    elif "section 17" in target_lower or "exemption" in target_lower or "illegal" in target_lower:
+        keywords = ["Section 17", "Exemption", "State", "security of India", "instrumentality"]
+    elif "section 28" in target_lower or "board" in target_lower or "compliance" in target_lower or "summon" in target_lower:
+        keywords = ["Section 28", "summon", "inquiry", "interim orders", "civil court"]
+    elif "section 3" in target_lower or "scope" in target_lower or "evasion" in target_lower or "territory" in target_lower:
+        keywords = ["Section 3", "offline", "digitise", "territory of India", "outside the territory"]
     elif "section 44" in target_lower or "rti" in target_lower:
         keywords = ["Section 44", "RTI", "Right to Information"]
 
     keywords_lower = [kw.lower() for kw in keywords]
-    paragraphs = law_text.split('\n\n')
-    if len(paragraphs) == 1:
-        paragraphs = law_text.split('\n')
+    query_text = target_lower + " " + " ".join(keywords)
+    
+    rag_result = semantic_rag_query(query_text, n_results=3)
+    
+    if "RAG Retrieval Error" not in rag_result and len(rag_result) > 50:
+        result = rag_result
+    else:
+        # Fallback to strict regex or a much smaller chunk (3000 chars instead of 36000)
+        paragraphs = law_text.split('\n\n')
+        if len(paragraphs) == 1:
+            paragraphs = law_text.split('\n')
+            
+        relevant_chunks = []
+        if keywords_lower:
+            for p in paragraphs:
+                p_lower = p.lower()
+                if any(kw in p_lower for kw in keywords_lower):
+                    relevant_chunks.append(p.strip())
+        
+        if not relevant_chunks:
+            relevant_chunks = paragraphs
+            
+        MAX_LAW_CHARS = 4000 # Strict fallback constraint to prevent bloat
+        final_chunks = []
+        current_length = 0
+        for chunk in relevant_chunks:
+            if current_length + len(chunk) + 2 > MAX_LAW_CHARS:
+                break
+            final_chunks.append(chunk)
+            current_length += len(chunk) + 2
+            
+        result = "\n\n".join(final_chunks)
 
-    relevant_chunks = []
-    if keywords_lower:
-        for p in paragraphs:
-            p_lower = p.lower()
-            if any(kw in p_lower for kw in keywords_lower):
-                relevant_chunks.append(p.strip())
-
-    if not relevant_chunks:
-        relevant_chunks = paragraphs
-
-    MAX_LAW_CHARS = 36000
-    final_chunks = []
-    current_length = 0
-    for chunk in relevant_chunks:
-        if current_length + len(chunk) + 2 > MAX_LAW_CHARS:
-            break
-        final_chunks.append(chunk)
-        current_length += len(chunk) + 2
-
-    result = "\n\n".join(final_chunks)
     law_cache[target_lower] = result
     return result
 
@@ -319,7 +358,7 @@ def is_administrative_element(quote: str, offending_entities: list = None) -> bo
     
     has_email = bool(re.search(r'[\w\.-]+@[\w\.-]+\.\w+', quote))
     has_phone = bool(re.search(r'\b\d{10}\b|\+91-\d{2}-\d{8}', quote))
-    has_address_marker = any(m in norm for m in ["registered office", "corporate office", "postal code", "pin code", "gstin:", "grievance officer", "data protection officer", "dpo", "nodal officer"])
+    has_address_marker = any(m in norm for m in ["registered office", "corporate office", "postal code", "pin code", "gstin:", "grievance officer", "data protection officer", "dpo", "nodal officer", "concerns or clarifications", "contact us", "queries regarding", "questions about", "reach out to"])
     
     if has_email or has_phone or has_address_marker:
         violation_keywords = [
@@ -433,50 +472,20 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if not isinstance(v, dict): return False, "Violation item is not a dictionary"
         
         quote = str(v.get("evidence_quote", "")).strip()
-        if not is_quote_in_policy(quote, policy_text):
-            step_1 = str(v.get("step_1_raw_text_extraction", "")).strip()
-            if is_quote_in_policy(step_1, policy_text):
-                v["evidence_quote"] = step_1
-                quote = step_1
-            else:
-                norm_quote = re.sub(r'\s+', ' ', quote.lower())
-                norm_policy = re.sub(r'\s+', ' ', policy_text.lower())
-                found = False
-                if len(norm_quote) >= 15:
-                    q_words = norm_quote.split()
-                    if len(q_words) >= 4:
-                        idx = norm_policy.find(" ".join(q_words[:4]))
-                        if idx != -1:
-                            window = policy_text[max(0, idx):min(len(policy_text), idx + len(norm_quote) + 20)].strip()
-                            if SequenceMatcher(None, norm_quote, window.lower()).ratio() > 0.65:
-                                v["evidence_quote"] = window
-                                quote = v["evidence_quote"]
-                                found = True
-                if not found and is_dpo:
-                    # Auto-Healing for DPO Validation: split policy into sentences and find closest match
-                    sentences = re.split(r'(?<=[.!?])\s+', policy_text)
-                    best_sentence = None
-                    best_ratio = 0.0
-                    norm_q = re.sub(r'\s+', ' ', quote.lower().translate(str.maketrans('', '', string.punctuation)))
-                    for s in sentences:
-                        s_clean = s.strip()
-                        if len(s_clean) < 15:
-                            continue
-                        norm_s = re.sub(r'\s+', ' ', s_clean.lower().translate(str.maketrans('', '', string.punctuation)))
-                        ratio = SequenceMatcher(None, norm_q, norm_s).ratio()
-                        if ratio > best_ratio:
-                            best_ratio = ratio
-                            best_sentence = s_clean
-                    if best_ratio > 0.40 and best_sentence:
-                        v["evidence_quote"] = best_sentence
-                        v["step_1_raw_text_extraction"] = best_sentence
-                        quote = best_sentence
-                        found = True
-                if not found:
-                    return False, f"Evidence quote not found in policy: {quote[:40]}..."
-        v["step_1_raw_text_extraction"] = quote
+        if quote not in policy_text:
+            # Strict Auto-Healing: find the exact original substring ignoring punctuation/whitespace drift
+            words = [re.escape(w) for w in re.findall(r'\w+', quote)]
+            if len(words) >= 3:
+                pattern = r'\W+'.join(words)
+                match = re.search(pattern, policy_text, re.IGNORECASE)
+                if match:
+                    exact_str = match.group(0)
+                    v["evidence_quote"] = exact_str
+                    quote = exact_str
+            if quote not in policy_text:
+                return False, f"Evidence quote not strictly found in policy: {quote[:40]}..."
         
-        if check_string_poison(quote) or check_string_poison(str(v.get("step_2_semantic_justification", ""))):
+        if check_string_poison(quote) or check_string_poison(str(v.get("step_3_semantic_justification", ""))) or check_string_poison(str(v.get("step_2_statute_match", ""))) or check_string_poison(str(v.get("step_1_active_claim_analysis", ""))):
             return False, "Violation contains unresolved placeholders, leaked tags, or unicode poison"
             
         # Internal Period & Multi-Sentence Check (Abbreviation-Aware Period Purge Enforcement)
@@ -494,19 +503,26 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         # Strip standard honorifics, corporate and calendar abbreviations with optional trailing/leading punctuation
         quote_check = re.sub(r'(?i)\b(?:Pvt|Private\s+Ltd|Ltd|Co|Inc|Corp|Dr|Mr|Mrs|Ms|Smt|Shri|Prof|Capt|Col|Gen|Hon|Rev|Sr|Jr|No|S\.No|Reg|Sec|Rule|Section|Cl|Clause|Dept|Est|Approx|Max|Min|Rs|INR|Fig|Ref|App|Ph\.D|B\.Tech|M\.Tech|e\.g|i\.e|vs|v|etc|viz|cf|et\s+al|St|Ave|Blvd|Rd|Sq|Gov|Org|Edu|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*(?:Ltd\.?)?', '', quote_check)
         if re.search(r'\.\s+[A-Z0-9]', quote_check):
-            return False, f"Internal period detected inside evidence quote (Period Purge violation): {quote_clean[:60]}..."
+            # Auto-Heal: Truncate at the very first period
+            truncated_quote = quote.split('.')[0] + '.'
+            if len(truncated_quote) >= 20 and truncated_quote in policy_text:
+                v["evidence_quote"] = truncated_quote
+                quote = truncated_quote
+            else:
+                return False, f"Internal period detected inside evidence quote (Period Purge violation): {quote_clean[:60]}..."
             
         # Omission Hallucination Check & Runtime Justification Deduplication
-        justification = str(v.get("step_2_semantic_justification", "")).lower()
+        justification = str(v.get("step_3_semantic_justification", "")).lower()
+        active_claim = str(v.get("step_1_active_claim_analysis", "")).lower()
+        statute_match = str(v.get("step_2_statute_match", "")).lower()
         if len(justification.split()) > 150:
             return False, f"Justification is too verbose ({len(justification.split())} words). Must be under 150 words."
             
         strictly_forbidden_omissions = ["silent on", "no mention of", "fails to mention", "does not mention", "omits any mention", "does not disclose", "fails to disclose", "without explaining", "fails to explain"]
-        if any(phrase in justification for phrase in strictly_forbidden_omissions):
-            return False, f"Omission hallucination in justification: {justification[:60]}..."
-        if any(phrase in justification for phrase in forbidden_justification_phrases):
-            if any(marker in quote.lower() for marker in ["the policy does not", "no mention of", "does not explicitly", "silent on", "fails to"]):
-                return False, f"Omission hallucination in justification with commentary quote: {justification[:60]}..."
+        if any(phrase in justification for phrase in strictly_forbidden_omissions) or any(phrase in active_claim for phrase in strictly_forbidden_omissions) or any(phrase in statute_match for phrase in strictly_forbidden_omissions):
+            return False, f"Omission hallucination in justification, active claim, or statute match."
+        if any(phrase in justification for phrase in forbidden_justification_phrases) or any(phrase in active_claim for phrase in forbidden_justification_phrases) or any(phrase in statute_match for phrase in forbidden_justification_phrases):
+            return False, f"Omission hallucination (Secondary) in justification, active claim, or statute match."
                 
         norm_just = re.sub(r'\s+', ' ', justification).strip()
         if len(norm_just) >= 20:
@@ -525,7 +541,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
             return False, f"Administrative/contact info flagged as violation: {quote[:40]}..."
 
         statute = str(v.get("statute_reference", ""))
-        if any(m in statute.lower() or m in justification for m in foreign_legacy_markers):
+        if any(m in statute.lower() or m in justification or m in statute_match or m in active_claim for m in foreign_legacy_markers):
             return False, f"Foreign/Legacy law bleed: {statute} / {justification[:40]}..."
             
         if any(marker in quote.lower() for marker in ["the policy does not", "no mention of", "does not explicitly"]):
@@ -540,7 +556,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                     if quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.85:
                         return False, f"DPO rejected audit targets chosen evidence quote directly ({c_type}): {quote[:40]}..."
 
-        v["omission_check"] = False
+        # v["omission_check"] = False (handled dynamically by prompt constraint)
         statute_pattern = r'(?i)\b(?:(?:section|sec\.?|s\.?|clause|act)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:rule|r\.?)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|the)\s+schedule|dpdp)\b'
         if not re.search(statute_pattern, statute):
             v["statute_reference"] = "DPDP Act 2023, Section 8"
@@ -550,6 +566,12 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if v["network_action"] not in ["BLOCK_THIRD_PARTY", "STRIP_TELEMETRY_HEADER", "SPOOF_HARDWARE_API", "INJECT_GPC_SIGNAL", "WARN_USER_ONLY"]:
             v["network_action"] = "WARN_USER_ONLY"
             
+    # Post-validation Trust Score Clamping
+    for v in viols:
+        sev_violations = ["ALGORITHMIC_PROFILING_SDF", "CHILD_CONSENT_VIOLATION", "CONSENT_NOT_FREE_OR_SPECIFIC", "ILLEGAL_EXEMPTION_CLAIM", "DATA_RETENTION_LIMIT_EXCEEDED"]
+        if v.get("violation_type") in sev_violations:
+            if audit.get("dpdp_trust_score", 100) > 20:
+                audit["dpdp_trust_score"] = 15 # Severe clamp
     return True, ""
 
 def repair_json_string(s: str) -> str:
@@ -784,7 +806,7 @@ Do not use generic terms like 'third parties'—name the specific URLs/domains r
         law_chunk = extract_relevant_law(DPDP_LAW_TEXT, target_category)
 
     final_prompt = SYNTHESIZER_PROMPT \
-        .replace("[LAW_INJECTION]", str(law_chunk)) \
+        .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
         .replace("[SEED_INJECTION]", seed) \
         .replace("[INDUSTRY_INJECTION]", industry_context) \
         .replace("[TARGET_VIOLATION_OBJECTIVE]", target_violation_text) \
@@ -830,7 +852,7 @@ print("Initializing 72B FP8 vLLM Engine...")
 if VLLM_AVAILABLE:
     llm = LLM(
         model=MODEL_PATH, quantization="fp8", tensor_parallel_size=1,
-        max_model_len=24576, gpu_memory_utilization=0.85, max_num_seqs=BATCH_SIZE, max_num_batched_tokens=4096,
+        max_model_len=32768, gpu_memory_utilization=0.85, max_num_seqs=BATCH_SIZE, max_num_batched_tokens=4096,
         kv_cache_dtype="fp8", enable_prefix_caching=True, enable_chunked_prefill=True,
         attention_backend="TRITON_ATTN"
     )
@@ -911,9 +933,17 @@ def run_audit_forge():
             hn_msgs = []
             for i in remaining:
                 item = batch[i]
+                law_chunk = extract_relevant_law(DPDP_LAW_TEXT, item.get("target_category", ""))
                 prompt = JUDGE_PROMPT.replace("[JUDGE_PERSONA_INJECTION]", random.choice(JUDGE_PERSONAS)) \
-                                     .replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                                     .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
                                      .replace("[POLICY_INJECTION]", current_policies[i][:20000])
+                                     
+                if random.random() < 0.15: # 15% chance to test for intentional statutory omission
+                    prompt = prompt.replace("[OMISSION_RULES]", "You MUST evaluate whether the policy omitted a required detail based on the context. Set 'omission_check' to true if it is an omission.")
+                    prompt = prompt.replace("[OMISSION_SCHEMA]", "true")
+                else:
+                    prompt = prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
+                    prompt = prompt.replace("[OMISSION_SCHEMA]", "false")
                 judge_msgs.append([{"role": "system", "content": "Strict DPDP Auditor."}, {"role": "user", "content": prompt}])
                 
             audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
@@ -929,10 +959,19 @@ def run_audit_forge():
                         chosen_quote = str(viols[0].get("evidence_quote", "")).strip()
                 except Exception:
                     pass
-                hn_prompt = HARD_NEGATIVE_PROMPT.replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                law_chunk = extract_relevant_law(DPDP_LAW_TEXT, item.get("target_category", ""))
+                hn_prompt = HARD_NEGATIVE_PROMPT \
+                                                .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
                                                 .replace("[POLICY_INJECTION]", current_policies[idx][:20000]) \
-                                                .replace("[TRUE_VIOLATION_CONTEXT]", f"Target Category: {item['target_category']}\nChosen Violation Quote: {chosen_quote}") \
+                                                .replace("[TRUE_VIOLATION_CONTEXT]", f"Target Category: {item['target_category']}\\nChosen Violation Quote: {chosen_quote}") \
                                                 .replace("[CHOSEN_EVIDENCE_QUOTE]", chosen_quote if chosen_quote else "None extracted yet")
+                                                
+                if random.random() < 0.15:
+                    hn_prompt = hn_prompt.replace("[OMISSION_RULES]", "You MUST evaluate whether the policy omitted a required detail based on the context. Set 'omission_check' to true if it is an omission.")
+                    hn_prompt = hn_prompt.replace("[OMISSION_SCHEMA]", "true")
+                else:
+                    hn_prompt = hn_prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
+                    hn_prompt = hn_prompt.replace("[OMISSION_SCHEMA]", "false")
                 hn_msgs.append([{"role": "system", "content": "Authoritative, overzealous privacy auditor."}, {"role": "user", "content": hn_prompt}])
                 
             hn_audit_outputs = llm.chat(messages=hn_msgs, sampling_params=judge_params)
@@ -965,7 +1004,7 @@ def run_audit_forge():
                         combined_error = " | ".join(err_reasons)
                         
                         compiled_obj = compile_violation_objective(item["target_category"], item.get("edge_template"))
-                        heal_prompt = REFLEXION_EXPLICIT_PROMPT.replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                        heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                             .replace("[TARGET_VIOLATION]", compiled_obj) \
                             .replace("[AUDIT_FEEDBACK]", f"ERROR: {combined_error}. FIX IMMEDIATELY.") \
                             .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
@@ -1003,7 +1042,7 @@ def run_audit_forge():
                         else:
                             if step < MAX_REFLEXION_STEPS - 1:
                                 compiled_obj = compile_violation_objective(item["target_category"], item.get("edge_template"))
-                                heal_prompt = REFLEXION_EXPLICIT_PROMPT.replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                                heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                     .replace("[TARGET_VIOLATION]", compiled_obj) \
                                     .replace("[AUDIT_FEEDBACK]", "ERROR: Failed to commit paired DPO audit. Ensure hard negative audit has extractable verbatim violations without internal periods.") \
                                     .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
@@ -1017,7 +1056,7 @@ def run_audit_forge():
                     else:
                         if step < MAX_REFLEXION_STEPS - 1:
                             compiled_obj = compile_violation_objective(item["target_category"], item.get("edge_template"))
-                            heal_prompt = REFLEXION_EXPLICIT_PROMPT.replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                            heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", "ERROR: DPO hard negative audit returned 0 violations. Rewrite policy to ensure clear extractable sentences.") \
                                 .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
@@ -1031,7 +1070,7 @@ def run_audit_forge():
                 else:
                     if step < MAX_REFLEXION_STEPS - 1:
                         compiled_obj = compile_violation_objective(item["target_category"], item.get("edge_template"))
-                        heal_prompt = REFLEXION_EXPLICIT_PROMPT.replace("[LAW_INJECTION]", extract_relevant_law(DPDP_LAW_TEXT, item["target_category"])) \
+                        heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                             .replace("[TARGET_VIOLATION]", compiled_obj) \
                             .replace("[AUDIT_FEEDBACK]", "The Judge MISSED the trap. It is too subtle or accidentally compliant. Rewrite to make the violation undeniable but corporately camouflaged.") \
                             .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
@@ -1077,10 +1116,10 @@ def run_chatbot_forge():
         sft_messages = []
         dpo_messages = []
         for item in batch:
-            prompt_sft = CHATBOT_QA_SFT_PROMPT.replace("[LAW_INJECTION]", str(item["law_chunk"])).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
+            prompt_sft = CHATBOT_QA_SFT_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", str(semantic_rag_query(str(item.get("scenario", ""))))).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
             sft_messages.append([{"role": "system", "content": "You are an expert Indian legal AI synthesizing training data."}, {"role": "user", "content": prompt_sft}])
             
-            prompt_dpo = CHATBOT_QA_DPO_PROMPT.replace("[LAW_INJECTION]", str(item["law_chunk"])).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
+            prompt_dpo = CHATBOT_QA_DPO_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", str(semantic_rag_query(str(item.get("scenario", ""))))).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
             dpo_messages.append([{"role": "system", "content": "You are synthesizing legal AI training data."}, {"role": "user", "content": prompt_dpo}])
             
         sft_out = llm.chat(messages=sft_messages, sampling_params=chatbot_sft_params)
@@ -1123,6 +1162,14 @@ def run_chatbot_forge():
                 )
                 
                 if is_valid_sft and is_valid_dpo:
+                    law_context = str(semantic_rag_query(str(item.get("scenario", ""))))
+                    
+                    parsed_sft["messages"][0]["content"] = f"[CONTEXT: THE LAW]\n{law_context}\n\n[TASK]\n{parsed_sft['messages'][0]['content']}"
+                    parsed_sft["messages"].insert(0, {"role": "system", "content": "Expert Indian Legal AI Assistant."})
+                    
+                    parsed_dpo["prompt"][0]["content"] = f"[CONTEXT: THE LAW]\n{law_context}\n\n[TASK]\n{parsed_dpo['prompt'][0]['content']}"
+                    parsed_dpo["prompt"].insert(0, {"role": "system", "content": "Expert Indian Legal AI Assistant."})
+
                     with open(os.path.join(CHATBOT_SFT_DIR, f"qa_sft_{idx:05d}.json"), "w", encoding="utf-8") as f: 
                         json.dump(parsed_sft, f, ensure_ascii=False, indent=2)
                     with open(JSONL_CHATBOT_SFT, "a", encoding="utf-8") as f:

@@ -62,11 +62,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-export LOG_DIR="${REPO_ROOT}/logs/evaluate_models_${TIMESTAMP}"
+export LOG_DIR="${REPO_ROOT}/logs"
 export PYTHONUNBUFFERED=1
 mkdir -p "${LOG_DIR}"
 
-MASTER_LOG="${LOG_DIR}/00_evaluate_models_master.log"
+SCRIPT_NAME=$(basename "$0" .sh)
+MASTER_LOG="${LOG_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
 exec > >(tee -i "${MASTER_LOG}")
 exec 2>&1
 
@@ -82,7 +83,7 @@ cd "${REPO_ROOT}/ml/evals"
 
 # Execute verify.sh inside ml/evals with forwarded arguments
 bash verify.sh "$@"
-EXIT_CODE=$?
+EXIT_CODE=${PIPESTATUS[0]}
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"
 if [ ${EXIT_CODE} -eq 0 ]; then

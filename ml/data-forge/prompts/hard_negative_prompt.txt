@@ -1,5 +1,6 @@
-[CONTEXT: THE LAW]
-[LAW_INJECTION]
+[RETRIEVED_LAW_CONTEXT]
+
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
 
 [CONTEXT: THE PRIVACY POLICY TO AUDIT]
 Read the following privacy policy carefully. You will audit this text against the law provided above.
@@ -14,7 +15,7 @@ Read the following privacy policy carefully. You will audit this text against th
 You are an authoritative, overzealous, and highly rigorous forensic privacy auditor specializing in the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. 
 
 You are evaluating a privacy policy to construct a realistic DPO rejected candidate (a hard-negative legal misinterpretation). 
-CRITICAL DPO TARGETING & SPATIAL FIREWALL (PREVENTING POSITIVE/NEGATIVE COLLISION):
+CRITICAL COMPLIANCE ANCHOR:
 - Look at `[TRUE VIOLATION CONTEXT]` above, which includes the Target Category and `Chosen Violation Quote` selected by the SFT Judge (`[CHOSEN_EVIDENCE_QUOTE]`). You are STRICTLY AND ABSOLUTELY FORBIDDEN from extracting, selecting, or quoting `[CHOSEN_EVIDENCE_QUOTE]`, `[TRUE_VIOLATION_CONTEXT]`, or any sentence from its surrounding trap section. Selecting the true violation quote destroys the DPO preference signal and triggers an immediate validation drop.
 - STRATIFIED TARGET ROTATION DIRECTIVE: Instead, you MUST select a BENIGN, COMPLIANT SAFE-HARBOR clause or a STATUTORY EXEMPTION clause from an entirely different, compliant section of the policy. To prevent mode collapse onto Section 8(7) retention clauses, you MUST dynamically rotate your target across different chapters of the DPDP Act across evaluations: Notice requirements (Section 5), Consent withdrawal / Consent Managers (Section 6 & Rule 4), Legitimate uses (Section 7), Security safeguards (Section 8(5)), Verifiable parental consent (Section 9), DPO/SDF duties (Section 10), Grievance redressal (Section 13), or Cross-border transfer restrictions (Section 16).
 - You must construct an overzealous, technically strict, but flawed academic misinterpretation claiming that the affirmative words of this benign or safe-harbor clause assert self-judging, open-ended, or overbroad discretionary power that actively overreaches statutory limits.
@@ -25,14 +26,14 @@ You must output ONLY a single, valid JSON object matching the exact schema below
 =========================================
 ANTI-POISON CONSTRAINTS (CRITICAL)
 =========================================
-1. ABSOLUTE PROHIBITION (ZERO ADDRESS / CONTACT FLAGGING):
-   You MUST NOT flag company addresses, email contacts, DPO contact lines, helpline phone numbers, PIN codes, corporate registered offices, or introductory preambles as violations. Flagging administrative contact details is severe data poisoning and is strictly banned. Flag strictly a substantive policy sentence (retention, purpose, consent, transfer, or exemption).
+1. ABSOLUTE PROHIBITION (ZERO ADDRESS / CONTACT / GRIEVANCE FLAGGING):
+   You MUST NOT flag company addresses, email contacts, DPO contact lines, helpline phone numbers, PIN codes, corporate registered offices, or introductory preambles as violations. You MUST NOT flag grievance redressal clauses, general customer support lines, or any sentences providing instructions for users to raise questions, concerns, or clarifications. Flagging administrative or contact details is severe data poisoning and is strictly banned. Flag strictly a substantive policy sentence (retention, purpose, consent, transfer, or exemption).
 
 2. STATUTORY JURISDICTION:
    Evaluate the policy exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and the DPDP Rules 2025. Base all analysis, definitions, rights, and statutory citations solely on the explicit text of the DPDP Act and Rules.
 
-3. EXCLUSIVE DPDP FOCUS:
-   Cite and apply only sections and schedules of the DPDP Act 2023 and Rules 2025. Maintain strict grounding within the provided statutory framework.
+3. EXCLUSIVE DPDP FOCUS (ANTI-GDPR BLEED):
+   Cite and apply only sections and schedules of the DPDP Act 2023 and Rules 2025. Maintain strict grounding within the provided statutory framework. Do NOT hallucinate foreign rights (e.g., GDPR Article 22 "right to explanation of automated decisions", "right to be forgotten", or "legitimate interest"). India's DPDP Act only grants access to summary data and identities of processors under Section 11, NOT algorithmic logic.
 
 4. OMISSION HALLUCINATION FIREWALL (STRICTLY PROHIBITED PHRASES):
    When constructing your semantic justification (`step_2_semantic_justification`) and `global_legal_reasoning`, you MUST NEVER complain about missing details, policy silence, or what the policy leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
@@ -67,14 +68,20 @@ ZERO-SHOT ANALYTICAL GROUNDING (HOW TO FRAME YOUR CRITIQUE):
 =========================================
 EXECUTION RULES & FIELD DEFINITIONS
 =========================================
-1. SINGLE-SENTENCE EXTRACTION ('step_1_raw_text_extraction' & 'evidence_quote'):
-   Extract exactly ONE full verbatim sentence (minimum 20 characters) from the policy that contains the targeted claim or clause. You must populate BOTH 'step_1_raw_text_extraction' and 'evidence_quote' with this exact same string.
-   MECHANICAL CONSTRAINT (ZERO INTERNAL PERIODS): The extracted string MUST be an exact verbatim substring physically present in the text above. It MUST contain exactly ONE terminal punctuation mark (period, exclamation, or question mark) at the very end. It MUST NOT contain multiple sentences or any internal sentence-ending periods (`.`), nor internal abbreviations containing periods (`Pvt. Ltd.`, `Inc.`, `e.g.`, `i.e.`). If a sentence contains abbreviations with periods, select a clean sentence without internal dots. Do NOT modify, paraphrase, truncate, or invent any text.
+1. SINGLE-SENTENCE EXTRACTION ('evidence_quote'):
+   Extract exactly ONE full verbatim sentence (minimum 20 characters) from the policy that contains the targeted claim or clause. You must populate 'evidence_quote' with this exact string. You MUST COPY AND PASTE the sentence exactly as it appears in the text. DO NOT paraphrase. DO NOT change any words.
+   MECHANICAL CONSTRAINT (ZERO INTERNAL PERIODS): The extracted string MUST be an exact verbatim substring physically present in the text above. It MUST contain exactly ONE terminal punctuation mark (period, exclamation, or question mark) at the very end. It MUST NOT contain multiple sentences or any internal sentence-ending periods (`.`), nor internal abbreviations containing periods (`Pvt. Ltd.`, `Inc.`, `e.g.`, `i.e.`). You are STRICTLY COMMANDED to extract ONLY the first sentence and never span across multiple sentences. If you extract more than one sentence, you will fail. Stop at the very first period. If a sentence contains abbreviations with periods, select a clean sentence without internal dots. Do NOT modify, paraphrase, truncate, or invent any text.
 
 2. OMISSION CHECK ('omission_check'):
-   Must ALWAYS be exactly false. If your argument relies on what the policy omits rather than what the sentence actively states, re-frame or select a sentence that actively declares a rule or practice.
+   [OMISSION_RULES]
 
-3. SEMANTIC JUSTIFICATION ('step_2_semantic_justification'):
+3. STEP 1: ACTIVE CLAIM ANALYSIS ('step_1_active_claim_analysis'):
+   Analyze the affirmative, present-tense words inside the quote to explicitly state what the policy commands. Prove it is an active claim, not an omission.
+
+4. STEP 2: STATUTE MATCH ('step_2_statute_match'):
+   Mathematically link the quote's claim to the targeted statute. Verify that the quote matches the specific violation type and is not statute-stretching.
+
+5. STEP 3: SEMANTIC JUSTIFICATION ('step_3_semantic_justification'):
    Explain why the extracted words constitute an illegal overreach or statutory misapplication.
    ZERO-SHOT HIGH-ENTROPY ANALYTICAL GROUNDING (ANTI-TEMPLATE DIRECTIVE):
    - Do NOT use rigid grammatical scaffolds or formulaic prefixes across evaluations (such as "By stating the exact quoted text..." or "By stating that...").
@@ -92,10 +99,10 @@ EXECUTION RULES & FIELD DEFINITIONS
    Must be one of: BLOCK_THIRD_PARTY, STRIP_TELEMETRY_HEADER, SPOOF_HARDWARE_API, INJECT_GPC_SIGNAL, WARN_USER_ONLY. For exemption or retention claims without third-party tracking, use WARN_USER_ONLY.
 
 7. OFFENDING ENTITIES ('offending_entities'):
-   Look strictly inside the extracted sentence. If it explicitly names third-party tracking domains or external URLs, list them as strings. Otherwise, output an empty array []. Never list the primary company or administrative contact details.
+   CRITICAL ZERO-SHOT EXTRACTION: You must explicitly extract the exact third-party entity name, corporate tracker, or external domain from the evidence quote if it is present. Do not leave the array empty if an entity is named. If absolutely none exist, output an empty array [].
 
 8. GLOBAL REASONING ('global_legal_reasoning'):
-   Provide a detailed, case-specific forensic assessment explaining the core arguments of this legal critique.
+   Provide a detailed, case-specific forensic assessment explaining the core arguments of this legal critique. LOGICAL CONSISTENCY RULE: If the 'violations' array is populated, this field MUST explicitly summarize those violations and CANNOT state that the policy is compliant.
    - WHAT TO AVOID: Do not use generic boilerplate or static placeholder text across evaluations. Do not reference omissions or policy silence.
    - HOW TO AVOID IT: Synthesize a highly customized, nuanced analytical summary based entirely on the specific affirmative claims and statutory sections targeted in this exact policy.
 
@@ -110,9 +117,10 @@ Output ONLY a valid JSON object matching the format below. Escape all internal d
   "subtlety_score": 85,
   "violations": [
     {
-      "step_1_raw_text_extraction": "Exact verbatim single sentence from policy ending in terminal punctuation with no internal periods or ellipses and at least twenty characters long.",
-      "omission_check": false,
-      "step_2_semantic_justification": "The company's broad reliance on internal administrative discretion for secondary processing creates an unqualified operational loophole that exceeds the statutory boundaries established under Section 6.",
+      "step_1_active_claim_analysis": "The exact affirmative command made in the sentence is...",
+      "step_2_statute_match": "This command specifically connects to Section 6 because...",
+      "omission_check": [OMISSION_SCHEMA],
+      "step_3_semantic_justification": "The company's broad reliance on internal administrative discretion for secondary processing creates an unqualified operational loophole that exceeds the statutory boundaries established under Section 6.",
       "statute_reference": "Section 6",
       "violation_type": "ILLEGAL_EXEMPTION_CLAIM",
       "evidence_quote": "Exact verbatim single sentence from policy ending in terminal punctuation with no internal periods or ellipses and at least twenty characters long.",

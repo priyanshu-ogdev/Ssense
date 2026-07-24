@@ -41,8 +41,8 @@ OUTPUT_DIR_FINAL = "../models/audit-model-final"
 MAX_SEQ_LENGTH = 24576
 BATCH_SIZE = 1
 GRADIENT_ACCUMULATION = 8
-EPOCHS_SFT = 2
-EPOCHS_DPO = 1
+EPOCHS_SFT = 4
+EPOCHS_DPO = 2
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 1: SUPERVISED FINE-TUNING (SFT)
@@ -65,7 +65,7 @@ def run_sft():
 
     model = FastLanguageModel.get_peft_model(
         model,
-        r=128,
+        r=64,
         lora_alpha=128,
         use_rslora=True,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
@@ -84,15 +84,17 @@ def run_sft():
         return {"text": texts}
 
     dataset = dataset.map(apply_chat_template, batched=True, num_proc=8)
+    if len(dataset) > 2000:
+        dataset = dataset.select(range(2000))
     split = dataset.train_test_split(test_size=0.05, seed=42)
 
     sft_args = SFTConfig(
         per_device_train_batch_size=BATCH_SIZE,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION,
-        warmup_ratio=0.05,
+        warmup_steps=15,
         num_train_epochs=EPOCHS_SFT,
-        learning_rate=2e-5,
+        learning_rate=1.5e-5,
         lr_scheduler_type="cosine",
         bf16=True,
         optim="adamw_torch",
@@ -105,8 +107,8 @@ def run_sft():
         packing=False,
         remove_unused_columns=False,
         eval_strategy="steps",
-        eval_steps=50,
-        save_steps=50,
+        eval_steps=20,
+        save_steps=20,
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
@@ -195,13 +197,15 @@ def run_dpo():
         return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds}
 
     dataset = dataset.map(format_preference_dataset, batched=True, num_proc=8)
+    if len(dataset) > 800:
+        dataset = dataset.select(range(800))
     split = dataset.train_test_split(test_size=0.05, seed=42)
 
     dpo_args = DPOConfig(
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=16,
-        warmup_ratio=0.05,
+        warmup_steps=15,
         num_train_epochs=EPOCHS_DPO,
         learning_rate=5e-6,
         lr_scheduler_type="cosine",
@@ -209,15 +213,15 @@ def run_dpo():
         optim="adamw_torch",
         weight_decay=0.05,
         loss_type="simpo",
-        beta=2.0,
+        beta=0.1,
         simpo_gamma=0.5,
         max_length=MAX_SEQ_LENGTH,
         max_prompt_length=23500,
         output_dir=OUTPUT_DIR_FINAL,
         logging_steps=10,
         eval_strategy="steps",
-        eval_steps=50,
-        save_steps=50,
+        eval_steps=20,
+        save_steps=20,
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",

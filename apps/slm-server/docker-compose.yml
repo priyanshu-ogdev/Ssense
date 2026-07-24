@@ -14,7 +14,6 @@ services:
       - SSENSE_AUDIT_LORA=audit_lora
       - SSENSE_CHAT_LORA=chat_lora
       - SSENSE_API_KEYS=ssense_dev_key_2026,ssense_prod_key_2026
-      - SSENSE_MAX_WORKERS=8
     volumes:
       - ../../ml/models:/app/ml/models:ro
       - ../../libs/contracts/schemas:/app/libs/contracts/schemas:ro

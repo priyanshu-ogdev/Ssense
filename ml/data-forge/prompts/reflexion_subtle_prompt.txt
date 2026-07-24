@@ -1,5 +1,6 @@
-[CONTEXT: THE LAW]
-[LAW_INJECTION]
+[RETRIEVED_LAW_CONTEXT]
+
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
 
 [CONTEXT: FAILED POLICY TO REWRITE]
 The text below is your previous attempt. It failed the audit for being too obvious.

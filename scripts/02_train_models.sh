@@ -66,11 +66,12 @@ if [[ "${MODEL_TARGET}" != "audit" && "${MODEL_TARGET}" != "chatbot" && "${MODEL
 fi
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-export LOG_DIR="${REPO_ROOT}/logs/train_models_${TIMESTAMP}"
+export LOG_DIR="${REPO_ROOT}/logs"
 export PYTHONUNBUFFERED=1
 mkdir -p "${LOG_DIR}"
 
-MASTER_LOG="${LOG_DIR}/00_train_models_master.log"
+SCRIPT_NAME=$(basename "$0" .sh)
+MASTER_LOG="${LOG_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
 exec > >(tee -i "${MASTER_LOG}")
 exec 2>&1
 
@@ -119,12 +120,12 @@ cd "${REPO_ROOT}/ml/slm-training"
 
 if [[ "${MODEL_TARGET}" == "audit" || "${MODEL_TARGET}" == "all" ]]; then
     echo -e "\n▶️  [TRAINING 1/2]: Executing Forensic Auditor Fine-Tuning (train_audit.py)..."
-    "${PYTHON_CMD}" -u train_audit.py 2>&1 | tee "${LOG_DIR}/01_train_audit.log"
+    "${PYTHON_CMD}" -u train_audit.py
 fi
 
 if [[ "${MODEL_TARGET}" == "chatbot" || "${MODEL_TARGET}" == "all" ]]; then
     echo -e "\n▶️  [TRAINING 2/2]: Executing Conversational Chatbot Fine-Tuning (train_chatbot.py)..."
-    "${PYTHON_CMD}" -u train_chatbot.py 2>&1 | tee "${LOG_DIR}/02_train_chatbot.log"
+    "${PYTHON_CMD}" -u train_chatbot.py
 fi
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"

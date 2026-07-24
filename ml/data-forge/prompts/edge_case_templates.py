@@ -8,6 +8,16 @@ model from learning only 'blatant' violations and prepares it for real-world sub
 
 EDGE_CASE_TEMPLATES = [
     {
+        "name": "the_shadow_profiling_loophole",
+        "target_categories": ["consent", "purpose_limitation"],
+        "prompt": "Claim that data purchased from third-party data brokers or scraped automatically is exempt from direct user consent. Use phrases like 'We enrich your profile using publicly available commercial datasets and partner registries, which are not subject to direct user opt-in mechanisms under our platform rules.' This violates Section 6."
+    },
+    {
+        "name": "the_cookie_wall",
+        "target_categories": ["consent"],
+        "prompt": "Force users to accept all non-essential tracking cookies to even view the basic privacy policy page or use the service. Use phrases like 'Access to this platform is strictly conditional upon your acceptance of our comprehensive ecosystem tracking cookies.' This violates Free and Unconditional Consent."
+    },
+    {
         "name": "the_vendor_shield",
         "target_categories": ["processor_accountability", "security"],
         "prompt": "Attempt to outsource legal liability to third-party vendors. Use phrases like 'We utilize industry-leading third-party cloud providers. While we vet our partners, we explicitly disclaim liability for any data breaches originating from third-party servers or payment gateways.' This violates the non-delegable vicarious liability established under Section 8(1)."
@@ -90,6 +100,40 @@ EDGE_CASE_TEMPLATES = [
     {
         "name": "the_nominee_invalidation",
         "target_categories": ["rights_implementation", "grievance"],
-        "prompt": "Refuse to honor data principal nominee rights in the event of death or incapacity by citing account non-transferability. Use phrases like 'User accounts and associated data rights are strictly non-transferable; we do not recognize third-party nominee designations for data access post-mortem.' This directly violates Section 15."
+        "prompt": "Refuse to honor data principal nominee rights in the event of death or incapacity by citing account non-transferability. Use phrases like 'User accounts and associated data rights are strictly non-transferable; we do not recognize third-party nominee designations for data access post-mortem.' This directly violates Section 14."
+    },
+    {
+        "name": "the_liability_cap",
+        "target_categories": ["penalty_avoidance"],
+        "prompt": "Attempt to bypass statutory fines by capping liability in the Terms of Service. Use phrases like 'In no event shall our total aggregate liability for any data breach exceed the amount you paid for our services in the last 12 months, or 1000 rupees, whichever is less.' This directly contradicts Section 33 and the Schedule."
+    },
+    {
+        "name": "forced_arbitration_trap",
+        "target_categories": ["appeal_process", "board_compliance"], # 🚨 FIXED: Removed '_violation' suffix to match TARGET_VIOLATIONS keys
+        "prompt": "Force users into private binding arbitration to prevent them from appealing to the Board or TDSAT. Use phrases like 'Any and all disputes arising from data privacy practices shall be resolved exclusively through final and binding arbitration in Singapore, and you waive all rights to seek relief from any Indian regulatory tribunal or civil court.' This illegally attempts to override Sections 28, 29, and 39."
+    },
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 🏆 NEW ELITE TRAPS (Calibrated to match the upgraded SEMANTIC_KEYWORD_MAP)
+    # ═══════════════════════════════════════════════════════════════════════════
+    {
+        "name": "the_erasure_denial_trap",
+        "target_categories": ["retention", "rights_implementation"],
+        "prompt": "Permanently deny the user's right to request data erasure after an arbitrary timeframe. Use phrases like 'In a move to streamline our operations, we permanently deny your right to request the erasure of your data if it has been processed for more than six months, even if it is no longer necessary.' This directly violates Section 12 and the Third Schedule."
+    },
+    {
+        "name": "the_unrestricted_sharing_trap",
+        "target_categories": ["purpose_limitation", "consent"],
+        "prompt": "Assert an unlimited right to share data with named third parties without any restrictions. Use phrases like 'We share your personal data with [Third Party A] and [Third Party B] for the purpose of processing without any restrictions, always and without exception, as part of our standard data handling practices.' This violates Section 4 and Section 6."
+    },
+    {
+        "name": "the_false_state_exemption",
+        "target_categories": ["illegal_exemption_claim", "scope_application_evasion"],
+        "prompt": "Falsely claim that the private company is exempt from DPDP obligations by misapplying State or national security exemptions. Use phrases like 'As an entity contributing to the digital sovereignty and economic security of the State, our data processing activities are exempt from standard consent and notice requirements under Section 17 and the Second Schedule.' This is an illegal exemption claim for a private Data Fiduciary."
+    },
+    {
+        "name": "the_consent_withdrawal_blackhole",
+        "target_categories": ["consent", "grievance"],
+        "prompt": "Make it practically impossible to withdraw consent by hiding the mechanism or imposing severe friction. Use phrases like 'To withdraw your consent, you must submit a notarized affidavit to our registered office, and the withdrawal will be processed within 90 days subject to legal review.' This violates the 'ease of withdrawal' mandate under Section 6(4)."
     }
 ]

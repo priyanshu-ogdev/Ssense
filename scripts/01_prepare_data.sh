@@ -58,11 +58,12 @@ done
 
 # Setup logging
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-export LOG_DIR="${REPO_ROOT}/logs/prepare_data_${TIMESTAMP}"
+export LOG_DIR="${REPO_ROOT}/logs"
 export PYTHONUNBUFFERED=1
 mkdir -p "${LOG_DIR}"
 
-MASTER_LOG="${LOG_DIR}/00_prepare_data_master.log"
+SCRIPT_NAME=$(basename "$0" .sh)
+MASTER_LOG="${LOG_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
 exec > >(tee -i "${MASTER_LOG}")
 exec 2>&1
 
@@ -84,11 +85,11 @@ pkill -f vllm.entrypoints.openai.api_server 2>/dev/null || true
 # [PHASE 0/4]: MODEL VERIFICATION & DOWNLOAD (LOCAL CHECK & HUGGINGFACE FALLBACK)
 # ════════════════════════════════════════════════════════════════════════════════
 mkdir -p "${REPO_ROOT}/ml/models"
-echo -e "\n▶️  [PHASE 0/4]: Verifying Teacher (`Qwen2-72B`) & Student (`Qwen 3.5 9B`) Models in ml/models/..."
+echo -e "\n▶️  [PHASE 0/4]: Verifying Teacher ('Qwen2-72B') & Student ('Qwen 3.5 9B') Models in ml/models/..."
 
 # 1. Check Student Model: Qwen/Qwen3.5-9B (or Qwen2.5-9B-Instruct if already downloaded)
 if [ -d "${REPO_ROOT}/ml/models/Qwen3.5-9B" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen3.5-9B" 2>/dev/null)" ]; then
-    echo "   ✅ Student model (`Qwen3.5-9B`) found locally at ml/models/Qwen3.5-9B. Skipping download."
+    echo "   ✅ Student model ('Qwen3.5-9B') found locally at ml/models/Qwen3.5-9B. Skipping download."
 elif [ -d "${REPO_ROOT}/ml/models/Qwen2.5-9B-Instruct" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2.5-9B-Instruct" 2>/dev/null)" ]; then
     echo "   ✅ Student model found locally at ml/models/Qwen2.5-9B-Instruct. Skipping download."
 else
@@ -103,7 +104,7 @@ fi
 
 # 2. Check Teacher Model: Qwen2-72B-Instruct-FP8 (or Qwen2.5-72B-Instruct-FP8)
 if [ -d "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8" 2>/dev/null)" ]; then
-    echo "   ✅ Teacher model (`Qwen2-72B-Instruct-FP8`) found locally at ml/models/Qwen2-72B-Instruct-FP8. Skipping download."
+    echo "   ✅ Teacher model ('Qwen2-72B-Instruct-FP8') found locally at ml/models/Qwen2-72B-Instruct-FP8. Skipping download."
 elif [ -d "${REPO_ROOT}/ml/models/Qwen2.5-72B-Instruct-FP8" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2.5-72B-Instruct-FP8" 2>/dev/null)" ]; then
     echo "   ✅ Teacher model found locally at ml/models/Qwen2.5-72B-Instruct-FP8. Skipping download."
 else
@@ -124,21 +125,24 @@ cd "${REPO_ROOT}/ml/data-forge"
 if [ "${SKIP_GAN}" = true ]; then
     echo -e "\n⏭️  [PHASE 1/4]: Skipping Synthetic GAN Forge (--skip-gan enabled)."
 else
-    echo -e "\n▶️  [PHASE 1/4]: Forging Synthetic Data (GAN Forge via vLLM)..."
-    "${PYTHON_CMD}" -u gan_forge.py 2>&1 | tee "${LOG_DIR}/01_gan_forge.log"
+    "${PYTHON_CMD}" -u build_vector_db.py
+
+    echo -e "\n▶️  [PHASE 1/4(b)]: Forging Synthetic Data (GAN Forge via vLLM)..."
+
+    "${PYTHON_CMD}" -u gan_forge.py
 fi
 
 # ════════════════════════════════════════════════════════════════════════════════
 # [PHASE 2/4]: DETERMINISTIC RUST DECISION TREE
 # ════════════════════════════════════════════════════════════════════════════════
 echo -e "\n▶️  [PHASE 2/4]: Building Deterministic Rust Decision Tree..."
-"${PYTHON_CMD}" -u build_dpdp_tree.py 2>&1 | tee "${LOG_DIR}/02_build_tree.log"
+"${PYTHON_CMD}" -u build_dpdp_tree.py
 
 # ════════════════════════════════════════════════════════════════════════════════
 # [PHASE 3/4]: UNSLOTH DATASET ALIGNMENT & FORMATTING
 # ════════════════════════════════════════════════════════════════════════════════
 echo -e "\n▶️  [PHASE 3/4]: Aligning & Formatting Data Schemas for Unsloth..."
-"${PYTHON_CMD}" -u prepare_unsloth_data.py 2>&1 | tee "${LOG_DIR}/03_prepare_data.log"
+"${PYTHON_CMD}" -u prepare_unsloth_data.py
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"
 echo "✅ STAGE 1 COMPLETE: Models verified and Unsloth SFT & DPO training datasets synthesized."
