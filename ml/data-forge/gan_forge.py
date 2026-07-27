@@ -23,23 +23,134 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 import itertools
 import time
-import chromadb
-from chromadb.utils import embedding_functions
+import numpy as np
+import pickle
+from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer, CrossEncoder
+from huggingface_hub import snapshot_download
+
+def resolve_local_rag_model(repo_id: str, model_dirname: str) -> str:
+    """Resolves and ensures RAG embedding/reranker models are stored directly in ml/models/."""
+    curr = os.path.dirname(os.path.abspath(__file__))
+    models_root = None
+    while curr and curr != os.path.dirname(curr):
+        candidate = os.path.join(curr, "ml", "models")
+        if os.path.isdir(candidate):
+            models_root = candidate
+            break
+        curr = os.path.dirname(curr)
+    if not models_root:
+        models_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models"))
+    
+    local_path = os.path.join(models_root, model_dirname)
+    os.makedirs(local_path, exist_ok=True)
+    
+    if not os.path.exists(os.path.join(local_path, "config.json")):
+        print(f"📥 Downloading {repo_id} directly to local studio store at ml/models/{model_dirname}...")
+        try:
+            snapshot_download(repo_id=repo_id, local_dir=local_path)
+            print(f"✅ {repo_id} saved offline at ml/models/{model_dirname}.")
+        except Exception as e:
+            print(f"⚠️ Warning: Snapshot download failed ({e}). Falling back to repo_id.")
+            return repo_id
+    else:
+        print(f"✅ Loaded {repo_id} directly from offline store at ml/models/{model_dirname}.")
+    return local_path
+
+# Global Hybrid Search Cache
+RAG_CHUNKS = []
+RAG_METADATAS = []
+RAG_EMBEDDINGS = None
+RAG_BM25 = None
+BGE_MODEL = None
+RERANKER_MODEL = None
 
 try:
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="BAAI/bge-small-en-v1.5")
-    chroma_client = chromadb.PersistentClient(path="./chroma_db")
-    law_collection = chroma_client.get_collection(name="dpdp_law", embedding_function=ef)
+    with open("dpdp_hybrid_index.pkl", "rb") as f:
+        meta = pickle.load(f)
+        RAG_CHUNKS = meta["chunks"]
+        RAG_METADATAS = meta["metadatas"]
+        RAG_BM25 = meta["bm25_index"]
+        RAG_EMBEDDINGS = meta["dense_embeddings"]
+        
+        # Integrity check
+        if not (meta["chunk_count"] == len(RAG_CHUNKS) == len(RAG_METADATAS) == RAG_EMBEDDINGS.shape[0]):
+            raise ValueError("Index integrity check failed: mismatched array lengths.")
+            
+    bge_local_path = resolve_local_rag_model("BAAI/bge-small-en-v1.5", "bge-small-en-v1.5")
+    reranker_local_path = resolve_local_rag_model("BAAI/bge-reranker-v2-m3", "bge-reranker-v2-m3")
+    BGE_MODEL = SentenceTransformer(bge_local_path)
+    RERANKER_MODEL = CrossEncoder(reranker_local_path, max_length=512)
+    print(f"✅ Hybrid RAG Cache loaded successfully ({len(RAG_CHUNKS)} chunks).")
 except Exception as e:
-    print(f"Warning: ChromaDB not fully initialized. {e}")
-    law_collection = None
+    print(f"Warning: Hybrid RAG cache not found or failed to load. Run build_vector_db.py first. {e}")
 
-def semantic_rag_query(query: str, n_results: int = 3) -> str:
-    if law_collection is None:
-        return "RAG Retrieval Error: Collection not found."
+def get_legal_query_tokens(query: str) -> list:
+    """Exact mirror of the builder's tokenizer for perfect BM25 alignment."""
+    query_lower = query.lower()
+    query_lower = query_lower.replace("data fiduciary", "data_fiduciary") \
+                             .replace("data principal", "data_principal") \
+                             .replace("consent manager", "consent_manager") \
+                             .replace("sub-section", "subsection")
+    query_lower = re.sub(r'section\s+(\d+)\((\d+)\)', r'section_\1_\2', query_lower)
+    query_lower = re.sub(r'rule\s+(\d+)\((\d+)\)', r'rule_\1_\2', query_lower)
+    query_lower = re.sub(r'section\s+(\d+)', r'section_\1', query_lower)
+    query_lower = re.sub(r'rule\s+(\d+)', r'rule_\1', query_lower)
+    
+    generic_stopwords = {"the", "a", "an", "is", "are", "was", "were", "of", "and", "in", "to", "for", "with", "on", "at", "by", "from", "as", "that", "this", "it", "be", "or", "which", "will", "would", "could", "should", "their", "they"}
+    
+    return [w for w in re.findall(r'\b\w+\b', query_lower) if w not in generic_stopwords and len(w) > 2]
+
+def semantic_rag_query(query: str, n_results: int = 3, is_private_audit: bool = True) -> str:
+    if not RAG_CHUNKS or RAG_EMBEDDINGS is None or RAG_BM25 is None:
+        return "RAG Retrieval Error: Hybrid index not found."
     try:
-        results = law_collection.query(query_texts=[query], n_results=n_results)
-        return "\n\n---\n\n".join(results['documents'][0])
+        # 1. Lexical BM25 Search (Cleaned: get_legal_query_tokens handles all lowercasing/replacing)
+        query_tokens = get_legal_query_tokens(query)
+        bm25_scores = RAG_BM25.get_scores(query_tokens)
+        
+        # 2. Dense Semantic Search
+        q_emb = BGE_MODEL.encode([f"Represent this query for retrieval: {query}"])[0]
+        q_emb = q_emb / np.linalg.norm(q_emb)
+        dense_scores = np.dot(RAG_EMBEDDINGS, q_emb)
+        
+        # 3. Pre-Filter & Reciprocal Rank Fusion (RRF k=60)
+        rrf_scores = np.zeros(len(RAG_CHUNKS))
+        
+        bm25_ranks = np.argsort(bm25_scores)[::-1]
+        dense_ranks = np.argsort(dense_scores)[::-1]
+        
+        for rank, idx in enumerate(bm25_ranks):
+            if is_private_audit and RAG_METADATAS[idx].get("applies_to") == "state":
+                continue
+            rrf_scores[idx] += 1.0 / (60 + rank + 1)
+            
+        for rank, idx in enumerate(dense_ranks):
+            if is_private_audit and RAG_METADATAS[idx].get("applies_to") == "state":
+                continue
+            rrf_scores[idx] += 1.0 / (60 + rank + 1)
+        
+        # 4. Deduplicate Candidates (Top 10)
+        top_indices = np.argsort(rrf_scores)[::-1]
+        candidates = []
+        seen = set()
+        for idx in top_indices:
+            if rrf_scores[idx] == 0: break # Skip zero scores
+            chunk_text = RAG_CHUNKS[idx]
+            if chunk_text not in seen:
+                seen.add(chunk_text)
+                candidates.append(chunk_text)
+            if len(candidates) == 10: break
+            
+        if not candidates:
+            return "No valid context found."
+            
+        # 5. Cross-Encoder Reranking
+        cross_inp = [[query, doc] for doc in candidates]
+        cross_scores = RERANKER_MODEL.predict(cross_inp)
+        best_indices = np.argsort(cross_scores)[::-1][:n_results]
+        
+        return "\n\n---\n\n".join([candidates[i] for i in best_indices])
     except Exception as e:
         return f"RAG Retrieval Error: {str(e)}"
 
@@ -185,25 +296,273 @@ CHATBOT_PERSONAS = [
     "A corporate compliance lawyer advising a multinational client.",
     "A journalist trying to file an RTI request for a politician's data.",
     "A parent concerned about their child's data being tracked by an EdTech app.",
-    "A small business owner trying to understand SDF thresholds."
+    "A small business owner trying to understand SDF thresholds.",
+    "A government hospital administrator dealing with patient data.",
+    "A startup CTO trying to understand SDF thresholds.",
+    "A consumer rights NGO worker advocating for rural citizens.",
+    "A cross-border SaaS vendor managing Indian client data.",
+    "A school principal handling student records and grades.",
+    "An HR manager at a large employer dealing with employee data.",
+    "An elderly individual confused about consent notices.",
+    "A freelance software developer building a web application."
 ]
 
-CHATBOT_SCENARIOS = [
-    "The exact penalty schedule and maximum fines for data breaches (Section 33 & Schedule).",
-    "The step-by-step process of filing a complaint with the Data Protection Board.",
-    "The composition, appointment, and removal criteria of Board members (Section 18-20).",
-    "The powers of the Board to summon evidence and conduct inquiries (Section 21).",
-    "The appellate process: How to appeal a Board decision to the TDSAT (Section 29).",
-    "The legal definition and distinction between Data Principal and Data Fiduciary (Section 2).",
-    "The scope of the Act: How it applies to offline data that is later digitized (Section 3).",
-    "Government and law enforcement exemptions for investigating offenses (Section 17).",
-    "How Section 44 of the DPDP Act overrides the RTI Act 2005 regarding personal information.",
-    "The legal obligations and liabilities of Data Processors acting on behalf of Fiduciaries (Section 8(8)).",
-    "The specific duties of Significant Data Fiduciaries (SDFs) regarding DPIAs and audits (Section 10).",
-    "The rights of Data Principals to nominate a representative in case of death or incapacity (Section 15).",
-    "The mechanics and interoperability requirements of Consent Managers (Rule 4).",
-    "The exact timelines and mechanisms for data breach notification to the Board and users (Rule 7)."
+def get_expanded_scenarios():
+    return [
+    {
+        "id": "consent_basics_1",
+        "primary_section": "6(1)",
+        "scenario": "Turn 1: How can we obtain valid consent for our app?\nTurn 2: Is a pre-checked box legally sufficient?\nTurn 3: Does the consent prompt need to explain every third party we share data with?"
+    },
+    {
+        "id": "consent_basics_2",
+        "primary_section": "6(2)",
+        "scenario": "Turn 1: Can we bundle consent for marketing with consent for our core service?\nTurn 2: What if the core service is free, can we make marketing a condition then?\nTurn 3: How do we prove the consent was free and unconditional?"
+    },
+    {
+        "id": "consent_withdrawal_1",
+        "primary_section": "6(4)",
+        "scenario": "Turn 1: A user wants to withdraw consent. How quickly must we process this?\nTurn 2: Must we provide a 'one-click' withdrawal option?\nTurn 3: What if processing their withdrawal breaks their active subscription?"
+    },
+    {
+        "id": "consent_withdrawal_2",
+        "primary_section": "6(5)",
+        "scenario": "Turn 1: If a user withdraws consent, do we lose the legal right to the data we already processed?\nTurn 2: Can we retain their data for audit purposes after withdrawal?\nTurn 3: Are we liable for actions taken by our processors before the withdrawal?"
+    },
+    {
+        "id": "consent_manager_1",
+        "primary_section": "6(7)",
+        "scenario": "Turn 1: What is a Consent Manager under the DPDP Act?\nTurn 2: Are we legally required to integrate with them?\nTurn 3: Can we charge users a fee for using a Consent Manager?"
+    },
+    {
+        "id": "consent_manager_2",
+        "primary_section": "6(8)",
+        "scenario": "Turn 1: Who is responsible if a Consent Manager maliciously alters a user's preferences?\nTurn 2: Does the Data Fiduciary face penalties for the Consent Manager's failure?\nTurn 3: How do we verify the identity of the Consent Manager?"
+    },
+    {
+        "id": "legitimate_use_1",
+        "primary_section": "7(a)",
+        "scenario": "Turn 1: A user voluntarily gave us their email. Is that deemed consent for our newsletter?\nTurn 2: What if they gave it for a customer support ticket, can we still send marketing?\nTurn 3: Does 'voluntary provision' require a privacy notice?"
+    },
+    {
+        "id": "legitimate_use_2",
+        "primary_section": "7(b)",
+        "scenario": "Turn 1: Can the State process data without consent for subsidies?\nTurn 2: Are private contractors working for the State exempt under this clause?\nTurn 3: Must the State provide a privacy notice when processing under this section?"
+    },
+    {
+        "id": "legitimate_use_3",
+        "primary_section": "7(c)",
+        "scenario": "Turn 1: Is processing medical data during a health emergency allowed without consent?\nTurn 2: Does this apply to private hospitals or only government bodies?\nTurn 3: What happens to the data after the emergency is over?"
+    },
+    {
+        "id": "legitimate_use_4",
+        "primary_section": "7(d)",
+        "scenario": "Turn 1: Can an employer process employee biometrics without explicit consent?\nTurn 2: Does this cover processing data to monitor employee productivity?\nTurn 3: Can the employee opt out of this processing?"
+    },
+    {
+        "id": "processor_liability_1",
+        "primary_section": "8(1)",
+        "scenario": "Turn 1: Are we liable if our cloud provider suffers a data breach?\nTurn 2: Can we use a contract to shift DPDP liability entirely to the processor?\nTurn 3: What specific clauses are mandatory in a processor contract?"
+    },
+    {
+        "id": "processor_liability_2",
+        "primary_section": "8(2)",
+        "scenario": "Turn 1: Must we conduct technical audits on our processors?\nTurn 2: Is it sufficient to rely on their ISO certifications?\nTurn 3: What if the processor is located outside India?"
+    },
+    {
+        "id": "data_accuracy_1",
+        "primary_section": "8(3)",
+        "scenario": "Turn 1: Are we required to verify the accuracy of all user data?\nTurn 2: If a user provides a fake name, are we penalized?\nTurn 3: How does this apply to data collected from third-party brokers?"
+    },
+    {
+        "id": "data_security_1",
+        "primary_section": "8(4)",
+        "scenario": "Turn 1: What 'reasonable security safeguards' are mandated by the Act?\nTurn 2: Is end-to-end encryption a strict legal requirement?\nTurn 3: Can we be fined if we had security measures but a breach still occurred?"
+    },
+    {
+        "id": "breach_notification_1",
+        "primary_section": "8(6)",
+        "scenario": "Turn 1: We discovered a data breach. Who exactly must we notify?\nTurn 2: Is there a specific format for notifying the Data Protection Board?\nTurn 3: Must we notify users if the breached data was fully encrypted?"
+    },
+    {
+        "id": "breach_notification_2",
+        "primary_section": "8(6)",
+        "scenario": "Turn 1: What is the exact timeline for breach notification?\nTurn 2: Does the 72-hour clock start upon suspicion or confirmation?\nTurn 3: Can we delay notification to conduct a forensic investigation?"
+    },
+    {
+        "id": "data_erasure_1",
+        "primary_section": "8(7)",
+        "scenario": "Turn 1: When must we erase user data if they haven't requested it?\nTurn 2: What defines the 'specified purpose' being no longer served?\nTurn 3: How do we handle backups and archives in data erasure?"
+    },
+    {
+        "id": "data_erasure_2",
+        "primary_section": "8(7)",
+        "scenario": "Turn 1: Can we retain data to comply with tax laws even if the user withdraws consent?\nTurn 2: Must we inform the user when their data is automatically erased?\nTurn 3: Do we have to ensure our processors also erase the data?"
+    },
+    {
+        "id": "dpo_contact_1",
+        "primary_section": "8(9)",
+        "scenario": "Turn 1: Must every company appoint a Data Protection Officer?\nTurn 2: Does the contact information need to be a physical address or is email sufficient?\nTurn 3: Can the DPO be based outside India?"
+    },
+    {
+        "id": "grievance_mechanism_1",
+        "primary_section": "8(10)",
+        "scenario": "Turn 1: What are the requirements for an internal grievance redressal mechanism?\nTurn 2: Is there a statutory time limit for resolving grievances?\nTurn 3: Can we require users to send grievances via registered post?"
+    },
+    {
+        "id": "child_consent_1",
+        "primary_section": "9(1)",
+        "scenario": "Turn 1: How do we legally obtain 'verifiable parental consent'?\nTurn 2: Is a checkbox confirming 'I am over 18' sufficient?\nTurn 3: What if a child lies about their age on our platform?"
+    },
+    {
+        "id": "child_tracking_1",
+        "primary_section": "9(2)",
+        "scenario": "Turn 1: Are we absolutely prohibited from tracking children's data?\nTurn 2: Can we serve targeted ads to children if the parent consents?\nTurn 3: Does this ban apply to educational platforms monitoring student progress?"
+    },
+    {
+        "id": "child_exemptions_1",
+        "primary_section": "9(4)",
+        "scenario": "Turn 1: How can an EdTech company get an exemption from the tracking ban?\nTurn 2: Who determines if the processing is 'verifiably safe'?\nTurn 3: Can the exemption be revoked?"
+    },
+    {
+        "id": "sdf_threshold_1",
+        "primary_section": "10(1)",
+        "scenario": "Turn 1: How does a company become a Significant Data Fiduciary (SDF)?\nTurn 2: Is it purely based on the volume of data processed?\nTurn 3: Does processing sensitive financial data automatically make us an SDF?"
+    },
+    {
+        "id": "sdf_dpo_1",
+        "primary_section": "10(2)(a)",
+        "scenario": "Turn 1: What are the specific requirements for an SDF's Data Protection Officer?\nTurn 2: Can the DPO also serve as the Chief Information Security Officer?\nTurn 3: Does the DPO report to the CEO or the Board of Directors?"
+    },
+    {
+        "id": "sdf_auditor_1",
+        "primary_section": "10(2)(b)",
+        "scenario": "Turn 1: Must an SDF appoint an Independent Data Auditor?\nTurn 2: How often must the independent audit be conducted?\nTurn 3: Who receives the auditor's final report?"
+    },
+    {
+        "id": "sdf_dpia_1",
+        "primary_section": "10(2)(c)",
+        "scenario": "Turn 1: What exactly is a Data Protection Impact Assessment (DPIA)?\nTurn 2: Do we need to conduct a DPIA for every new feature?\nTurn 3: Must the DPIA be published publicly?"
+    },
+    {
+        "id": "right_to_access_1",
+        "primary_section": "11(1)",
+        "scenario": "Turn 1: A user requested a summary of all their data. What must we provide?\nTurn 2: Must we provide the raw data or just a descriptive summary?\nTurn 3: How long do we have to respond to this request?"
+    },
+    {
+        "id": "right_to_identities_1",
+        "primary_section": "11(2)",
+        "scenario": "Turn 1: Must we disclose the names of all third parties we shared user data with?\nTurn 2: Are there any exemptions for sharing data with law enforcement?\nTurn 3: What if we shared the data in an aggregated, anonymized format?"
+    },
+    {
+        "id": "right_to_correction_1",
+        "primary_section": "12(1)",
+        "scenario": "Turn 1: A user wants us to correct their address. What is the process?\nTurn 2: Are we legally required to verify the new address before updating it?\nTurn 3: What if the correction conflicts with our KYC records?"
+    },
+    {
+        "id": "right_to_erasure_1",
+        "primary_section": "12(3)",
+        "scenario": "Turn 1: If a user demands erasure, must we delete their data immediately?\nTurn 2: What if deleting their account breaks financial records required by law?\nTurn 3: Are we required to notify third-party processors to also erase the data?"
+    },
+    {
+        "id": "right_to_grievance_1",
+        "primary_section": "13(1)",
+        "scenario": "Turn 1: Can a user complain directly to the Data Protection Board?\nTurn 2: What constitutes an 'exhaustion' of the internal grievance mechanism?\nTurn 3: Can the Board penalize a user for filing a frivolous complaint?"
+    },
+    {
+        "id": "right_to_nominate_1",
+        "primary_section": "14",
+        "scenario": "Turn 1: What is the right to nominate under the DPDP Act?\nTurn 2: Can the nominee access the user's data while the user is still alive?\nTurn 3: Does this right supersede inheritance laws?"
+    },
+    {
+        "id": "duties_of_principal_1",
+        "primary_section": "15",
+        "scenario": "Turn 1: Are there any legal duties imposed on the users themselves?\nTurn 2: Can a user be fined for providing a fake identity?\nTurn 3: Who enforces the penalties against Data Principals?"
+    },
+    {
+        "id": "cross_border_1",
+        "primary_section": "16(1)",
+        "scenario": "Turn 1: Can we transfer Indian users' data to servers in the USA?\nTurn 2: Does the Central Government maintain a whitelist or a blacklist of countries?\nTurn 3: What happens if another Indian law strictly requires local data storage?"
+    },
+    {
+        "id": "state_exemption_1",
+        "primary_section": "17(1)(a)",
+        "scenario": "Turn 1: Is the government exempt from the DPDP Act for national security?\nTurn 2: Does this exemption apply to private contractors building software for the military?\nTurn 3: Who oversees the government's use of this exemption?"
+    },
+    {
+        "id": "research_exemption_1",
+        "primary_section": "17(2)(b)",
+        "scenario": "Turn 1: Can we process personal data for statistical research without consent?\nTurn 2: What safeguards must be in place to qualify for this exemption?\nTurn 3: Can the research findings include personally identifiable information?"
+    },
+    {
+        "id": "startup_exemption_1",
+        "primary_section": "17(3)",
+        "scenario": "Turn 1: Are startups entirely exempt from the DPDP Act?\nTurn 2: Which specific obligations can the Central Government exempt startups from?\nTurn 3: What defines a startup for the purpose of this exemption?"
+    },
+    {
+        "id": "board_inquiry_1",
+        "primary_section": "27(1)",
+        "scenario": "Turn 1: Can the Board initiate an inquiry without a user complaint?\nTurn 2: What triggers the Board's power to inquire?\nTurn 3: Does the Board have to provide a hearing before issuing penalties?"
+    },
+    {
+        "id": "board_powers_1",
+        "primary_section": "28(1)",
+        "scenario": "Turn 1: Does the Data Protection Board have the same powers as a civil court?\nTurn 2: Can they summon our CEO for an interrogation?\nTurn 3: Can the Board order a police search of our premises?"
+    },
+    {
+        "id": "interim_orders_1",
+        "primary_section": "27(3)",
+        "scenario": "Turn 1: Can the Board issue interim orders during an ongoing inquiry?\nTurn 2: Could they force us to halt our core business operations temporarily?\nTurn 3: Can we appeal an interim order immediately to TDSAT?"
+    },
+    {
+        "id": "tdsat_appeal_1",
+        "primary_section": "29(1)",
+        "scenario": "Turn 1: Where do we appeal if the Board issues a massive penalty against us?\nTurn 2: What is the time limit for filing an appeal to TDSAT?\nTurn 3: Do we have to pay the penalty before the appeal is heard?"
+    },
+    {
+        "id": "tdsat_powers_1",
+        "primary_section": "29(7)",
+        "scenario": "Turn 1: Can TDSAT completely overturn the Board's decision?\nTurn 2: Does TDSAT conduct a fresh investigation or only review the Board's order?\nTurn 3: Where can we appeal if TDSAT rules against us?"
+    },
+    {
+        "id": "penalties_breach_1",
+        "primary_section": "33(1)",
+        "scenario": "Turn 1: What is the maximum penalty for failing to prevent a data breach?\nTurn 2: Is the penalty calculated per affected user or per incident?\nTurn 3: Can the Board shut down the company instead of a financial penalty?"
+    },
+    {
+        "id": "penalties_child_1",
+        "primary_section": "33(2)",
+        "scenario": "Turn 1: What is the fine for violating the children's data provisions?\nTurn 2: Is the fine the same for both targeted tracking and lack of parental consent?\nTurn 3: Does the fine go to the affected children or the government?"
+    },
+    {
+        "id": "penalties_factors_1",
+        "primary_section": "33(2)",
+        "scenario": "Turn 1: How does the Board determine the exact penalty amount?\nTurn 2: Does taking immediate mitigating action reduce the fine?\nTurn 3: Does a previous violation history significantly increase the penalty?"
+    },
+    {
+        "id": "civil_court_bar_1",
+        "primary_section": "39",
+        "scenario": "Turn 1: Can a user file a lawsuit in a civil court for a data breach?\nTurn 2: Does the DPDP Act completely bar civil court jurisdiction?\nTurn 3: Can a user still claim compensation under the IT Act or tort law?"
+    },
+    {
+        "id": "rti_override_1",
+        "primary_section": "44(3)",
+        "scenario": "Turn 1: How does the DPDP Act amend the Right to Information (RTI) Act?\nTurn 2: Can a citizen still demand personal information of a government official under RTI?\nTurn 3: Does the 'public interest' exemption still exist for personal data under RTI?"
+    },
+    {
+        "id": "rules_notice_1",
+        "primary_section": "Rule 3",
+        "scenario": "Turn 1: Does the privacy notice need to be available in all 22 official languages?\nTurn 2: How must the notice be presented to the user during registration?\nTurn 3: Can the English version be the only legally binding one?"
+    },
+    {
+        "id": "rules_breach_1",
+        "primary_section": "Rule 7",
+        "scenario": "Turn 1: What exactly must be included in the breach notification to the Board?\nTurn 2: Do we have to specify the number of affected users within the 72 hours?\nTurn 3: What if we don't know the full extent of the breach yet?"
+    }
 ]
+
+CHATBOT_SCENARIOS = get_expanded_scenarios()
+
 
 SUBTLE_TECHNIQUE_MAP = {
     "purpose_limitation": "Legitimate Use Overreach: Claim that voluntarily providing data constitutes 'deemed consent' for secondary commercial marketing.",
@@ -231,7 +590,70 @@ SUBTLE_TECHNIQUE_MAP = {
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 2: DYNAMIC CONTEXT & VALIDATION ENGINE
 # ═══════════════════════════════════════════════════════════════════════════
+from prompts.target_violations import TARGET_VIOLATIONS
+
 law_cache = {}
+
+from difflib import get_close_matches
+
+# Global cache for Semantic Key Matching
+RAG_KEY_EMBEDDINGS = None
+RAG_KEYS_LIST = None
+
+def _get_semantic_key_cache():
+    """Lazily loads and caches the BGE embeddings for all TARGET_VIOLATIONS keys."""
+    global RAG_KEY_EMBEDDINGS, RAG_KEYS_LIST
+    if RAG_KEY_EMBEDDINGS is None and BGE_MODEL is not None:
+        RAG_KEYS_LIST = list(TARGET_VIOLATIONS.keys())
+        # Embed the keys using the same instruction prefix used for documents
+        RAG_KEY_EMBEDDINGS = BGE_MODEL.encode([
+            f"Represent this legal concept for retrieval: {k}" for k in RAG_KEYS_LIST
+        ])
+        # L2 Normalize for fast cosine similarity via dot product
+        RAG_KEY_EMBEDDINGS = RAG_KEY_EMBEDDINGS / np.linalg.norm(RAG_KEY_EMBEDDINGS, axis=1, keepdims=True)
+    return RAG_KEYS_LIST, RAG_KEY_EMBEDDINGS
+
+def get_audit_rag_context(target_category: str) -> str:
+    """
+    DETERMINISTIC AUDIT CONTEXT: 4-Tier Graceful Degradation.
+    Prioritizes the pristine TARGET_VIOLATIONS dictionary.
+    Falls back to the SOTA Hybrid RAG (with State-Schedule filtering) only if the dictionary fails.
+    """
+    if not target_category:
+        return ""
+
+    target_category = str(target_category).strip().lower()
+    
+    # TIER 1: Exact Match (Fast Path)
+    if target_category in TARGET_VIOLATIONS:
+        return "\n\n".join(TARGET_VIOLATIONS[target_category])
+    
+    # TIER 2: Fuzzy Key Match (Catches typos, trailing spaces, plurals)
+    close_matches = get_close_matches(target_category, TARGET_VIOLATIONS.keys(), n=1, cutoff=0.6)
+    if close_matches:
+        best_key = close_matches[0]
+        return "\n\n".join(TARGET_VIOLATIONS[best_key])
+    print(f"⚠️ FATAL: Dictionary lookup FAILED for '{target_category}'. Available keys: {list(TARGET_VIOLATIONS.keys())[:5]}")
+    
+    # TIER 3: Semantic Key Match (Uses BGE to find the closest dictionary key)
+    keys_list, key_embeddings = _get_semantic_key_cache()
+    if key_embeddings is not None:
+        target_embedding = BGE_MODEL.encode([f"Represent this legal concept for retrieval: {target_category}"])[0]
+        target_embedding = target_embedding / np.linalg.norm(target_embedding)
+        
+        # Cosine similarity via dot product
+        similarities = np.dot(key_embeddings, target_embedding)
+        best_key_idx = np.argmax(similarities)
+        best_key = keys_list[best_key_idx]
+        
+        # Accept if semantic similarity is reasonably high (> 0.5)
+        if similarities[best_key_idx] > 0.5: 
+            return "\n\n".join(TARGET_VIOLATIONS[best_key])
+
+    # TIER 4: SOTA Hybrid RAG Fallback (State-Schedule Filtered)
+    # If the category is completely novel and fails semantic matching, 
+    # we query the Hybrid RAG index but strictly filter out State/Instrumentality chunks.
+    return semantic_rag_query(target_category, n_results=2, is_private_audit=True)
 
 def extract_relevant_law(law_text, target_violation):
     target_lower = str(target_violation or "").lower()
@@ -360,11 +782,16 @@ def is_administrative_element(quote: str, offending_entities: list = None) -> bo
     has_phone = bool(re.search(r'\b\d{10}\b|\+91-\d{2}-\d{8}', quote))
     has_address_marker = any(m in norm for m in ["registered office", "corporate office", "postal code", "pin code", "gstin:", "grievance officer", "data protection officer", "dpo", "nodal officer", "concerns or clarifications", "contact us", "queries regarding", "questions about", "reach out to"])
     
-    if has_email or has_phone or has_address_marker:
+    # Check for company introduction preambles
+    intro_pattern = r'^(?:welcome to|at\s+[A-Z]|in\s+our\s+pursuit|we\s+are\s+dedicated\s+to|[A-Z][A-Za-z0-9\s&,\.\']+\s+(?:private\s+limited|limited|ltd|solutions|technologies|innovations|communications|services|finance|healthcare|logistics|retail)\s+(?:is|was|we|operates|maintains|strives|is\s+dedicated|is\s+unwavering|unwaveringly))\b'
+    is_intro_preamble = bool(re.search(intro_pattern, quote, re.IGNORECASE))
+    
+    if has_email or has_phone or has_address_marker or is_intro_preamble:
         violation_keywords = [
             "share", "sell", "transfer", "retain", "collect", "process", 
             "deny", "refuse", "restrict", "limit", "waive", "disclaim",
-            "consent", "agree", "charge", "fee", "arbitration", "ignore"
+            "consent", "agree", "charge", "fee", "arbitration", "ignore",
+            "permanently", "indefinitely", "unconditionally", "exempt", "bypass"
         ]
         if not any(kw in norm for kw in violation_keywords):
             return True
@@ -471,6 +898,9 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     for v in viols:
         if not isinstance(v, dict): return False, "Violation item is not a dictionary"
         
+        if v.get("omission_check") is True:
+            return False, "Violation is based on omission (omission_check is True)."
+
         quote = str(v.get("evidence_quote", "")).strip()
         if quote not in policy_text:
             # Strict Auto-Healing: find the exact original substring ignoring punctuation/whitespace drift
@@ -488,28 +918,45 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if check_string_poison(quote) or check_string_poison(str(v.get("step_3_semantic_justification", ""))) or check_string_poison(str(v.get("step_2_statute_match", ""))) or check_string_poison(str(v.get("step_1_active_claim_analysis", ""))):
             return False, "Violation contains unresolved placeholders, leaked tags, or unicode poison"
             
-        # Internal Period & Multi-Sentence Check (Abbreviation-Aware Period Purge Enforcement)
-        quote_clean = quote.strip()
-        quote_body = quote_clean[:-1] if quote_clean.endswith(('.', '!', '?')) else quote_clean
-        # Strip standard ellipsis (...) or (..) or [...]
-        quote_check = re.sub(r'\[\s*\.{2,3}\s*\]|\.{2,3}', ' ', quote_body)
-        # Strip decimals, monetary values with commas, section/rule numbers
-        quote_check = re.sub(r'\b(?:INR|Rs\.?|\$|[\d,]+)\s*[\d,]+\.\d+\b', '', quote_check, flags=re.IGNORECASE)
-        quote_check = re.sub(r'\b\d+\.\d+(?:\.\d+)*\b', '', quote_check)
-        # Strip emails, URLs, and domain names
-        quote_check = re.sub(r'\S+@\S+|\S+\.\S+/(?:\S+)?|\b(?:www\.)?[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|co|io|ai|info|biz)\b', '', quote_check, flags=re.IGNORECASE)
-        # Strip single/multi-letter acronyms and initials (e.g., D.P.D.P. or A. B. C.)
-        quote_check = re.sub(r'(?:\b[A-Za-z]\.\s*)+', '', quote_check)
-        # Strip standard honorifics, corporate and calendar abbreviations with optional trailing/leading punctuation
-        quote_check = re.sub(r'(?i)\b(?:Pvt|Private\s+Ltd|Ltd|Co|Inc|Corp|Dr|Mr|Mrs|Ms|Smt|Shri|Prof|Capt|Col|Gen|Hon|Rev|Sr|Jr|No|S\.No|Reg|Sec|Rule|Section|Cl|Clause|Dept|Est|Approx|Max|Min|Rs|INR|Fig|Ref|App|Ph\.D|B\.Tech|M\.Tech|e\.g|i\.e|vs|v|etc|viz|cf|et\s+al|St|Ave|Blvd|Rd|Sq|Gov|Org|Edu|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*(?:Ltd\.?)?', '', quote_check)
-        if re.search(r'\.\s+[A-Z0-9]', quote_check):
-            # Auto-Heal: Truncate at the very first period
-            truncated_quote = quote.split('.')[0] + '.'
-            if len(truncated_quote) >= 20 and truncated_quote in policy_text:
-                v["evidence_quote"] = truncated_quote
-                quote = truncated_quote
-            else:
-                return False, f"Internal period detected inside evidence quote (Period Purge violation): {quote_clean[:60]}..."
+        # Mechanical Single-Sentence Truncation (Anti-Mixed Trap)
+        def find_first_terminal_punctuation(text: str) -> int:
+            # Mask out abbreviations and decimals exactly, preserving string length
+            text_check = re.sub(r'\[\s*\.{2,3}\s*\]|\.{2,3}', lambda m: ' ' * len(m.group(0)), text)
+            text_check = re.sub(r'\b(?:INR|Rs\.?|\$|[\d,]+)\s*[\d,]+\.\d+\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
+            text_check = re.sub(r'\b\d+\.\d+(?:\.\d+)*\b', lambda m: ' ' * len(m.group(0)), text_check)
+            text_check = re.sub(r'\S+@\S+|\S+\.\S+/(?:\S+)?|\b(?:www\.)?[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|co|io|ai|info|biz)\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
+            text_check = re.sub(r'(?:\b[A-Za-z]\.\s*)+', lambda m: ' ' * len(m.group(0)), text_check)
+            text_check = re.sub(r'(?i)\b(?:Pvt|Private\s+Ltd|Ltd|Co|Inc|Corp|Dr|Mr|Mrs|Ms|Smt|Shri|Prof|Capt|Col|Gen|Hon|Rev|Sr|Jr|No|S\.No|Reg|Sec|Rule|Section|Cl|Clause|Dept|Est|Approx|Max|Min|Rs|INR|Fig|Ref|App|Ph\.D|B\.Tech|M\.Tech|e\.g|i\.e|vs|v|etc|viz|cf|et\s+al|St|Ave|Blvd|Rd|Sq|Gov|Org|Edu|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*(?:Ltd\.?)?', lambda m: ' ' * len(m.group(0)), text_check)
+            
+            # Find the first true terminal punctuation mark that signals end of sentence
+            match = re.search(r'([\.\!\?])\s+(?=[A-Z0-9])', text_check)
+            if match:
+                return match.start(1) + 1  # Include the punctuation mark
+            return -1
+
+        terminal_idx = find_first_terminal_punctuation(quote)
+        if terminal_idx != -1:
+            quote = quote[:terminal_idx].strip()
+            v["evidence_quote"] = quote  # Auto-heal by truncating stitched sentences
+
+        # Substantive Violation Keyword Verification (Anti-Benign Quote Flagging)
+        substantive_keywords = [
+            "refuse", "deny", "trade secret", "permanently", "indefinitely", "unconditionally", 
+            "unrestricted", "without consent", "no due diligence", "black box", "exempt", 
+            "retain", "share", "sell", "transfer", "cap", "arbitration", "bypass", "irrevocable",
+            "regardless", "shielded", "forego", "declines", "reject", "withhold", "disclose",
+            "disclosing", "logic", "automated", "profiling", "broker", "brokers", "third-party",
+            "third party", "liability", "jurisdiction", "court", "tribunal", "notarized",
+            "biometric", "presumptive", "tacit", "mandatory", "require", "requires", "condition",
+            "conditioned", "without exception", "no option", "no right", "no opt-out", "opt out",
+            "security", "safeguard", "safeguards", "measure", "measures", "compliance", "commitment",
+            "purpose", "purposes", "legal", "law", "statutory", "obligation", "obligations",
+            "store", "storage", "delete", "deletion", "erase", "erasure", "collect", "collection",
+            "use", "usage", "process", "processing", "access", "request", "notice", "notify",
+            "grievance", "manager"
+        ]
+        if not any(kw in quote.lower() for kw in substantive_keywords):
+            return False, f"Evidence quote lacks substantive violation terms (benign quote flagged): {quote[:40]}..."
             
         # Omission Hallucination Check & Runtime Justification Deduplication
         justification = str(v.get("step_3_semantic_justification", "")).lower()
@@ -556,6 +1003,26 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                     if quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.85:
                         return False, f"DPO rejected audit targets chosen evidence quote directly ({c_type}): {quote[:40]}..."
 
+        # 🚨 COMPREHENSIVE STATUTE STRETCHING FIREWALL
+        vtype = v.get("violation_type", "")
+        statute = v.get("statute_reference", "").lower()
+        quote_lower = quote.lower()
+        
+        # Guard 1: SDF/Algorithmic violations MUST cite Section 10 or Rule 13
+        if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING"]:
+            if "section 10" not in statute and "rule 13" not in statute:
+                return False, f"Statute stretching: {vtype} must cite Section 10 or Rule 13, not {statute}."
+        
+        # Guard 2: Retention violations MUST cite Section 8, Rule 8, or Schedule
+        if vtype == "DATA_RETENTION_LIMIT_EXCEEDED":
+            if "section 8" not in statute and "rule 8" not in statute and "schedule" not in statute:
+                return False, f"Statute stretching: {vtype} must cite Section 8, Rule 8, or Schedule, not {statute}."
+                
+        # Guard 3: Tracking/Analytics quotes CANNOT be classified as SDF/Algorithmic violations
+        if any(domain in quote_lower for domain in ["metrics.", "ad-tracker", "social-network", "analytics", "third-party"]):
+            if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING"]:
+                return False, "Statute stretching: Tracking/analytics sharing cannot be classified as an Algorithmic Profiling/SDF obligation violation."
+
         # v["omission_check"] = False (handled dynamically by prompt constraint)
         statute_pattern = r'(?i)\b(?:(?:section|sec\.?|s\.?|clause|act)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:rule|r\.?)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|the)\s+schedule|dpdp)\b'
         if not re.search(statute_pattern, statute):
@@ -574,94 +1041,45 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                 audit["dpdp_trust_score"] = 15 # Severe clamp
     return True, ""
 
-def repair_json_string(s: str) -> str:
-    chars = list(s)
-    n = len(chars)
-    in_string = False
-    escape = False
-    result = []
-    
-    i = 0
-    while i < n:
-        c = chars[i]
-        if escape:
-            result.append(c)
-            escape = False
-            i += 1
-            continue
-            
-        if c == '\\':
-            result.append(c)
-            escape = True
-            i += 1
-            continue
-            
-        if c == '"':
-            if in_string:
-                j = i + 1
-                while j < n and chars[j].isspace():
-                    j += 1
-                is_delimiter = False
-                if j < n:
-                    if chars[j] in (':', ',', '}', ']'):
-                        is_delimiter = True
-                else:
-                    is_delimiter = True
-                
-                if is_delimiter:
-                    in_string = False
-                    result.append(c)
-                else:
-                    result.append('\\')
-                    result.append('"')
-            else:
-                in_string = True
-                result.append(c)
-        else:
-            result.append(c)
-        i += 1
-        
-    return "".join(result)
-
 def json_repair_loads(raw_text: str):
-    text = raw_text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
+    text = str(raw_text).strip()
+    
+    # 1. Preamble & Postamble Trimming
+    start_obj = text.find('{')
+    end_obj = text.rfind('}')
+    start_arr = text.find('[')
+    end_arr = text.rfind(']')
+    
+    start = min(s for s in (start_obj, start_arr) if s != -1) if (start_obj != -1 or start_arr != -1) else -1
+    end = max(e for e in (end_obj, end_arr) if e != -1) if (end_obj != -1 or end_arr != -1) else -1
+    
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end+1]
+        
+    text = re.sub(r',\s*([\]}])', r'\1', text)
     
     try:
-        return json.loads(text)
+        return json.loads(text, strict=False)
     except json.JSONDecodeError:
         pass
         
-    cleaned = re.sub(r',\s*([\]}])', r'\1', text)
     try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
+        import yaml
+        parsed = yaml.safe_load(text)
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except Exception:
         pass
         
-    start = cleaned.find('{')
-    end = cleaned.rfind('}')
-    if start != -1 and end != -1:
-        segment = cleaned[start:end+1]
-        try:
-            return json.loads(segment)
-        except json.JSONDecodeError:
-            try:
-                repaired = repair_json_string(segment)
-                return json.loads(repaired)
-            except Exception:
-                pass
-                
     try:
-        repaired = repair_json_string(cleaned)
-        return json.loads(repaired)
-    except Exception as e:
-        raise ValueError(f"Failed to parse repaired JSON: {e}")
+        import json_repair
+        parsed = json_repair.loads(text)
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except Exception:
+        pass
+        
+    raise ValueError(f"Failed to parse defensively repaired JSON. Snippet: {text[:150]!r}")
 
 def safe_parse_audit(raw_text: str):
     try:
@@ -780,7 +1198,6 @@ To guarantee no accidental violations bleed into the text, you MUST explicitly a
 4. Grievance redressal must be explicitly frictionless (e.g., direct email to a named DPO, resolving within 90 days).
 5. Data transfers must explicitly state compliance with Central Government restrictions.
 6. NEVER include liability caps, mandatory arbitration, or foreign laws."""
-        law_chunk = extract_relevant_law(DPDP_LAW_TEXT, "compliance and general exemptions")
     elif rand_val < 0.625: # 60% Standard / Multi-label
         target_violation_text = compile_violation_objective(target_category, edge_template)
         if random.random() < 0.50:
@@ -794,16 +1211,16 @@ CRITICAL: You MUST embed a SECONDARY, subtle violation targeting this specific a
 {secondary_compiled}
 - The secondary violation must be woven naturally into the same corporate narrative, not tacked on as a separate, obvious clause.
 """
-        law_chunk = extract_relevant_law(DPDP_LAW_TEXT, target_category)
     else: # 37.5% Specific Entity Injection
         target_violation_text = compile_violation_objective(target_category, edge_template)
         secondary_text = """
 [SPECIFIC ENTITY INJECTION REQUIRED]
 CRITICAL: To test network interception protocols, you MUST explicitly name at least two fictional
-third-party tracking domains in your deceptive clause (e.g., 'metrics.ad-tracker.com', 'user-sync.social-network.net').
+third-party tracking domains in your deceptive clause.
 Do not use generic terms like 'third parties'—name the specific URLs/domains receiving the data.
 """
-        law_chunk = extract_relevant_law(DPDP_LAW_TEXT, target_category)
+
+    law_chunk = get_audit_rag_context(target_category)
 
     final_prompt = SYNTHESIZER_PROMPT \
         .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
@@ -834,11 +1251,46 @@ def build_audit_matrix():
     matrix.sort(key=lambda x: x["target_category"]) 
     return matrix
 
+import collections
+
 def build_chatbot_matrix():
-    return [{"index": i, "persona": random.choice(CHATBOT_PERSONAS), "scenario": s, "law_chunk": extract_relevant_law(DPDP_LAW_TEXT, s)} for i, s in enumerate(random.choices(CHATBOT_SCENARIOS, k=TARGET_CHATBOT_PAIRS))]
+    matrix = []
+    scenarios = list(CHATBOT_SCENARIOS)
+    personas = list(CHATBOT_PERSONAS)
+    
+    random.shuffle(scenarios)
+    random.shuffle(personas)
+    
+    p_idx = 0
+    while len(matrix) < TARGET_CHATBOT_PAIRS:
+        for scenario in scenarios:
+            if len(matrix) >= TARGET_CHATBOT_PAIRS:
+                break
+                
+            persona = personas[p_idx % len(personas)]
+            p_idx += 1
+            
+            # Shuffle personas after a full cycle to avoid same pairing
+            if p_idx % len(personas) == 0:
+                random.shuffle(personas)
+                
+            matrix.append({
+                "index": len(matrix),
+                "persona": persona,
+                "scenario": scenario["scenario"],
+                "law_context": str(semantic_rag_query(scenario["scenario"], is_private_audit=not any(k in persona.lower() for k in ["state", "government", "instrumentality", "public officer", "policymaker", "hospital", "school"])))
+            })
+            
+    random.shuffle(matrix)
+    
+    # Update indices after shuffle
+    for i, m in enumerate(matrix):
+        m["index"] = i
+        
+    return matrix
 
 JUDGE_PERSONAS = [
-    "Act as a Forensic Data Auditor specializing in the DPDP Rules 2025. You are ruthless about exact timelines and technical definitions. Hunt down deceptive clauses that attempt to bypass the 72-hour Board notification rule (Rule 7), skirt the 3-year erasure mandate (Third Schedule), or substitute 'verifiable parental consent' (Rule 10) with weak self-certification.",
+    "Act as a Forensic Data Auditor specializing in the DPDP Rules 2025. You are ruthless about exact timelines and technical definitions. Hunt down deceptive clauses that attempt to bypass the 72-hour Board notification rule (Rule 7), skirt statutory erasure deadlines (Section 8(7) and Rule 8), or substitute 'verifiable parental consent' (Rule 10) with weak self-certification.",
     "Act as an aggressive Privacy Rights Advocate representing Data Principals. Scrutinize the text for 'dark patterns'. Expose any attempt to bundle consent (Section 6(2)), claim 'presumptive' or 'implicit' consent, or introduce procedural friction (e.g., demanding physical visits or 90+ day delays) when users attempt to exercise their grievance or erasure rights.",
     "Act as a strict Inspector for the Data Protection Board. Assume this company is a Significant Data Fiduciary (SDF). Look for illegal attempts to cap liability fines below statutory limits, bypass algorithmic auditing (Rule 13) by claiming 'trade secrets', or outsource non-delegable vicarious liability to third-party cloud vendors (Section 8(1)).",
     "Act as a precise, hyper-literal Legal Semantic Parser. Strip away aspirational corporate fluff ('we care about your privacy') and analyze the actual mechanisms. Expose loopholes where the company misapplies Section 17 exemptions—such as claiming 'research purposes' or 'legitimate business continuity' to illegally justify commercial marketing or indefinite data retention.",
@@ -848,34 +1300,89 @@ JUDGE_PERSONAS = [
 # ═══════════════════════════════════════════════════════════════════════════
 # LLM ENGINE INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
-print("Initializing 72B FP8 vLLM Engine...")
-if VLLM_AVAILABLE:
-    llm = LLM(
-        model=MODEL_PATH, quantization="fp8", tensor_parallel_size=1,
-        max_model_len=32768, gpu_memory_utilization=0.85, max_num_seqs=BATCH_SIZE, max_num_batched_tokens=4096,
-        kv_cache_dtype="fp8", enable_prefix_caching=True, enable_chunked_prefill=True,
-        attention_backend="TRITON_ATTN"
-    )
-else:
-    llm = None
-    print("VLLM is not available. Engine will not start.")
+llm = None
+gen_params = None
+judge_params = None
+chatbot_sft_params = None
+chatbot_dpo_params = None
 
-gen_params = SamplingParams(temperature=0.65, top_p=0.90, max_tokens=8192)
-judge_params = SamplingParams(temperature=0.1, top_p=0.1, max_tokens=6144, structured_outputs=StructuredOutputsParams(json=dpdp_schema))
-chatbot_sft_params = SamplingParams(temperature=0.6, top_p=0.90, max_tokens=8192)
-chatbot_dpo_params = SamplingParams(temperature=0.7, top_p=0.90, max_tokens=8192)
+def init_llm():
+    global llm, gen_params, judge_params, chatbot_sft_params, chatbot_dpo_params
+    print("Initializing 72B FP8 vLLM Engine...")
+    if VLLM_AVAILABLE:
+        llm = LLM(
+            model=MODEL_PATH, quantization="fp8", tensor_parallel_size=1,
+            max_model_len=32768, gpu_memory_utilization=0.8, max_num_seqs=BATCH_SIZE, max_num_batched_tokens=4096,
+            kv_cache_dtype="fp8", enable_prefix_caching=True, enable_chunked_prefill=True,
+            attention_backend="TRITON_ATTN"
+        )
+    else:
+        llm = None
+        print("VLLM is not available. Engine will not start.")
+
+    gen_params = SamplingParams(temperature=0.65, top_p=0.90, max_tokens=10240)
+    judge_params = SamplingParams(temperature=0.1, top_p=0.1, max_tokens=10240, structured_outputs=StructuredOutputsParams(json=dpdp_schema))
+    CHATBOT_DPO_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "array"},
+            "chosen": {"type": "array"},
+            "rejected": {"type": "array"}
+        },
+        "required": ["prompt", "chosen", "rejected"],
+        "additionalProperties": False
+    }
+
+    CHATBOT_SFT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "messages": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "role": {"type": "string"},
+                        "content": {"type": "string"}
+                    },
+                    "required": ["role", "content"]
+                }
+            }
+        },
+        "required": ["messages"],
+        "additionalProperties": False
+    }
+
+    chatbot_sft_params = SamplingParams(temperature=0.6, top_p=0.90, max_tokens=10240, structured_outputs=StructuredOutputsParams(json=CHATBOT_SFT_SCHEMA))
+    chatbot_dpo_params = SamplingParams(temperature=0.7, top_p=0.90, max_tokens=10240, structured_outputs=StructuredOutputsParams(json=CHATBOT_DPO_SCHEMA))
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 4: GENERATION LOOPS (SYNC BATCHED)
 # ═══════════════════════════════════════════════════════════════════════════
+def deep_strip_dict(obj):
+    """Recursively strips trailing spaces from ALL JSON keys and values."""
+    if isinstance(obj, dict):
+        return {str(k).strip(): deep_strip_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [deep_strip_dict(i) for i in obj]
+    elif isinstance(obj, str):
+        return obj.strip()
+    return obj
+
 def _save_training_pair(batch_idx, local_idx, item, policy_text, audit, step, lazy_audit, is_dpo=False):
-    target_category = str(item.get("target_category") or "")
-    law_chunk = extract_relevant_law(DPDP_LAW_TEXT, target_category)
+    audit = deep_strip_dict(audit)
+    if lazy_audit:
+        lazy_audit = deep_strip_dict(lazy_audit)
+        
+    target_category = item.get("target_category", "")
+    law_chunk = get_audit_rag_context(target_category)
     
     if not is_dpo and audit:
         sft = {"messages": [
-            {"role": "system", "content": "Strict DPDP Auditor."},
-            {"role": "user", "content": f"[CONTEXT: THE LAW]\n{law_chunk}\n\n[TASK]\nAnalyze:\n{policy_text}"},
+            {"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
+
+{law_chunk}"},
+            {"role": "user", "content": f"Analyze:
+{policy_text}"},
             {"role": "assistant", "content": json.dumps(audit, ensure_ascii=False, indent=2)}
         ]}
         with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_idx:03d}.json"), "w", encoding="utf-8") as f:
@@ -886,7 +1393,10 @@ def _save_training_pair(batch_idx, local_idx, item, policy_text, audit, step, la
     elif is_dpo and audit and lazy_audit:
         if isinstance(lazy_audit, dict) and len(lazy_audit.get("violations", [])) > 0:
             dpo = {
-                "prompt": [{"role": "system", "content": "Strict DPDP Auditor."}, {"role": "user", "content": f"[CONTEXT: THE LAW]\n{law_chunk}\n\n[TASK]\nAnalyze:\n{policy_text}"}],
+                "prompt": [{"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
+
+{law_chunk}"}, {"role": "user", "content": f"Analyze:
+{policy_text}"}],
                 "chosen": [{"role": "assistant", "content": json.dumps(audit, ensure_ascii=False, indent=2)}],
                 "rejected": [{"role": "assistant", "content": json.dumps(lazy_audit, ensure_ascii=False, indent=2)}]
             }
@@ -933,18 +1443,18 @@ def run_audit_forge():
             hn_msgs = []
             for i in remaining:
                 item = batch[i]
-                law_chunk = extract_relevant_law(DPDP_LAW_TEXT, item.get("target_category", ""))
+                law_chunk = get_audit_rag_context(item.get("target_category", ""))
                 prompt = JUDGE_PROMPT.replace("[JUDGE_PERSONA_INJECTION]", random.choice(JUDGE_PERSONAS)) \
                                      .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
+                                     .replace("[TARGET_STATUTE]", str(item.get("target_violation", ""))) \
+                                     .replace("[TARGET_VIOLATION_TYPE]", str(item.get("target_category", ""))) \
                                      .replace("[POLICY_INJECTION]", current_policies[i][:20000])
                                      
-                if random.random() < 0.15: # 15% chance to test for intentional statutory omission
-                    prompt = prompt.replace("[OMISSION_RULES]", "You MUST evaluate whether the policy omitted a required detail based on the context. Set 'omission_check' to true if it is an omission.")
-                    prompt = prompt.replace("[OMISSION_SCHEMA]", "true")
-                else:
-                    prompt = prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
-                    prompt = prompt.replace("[OMISSION_SCHEMA]", "false")
-                judge_msgs.append([{"role": "system", "content": "Strict DPDP Auditor."}, {"role": "user", "content": prompt}])
+                prompt = prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
+                prompt = prompt.replace("[OMISSION_SCHEMA]", "false")
+                judge_msgs.append([{"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
+
+{law_chunk}"}, {"role": "user", "content": prompt}])
                 
             audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
             
@@ -959,19 +1469,15 @@ def run_audit_forge():
                         chosen_quote = str(viols[0].get("evidence_quote", "")).strip()
                 except Exception:
                     pass
-                law_chunk = extract_relevant_law(DPDP_LAW_TEXT, item.get("target_category", ""))
+                law_chunk = get_audit_rag_context(item.get("target_category", ""))
                 hn_prompt = HARD_NEGATIVE_PROMPT \
                                                 .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
                                                 .replace("[POLICY_INJECTION]", current_policies[idx][:20000]) \
-                                                .replace("[TRUE_VIOLATION_CONTEXT]", f"Target Category: {item['target_category']}\\nChosen Violation Quote: {chosen_quote}") \
+                                                .replace("[TRUE_VIOLATION_CONTEXT]", f"Banned SFT Target Category: {item['target_category']}\\nBanned SFT Evidence Quote (DO NOT USE): {chosen_quote}") \
                                                 .replace("[CHOSEN_EVIDENCE_QUOTE]", chosen_quote if chosen_quote else "None extracted yet")
                                                 
-                if random.random() < 0.15:
-                    hn_prompt = hn_prompt.replace("[OMISSION_RULES]", "You MUST evaluate whether the policy omitted a required detail based on the context. Set 'omission_check' to true if it is an omission.")
-                    hn_prompt = hn_prompt.replace("[OMISSION_SCHEMA]", "true")
-                else:
-                    hn_prompt = hn_prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
-                    hn_prompt = hn_prompt.replace("[OMISSION_SCHEMA]", "false")
+                hn_prompt = hn_prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
+                hn_prompt = hn_prompt.replace("[OMISSION_SCHEMA]", "false")
                 hn_msgs.append([{"role": "system", "content": "Authoritative, overzealous privacy auditor."}, {"role": "user", "content": hn_prompt}])
                 
             hn_audit_outputs = llm.chat(messages=hn_msgs, sampling_params=judge_params)
@@ -1025,7 +1531,7 @@ def run_audit_forge():
                 viols = audit.get("violations", [])
                 caught = (score < 90 and len(viols) > 0) or item.get("is_hn")
                 
-                if caught or step == MAX_REFLEXION_STEPS - 1:
+                if caught:
                     if isinstance(audit, dict) and isinstance(hn_audit, dict) and len(hn_audit.get("violations", [])) > 0:
                         res_sft = _save_training_pair(batch_idx, idx, item, policy, audit, step, LAZY_AUDIT, is_dpo=False)
                         res_dpo = _save_training_pair(batch_idx, idx, item, policy, audit, step, hn_audit, is_dpo=True)
@@ -1098,6 +1604,61 @@ def run_audit_forge():
                 print(f"      - {count}x: {reason}", flush=True)
         gc.collect()
 
+
+def validate_chatbot_content(messages) -> tuple[bool, str]:
+    """Returns (is_valid, rejection_reason). Hard gate, no auto-healing."""
+    banned_terms = [
+        "gdpr", "ccpa", "hipaa", "data protection authority", "dpa", 
+        "legitimate interest", "right to be forgotten", "data controller", 
+        "data subject", "article 17", "section 43a", "spdi rules 2011",
+        "it act 2000", "information technology act", "right to portability",
+        "lgpd", "pdpa"
+    ]
+    hallucinated_entities = ["apex retail", "rajesh", "xyz corp", "acme corp"]
+    canned_openings = ["certainly, i'd be glad", "i'd be happy to help", "as an ai", "i appreciate your diligence", "certainly, i'd be happy"]
+    omission_phrases = ["without specifying", "fails to specify", "fails to mention", "silent on", "no mention of", "does not specify", "omits information"]
+    
+    full_text = " ".join([msg.get("content", "").lower() for msg in messages])
+    
+    # 1. Foreign Law Bleed Check
+    for term in banned_terms:
+        if term in full_text:
+            # allow DPA if it's strictly part of DPDP Act but here we banned "dpa" as a standalone acronym for Data Protection Authority
+            # Since 'dpa' can be tricky, let's use word boundary for it
+            if term == 'dpa':
+                if re.search(r'\bdpa\b', full_text):
+                    return False, f"FOREIGN_LAW_BLEED: Found '{term}'"
+            else:
+                return False, f"FOREIGN_LAW_BLEED: Found '{term}'"
+            
+    # 2. Entity Hallucination Check
+    for entity in hallucinated_entities:
+        if entity in full_text:
+            return False, f"ENTITY_HALLUCINATION: Found '{entity}'"
+            
+    # 3. Statutory Misapplication Check
+    if "section 27" in full_text and ("breach" in full_text or "notify" in full_text):
+        return False, "STATUTORY_MISAPPLICATION: Cited Sec 27 for breach reporting"
+        
+    if "section 14" in full_text and "rti" in full_text:
+        return False, "STATUTORY_MISAPPLICATION: Conflated Sec 14 Nomination with RTI"
+        
+    # 4. Artifact Check
+    if "[context" in full_text or "[task]" in full_text or "[persona" in full_text or "[scenario" in full_text:
+        return False, "PROMPT_ARTIFACT_LEAK"
+        
+    # 5. Canned Opening Check
+    for opening in canned_openings:
+        if opening in full_text:
+            return False, f"CANNED_OPENING: Found '{opening}'"
+            
+    # 6. Omission Phrase Check
+    for omission in omission_phrases:
+        if omission in full_text:
+            return False, f"OMISSION_PHRASE: Found '{omission}'"
+            
+    return True, "VALID"
+
 def run_chatbot_forge():
     print("\n" + "="*70)
     print("🤖 INITIATING BATCHED CHATBOT QA FORGE")
@@ -1106,97 +1667,183 @@ def run_chatbot_forge():
     total_batches = math.ceil(len(matrix) / BATCH_SIZE)
     stats = {"saved_chatbot_sft": 0, "saved_chatbot_dpo": 0, "dropped": 0}
     
-    foreign_laws = ["gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", "article 17", "right to portability", "legitimate interest", "it act 2000", "spdi rules 2011"]
-    
+    def normalize_chatbot_dpo(dpo_obj):
+        if not isinstance(dpo_obj, dict): return dpo_obj
+        if "history" in dpo_obj and "prompt" not in dpo_obj: dpo_obj["prompt"] = dpo_obj.pop("history")
+        elif "messages" in dpo_obj and "prompt" not in dpo_obj: dpo_obj["prompt"] = dpo_obj.pop("messages")
+        if "chosen_response" in dpo_obj and "chosen" not in dpo_obj: dpo_obj["chosen"] = dpo_obj.pop("chosen_response")
+        if "rejected_response" in dpo_obj and "rejected" not in dpo_obj: dpo_obj["rejected"] = dpo_obj.pop("rejected_response")
+        for k in ["chosen", "rejected"]:
+            val = dpo_obj.get(k)
+            if isinstance(val, dict): dpo_obj[k] = [val]
+            elif isinstance(val, str): dpo_obj[k] = [{"role": "assistant", "content": val}]
+            elif isinstance(val, list) and len(val) > 1:
+                asst_turns = [m for m in val if isinstance(m, dict) and m.get("role") == "assistant"]
+                if asst_turns: dpo_obj[k] = [asst_turns[-1]]
+                elif len(val) > 0: dpo_obj[k] = [val[0]]
+        prompt_val = dpo_obj.get("prompt")
+        if isinstance(prompt_val, list) and len(prompt_val) == 4:
+            if isinstance(prompt_val[3], dict) and prompt_val[3].get("role") == "assistant" and not dpo_obj.get("chosen"):
+                dpo_obj["chosen"] = [prompt_val.pop(3)]
+        return dpo_obj
+
+    def normalize_chatbot_sft(sft_obj):
+        if not isinstance(sft_obj, dict): return sft_obj
+        if "conversation" in sft_obj and "messages" not in sft_obj: sft_obj["messages"] = sft_obj.pop("conversation")
+        elif "turns" in sft_obj and "messages" not in sft_obj: sft_obj["messages"] = sft_obj.pop("turns")
+        return sft_obj
+
     for batch_idx in range(total_batches):
         batch_start = batch_idx * BATCH_SIZE
         batch_end = min(batch_start + BATCH_SIZE, len(matrix))
         batch = matrix[batch_start:batch_end]
         
-        sft_messages = []
-        dpo_messages = []
-        for item in batch:
-            prompt_sft = CHATBOT_QA_SFT_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", str(semantic_rag_query(str(item.get("scenario", ""))))).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
-            sft_messages.append([{"role": "system", "content": "You are an expert Indian legal AI synthesizing training data."}, {"role": "user", "content": prompt_sft}])
-            
-            prompt_dpo = CHATBOT_QA_DPO_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", str(semantic_rag_query(str(item.get("scenario", ""))))).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
-            dpo_messages.append([{"role": "system", "content": "You are synthesizing legal AI training data."}, {"role": "user", "content": prompt_dpo}])
-            
-        sft_out = llm.chat(messages=sft_messages, sampling_params=chatbot_sft_params)
-        dpo_out = llm.chat(messages=dpo_messages, sampling_params=chatbot_dpo_params)
-        
         batch_drop_reasons = defaultdict(int)
-        for idx, s_out, d_out in zip(range(batch_start, batch_end), sft_out, dpo_out):
-            try:
-                s_text = s_out.outputs[0].text.strip()
-                d_text = d_out.outputs[0].text.strip()
+        
+        # Prepare inputs
+        sft_messages_all = []
+        dpo_messages_all = []
+        for item in batch:
+            if "law_context" not in item:
+                persona_lower = str(item.get("persona", "")).lower()
+                is_state_persona = any(k in persona_lower for k in ["state", "government", "instrumentality", "public officer", "policymaker", "hospital", "school"])
+                item["law_context"] = str(semantic_rag_query(str(item.get("scenario", "")), is_private_audit=not is_state_persona))
+            law_context = item["law_context"]
+            
+            prompt_sft = CHATBOT_QA_SFT_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", law_context).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
+            sft_messages_all.append([{"role": "user", "content": prompt_sft}])
+            
+            prompt_dpo = CHATBOT_QA_DPO_PROMPT.replace("[RETRIEVED_LAW_CONTEXT]", law_context).replace("[PERSONA_INJECTION]", str(item["persona"])).replace("[SCENARIO_INJECTION]", str(item["scenario"]))
+            dpo_messages_all.append([{"role": "user", "content": prompt_dpo}])
+            
+        max_retries = 2
+        active_indices = list(range(len(batch)))
+        final_sft_results = [None] * len(batch)
+        final_dpo_results = [None] * len(batch)
+        
+        for attempt in range(max_retries):
+            if not active_indices:
+                break
                 
-                # Check for string poison / unicode corruption / foreign law bleed
-                if check_string_poison(s_text) or check_string_poison(d_text):
-                    stats["dropped"] += 1
-                    batch_drop_reasons["String poison or bracketed placeholder detected"] += 1
-                    continue
-                if any(law in s_text.lower() or law in d_text.lower() for law in foreign_laws):
-                    stats["dropped"] += 1
-                    batch_drop_reasons["Foreign or legacy law bleed detected"] += 1
-                    continue
+            curr_sft_msgs = [sft_messages_all[i] for i in active_indices]
+            curr_dpo_msgs = [dpo_messages_all[i] for i in active_indices]
+            
+            sft_out = llm.chat(messages=curr_sft_msgs, sampling_params=chatbot_sft_params)
+            dpo_out = llm.chat(messages=curr_dpo_msgs, sampling_params=chatbot_dpo_params)
+            
+            next_active = []
+            
+            for i, s_o, d_o in zip(active_indices, sft_out, dpo_out):
+                item = batch[i]
+                try:
+                    s_text = s_o.outputs[0].text.strip()
+                    d_text = d_o.outputs[0].text.strip()
                     
-                parsed_sft = strip_keys(safe_parse_audit(s_text))
-                parsed_dpo = strip_keys(safe_parse_audit(d_text))
-                
-                is_valid_sft = (
-                    isinstance(parsed_sft, dict) and 
-                    "messages" in parsed_sft and 
-                    isinstance(parsed_sft["messages"], list) and 
-                    len(parsed_sft["messages"]) == 4 and
-                    parsed_sft["messages"][0].get("role") == "user" and
-                    parsed_sft["messages"][1].get("role") == "assistant"
-                )
-                
-                is_valid_dpo = (
-                    isinstance(parsed_dpo, dict) and 
-                    "prompt" in parsed_dpo and "chosen" in parsed_dpo and "rejected" in parsed_dpo and
-                    isinstance(parsed_dpo["prompt"], list) and len(parsed_dpo["prompt"]) == 3 and
-                    isinstance(parsed_dpo["chosen"], list) and len(parsed_dpo["chosen"]) == 1 and
-                    isinstance(parsed_dpo["rejected"], list) and len(parsed_dpo["rejected"]) == 1
-                )
-                
-                if is_valid_sft and is_valid_dpo:
-                    law_context = str(semantic_rag_query(str(item.get("scenario", ""))))
+                    if check_string_poison(s_text) or check_string_poison(d_text):
+                        if attempt == max_retries - 1:
+                            stats["dropped"] += 1
+                            batch_drop_reasons["String poison or bracketed placeholder detected"] += 1
+                        next_active.append(i)
+                        continue
                     
-                    parsed_sft["messages"][0]["content"] = f"[CONTEXT: THE LAW]\n{law_context}\n\n[TASK]\n{parsed_sft['messages'][0]['content']}"
-                    parsed_sft["messages"].insert(0, {"role": "system", "content": "Expert Indian Legal AI Assistant."})
+                    combined_lower = s_text.lower() + " " + d_text.lower()
                     
-                    parsed_dpo["prompt"][0]["content"] = f"[CONTEXT: THE LAW]\n{law_context}\n\n[TASK]\n{parsed_dpo['prompt'][0]['content']}"
-                    parsed_dpo["prompt"].insert(0, {"role": "system", "content": "Expert Indian Legal AI Assistant."})
+                    persona_lower = str(item.get("persona", "")).lower()
+                    is_state_persona = any(k in persona_lower for k in ["state", "government", "instrumentality", "public officer", "policymaker", "hospital", "school"])
+                    if not is_state_persona and "second schedule" in combined_lower:
+                        if attempt == max_retries - 1:
+                            stats["dropped"] += 1
+                            batch_drop_reasons["Toxic Second Schedule misapplication to private entity"] += 1
+                        next_active.append(i)
+                        continue
 
-                    with open(os.path.join(CHATBOT_SFT_DIR, f"qa_sft_{idx:05d}.json"), "w", encoding="utf-8") as f: 
-                        json.dump(parsed_sft, f, ensure_ascii=False, indent=2)
-                    with open(JSONL_CHATBOT_SFT, "a", encoding="utf-8") as f:
-                        f.write(json.dumps(parsed_sft, ensure_ascii=False) + "\n")
-                    stats["saved_chatbot_sft"] += 1
+                    parsed_sft = strip_keys(safe_parse_audit(s_text))
+                    parsed_dpo = strip_keys(safe_parse_audit(d_text))
+                    
+                    if isinstance(parsed_sft, dict): parsed_sft = normalize_chatbot_sft(parsed_sft)
+                    if isinstance(parsed_dpo, dict): parsed_dpo = normalize_chatbot_dpo(parsed_dpo)
+                    
+                    is_valid_sft_struct = (
+                        isinstance(parsed_sft, dict) and "messages" in parsed_sft and 
+                        isinstance(parsed_sft["messages"], list) and len(parsed_sft["messages"]) == 4 and
+                        parsed_sft["messages"][0].get("role") == "user" and parsed_sft["messages"][1].get("role") == "assistant"
+                    )
+                    
+                    is_valid_dpo_struct = (
+                        isinstance(parsed_dpo, dict) and "prompt" in parsed_dpo and "chosen" in parsed_dpo and "rejected" in parsed_dpo and
+                        isinstance(parsed_dpo["prompt"], list) and len(parsed_dpo["prompt"]) >= 2 and
+                        isinstance(parsed_dpo["chosen"], list) and len(parsed_dpo["chosen"]) == 1 and
+                        isinstance(parsed_dpo["rejected"], list) and len(parsed_dpo["rejected"]) == 1
+                    )
+                                    
+                    if is_valid_sft_struct and is_valid_dpo_struct:
+                        sft_valid, sft_reason = validate_chatbot_content(parsed_sft["messages"])
+                        dpo_valid, dpo_reason = validate_chatbot_content(parsed_dpo["prompt"] + parsed_dpo["chosen"] + parsed_dpo["rejected"])
                         
-                    with open(os.path.join(CHATBOT_DPO_DIR, f"qa_dpo_{idx:05d}.json"), "w", encoding="utf-8") as f: 
-                        json.dump(parsed_dpo, f, ensure_ascii=False, indent=2)
-                    with open(JSONL_CHATBOT_DPO, "a", encoding="utf-8") as f:
-                        f.write(json.dumps(parsed_dpo, ensure_ascii=False) + "\n")
-                    stats["saved_chatbot_dpo"] += 1
-                else:
-                    stats["dropped"] += 1
-                    if not is_valid_sft:
-                        batch_drop_reasons["Failed Chatbot SFT schema or turn count check"] += 1
-                    if not is_valid_dpo:
-                        batch_drop_reasons["Failed Chatbot DPO schema or turn count check"] += 1
-            except Exception:
-                stats["dropped"] += 1
-                batch_drop_reasons["JSON parse or structure failure"] += 1
+                        if not sft_valid or not dpo_valid:
+                            if attempt == max_retries - 1:
+                                stats["dropped"] += 1
+                                if not sft_valid: batch_drop_reasons[f"SFT Content Validation: {sft_reason}"] += 1
+                                if not dpo_valid: batch_drop_reasons[f"DPO Content Validation: {dpo_reason}"] += 1
+                            
+                            # Append failure reason to prompt for next attempt
+                            reason = sft_reason if not sft_valid else dpo_reason
+                            sft_messages_all[i][0]["content"] += f"\n\n[PREVIOUS ATTEMPT FAILED DUE TO: {reason}. CORRECT THIS IN THE NEXT ATTEMPT.]"
+                            dpo_messages_all[i][0]["content"] += f"\n\n[PREVIOUS ATTEMPT FAILED DUE TO: {reason}. CORRECT THIS IN THE NEXT ATTEMPT.]"
+                            
+                            next_active.append(i)
+                            continue
+                        
+                        # Valid!
+                        final_sft_results[i] = parsed_sft
+                        final_dpo_results[i] = parsed_dpo
+                    else:
+                        if attempt == max_retries - 1:
+                            stats["dropped"] += 1
+                            if not is_valid_sft_struct: batch_drop_reasons["Failed Chatbot SFT schema check"] += 1
+                            if not is_valid_dpo_struct: batch_drop_reasons["Failed Chatbot DPO schema check"] += 1
+                        next_active.append(i)
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        stats["dropped"] += 1
+                        batch_drop_reasons[f"JSON parse failure: {e}"] += 1
+                    next_active.append(i)
+            
+            active_indices = next_active
+            
+        # Save successful pairs
+        for i in range(len(batch)):
+            if final_sft_results[i] and final_dpo_results[i]:
+                item = batch[i]
+                parsed_sft = final_sft_results[i]
+                parsed_dpo = final_dpo_results[i]
                 
+                law_context = item["law_context"]
+                system_msg = f"You are Ssense, an expert Indian legal AI assistant specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Answer questions using only the following legal provisions:\n\n{law_context}"
+                
+                parsed_sft["messages"].insert(0, {"role": "system", "content": system_msg})
+                parsed_dpo["prompt"].insert(0, {"role": "system", "content": system_msg})
+
+                idx = batch_start + i
+                with open(os.path.join(CHATBOT_SFT_DIR, f"qa_sft_{idx:05d}.json"), "w", encoding="utf-8") as f: 
+                    json.dump(parsed_sft, f, ensure_ascii=False, indent=2)
+                with open(JSONL_CHATBOT_SFT, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(parsed_sft, ensure_ascii=False) + "\n")
+                stats["saved_chatbot_sft"] += 1
+                    
+                with open(os.path.join(CHATBOT_DPO_DIR, f"qa_dpo_{idx:05d}.json"), "w", encoding="utf-8") as f: 
+                    json.dump(parsed_dpo, f, ensure_ascii=False, indent=2)
+                with open(JSONL_CHATBOT_DPO, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(parsed_dpo, ensure_ascii=False) + "\n")
+                stats["saved_chatbot_dpo"] += 1
+
         print(f"   ✅ Chatbot Batch {batch_idx + 1}/{total_batches} complete | SFT: {stats['saved_chatbot_sft']} | DPO: {stats['saved_chatbot_dpo']} | Dropped: {stats['dropped']}", flush=True)
         if batch_drop_reasons:
             for reason, count in batch_drop_reasons.items():
                 print(f"      - {count}x: {reason}", flush=True)
+        import gc
         gc.collect()
-
+        
 def run_post_generation_analysis():
     print("\n" + "="*70)
     print("📊 RUNNING POST-GENERATION DATA QUALITY FORENSIC SCAN")
@@ -1317,7 +1964,7 @@ def run_post_generation_analysis():
         
 if __name__ == "__main__":
     try:
-        run_audit_forge()
+        init_llm()
         run_chatbot_forge()
         run_post_generation_analysis()
     except KeyboardInterrupt:

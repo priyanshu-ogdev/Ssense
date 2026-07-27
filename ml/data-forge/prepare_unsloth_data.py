@@ -19,11 +19,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def strip_assistant_turn(msg):
-    """Strip trailing whitespace right at assistant content boundaries for exact EOS alignment."""
-    if isinstance(msg, dict) and msg.get("role") == "assistant" and isinstance(msg.get("content"), str):
-        return {"role": msg["role"], "content": msg["content"].strip()}
-    return msg
+def deep_strip_strings(obj):
+    """Recursively strip leading/trailing whitespace from all dictionary keys AND string values.
+    This neutralizes LLM hallucinations of non-breaking spaces (\xa0) or trailing spaces in JSON keys/values."""
+    if isinstance(obj, dict):
+        return {k.strip(): deep_strip_strings(v) for k, v in obj.items() if isinstance(k, str)}
+    elif isinstance(obj, list):
+        return [deep_strip_strings(item) for item in obj]
+    elif isinstance(obj, str):
+        return obj.strip()
+    return obj
 
 def process_sft_file(file_path):
     """Worker function to read, validate character purity, clean EOS boundaries, and verify SFT file."""
@@ -35,11 +40,9 @@ def process_sft_file(file_path):
         if "\ufffd" in raw_text or "\u200b" in raw_text:
             return None, "UNICODE_CORRUPTION_ERR (\ufffd or \u200b detected)"
             
-        pair = json.loads(raw_text)
+        pair = deep_strip_strings(json.loads(raw_text))
         if "messages" in pair and isinstance(pair["messages"], list):
-            # Clean assistant turns so exact closing bracket '}' is immediately followed by <|im_end|>
-            cleaned_messages = [strip_assistant_turn(m) for m in pair["messages"]]
-            unsloth_record = {"messages": cleaned_messages}
+            unsloth_record = {"messages": pair["messages"]}
             serialized = json.dumps(unsloth_record, ensure_ascii=False)
             if "\ufffd" in serialized or "\u200b" in serialized:
                 return None, "UNICODE_CORRUPTION_IN_SERIALIZATION"
@@ -62,14 +65,12 @@ def process_dpo_file(file_path):
         if "\ufffd" in raw_text or "\u200b" in raw_text:
             return None, "UNICODE_CORRUPTION_ERR (\ufffd or \u200b detected)"
             
-        pair = json.loads(raw_text)
+        pair = deep_strip_strings(json.loads(raw_text))
         if "prompt" in pair and "chosen" in pair and "rejected" in pair and isinstance(pair["chosen"], list) and isinstance(pair["rejected"], list):
-            cleaned_chosen = [strip_assistant_turn(m) for m in pair["chosen"]]
-            cleaned_rejected = [strip_assistant_turn(m) for m in pair["rejected"]]
             unsloth_record = {
                 "prompt": pair["prompt"],
-                "chosen": cleaned_chosen,
-                "rejected": cleaned_rejected
+                "chosen": pair["chosen"],
+                "rejected": pair["rejected"]
             }
             serialized = json.dumps(unsloth_record, ensure_ascii=False)
             if "\ufffd" in serialized or "\u200b" in serialized:

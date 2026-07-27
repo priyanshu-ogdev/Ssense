@@ -1,69 +1,70 @@
 [RETRIEVED_LAW_CONTEXT]
 
-You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
+You are synthesizing Direct Preference Optimization (DPO) training data for Ssense, an expert Indian legal AI assistant specializing strictly in the Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025.
 
-[TASK & REVERSE GENERATION FORMAT]
-You are synthesizing Direct Preference Optimization (DPO) training data for an expert Indian legal AI chatbot specializing in the DPDP Act 2023.
-Generate a conversation history and two alternative final responses for the given scenario and persona.
+[CLOSED-DOMAIN CONSTRAINTS]
+1. ENTITY BINDING (CRITICAL — ZERO INVENTED NAMES):
+   You MUST ONLY reference entities (person names, company names, roles, email addresses, domains) that are explicitly stated in the USER PERSONA or LEGAL SCENARIO below.
+   - If the persona says "a fintech company," you say "your company" or "the company" — NEVER invent names.
+   - If the persona provides a specific name (e.g., "Rajesh, the DPO at Priya Technologies"), use ONLY that exact name and company.
+   - NEVER fabricate corporate names, individual names, email addresses, or domain names that are not in the scenario.
+   - The assistant must answer in the abstract when no specific entity is provided by the user.
 
-SCENARIO: [SCENARIO_INJECTION]
-PERSONA: [PERSONA_INJECTION]
+2. STATUTORY ACCURACY — CRITICAL PITFALL MAP:
+   You must cite the exact, correct section for each obligation. The following are the most common hallucinations — memorize and avoid them:
+   - Data Breach Notification DUTY (who must report) = Section 8(6) and Rule 7. NEVER cite Section 27 for this; Section 27 defines the Board's powers to RECEIVE reports and conduct inquiries — it places NO obligation on the Data Fiduciary to report.
+   - Data Breach Notification TIMELINE = Rule 7(2): "within seventy-two hours of becoming aware." NEVER invent other timelines such as 24 hours or 48 hours.
+   - Child Data Processing = Section 9 and Rule 10. NEVER classify child data tracking as a "breach" under Section 8(6).
+   - SDF Designation = Section 10(1) by Central Government notification based on factors in Section 10(1)(a)-(f). NEVER cite Section 40(j) or any provision not in the Act.
+   - Right to Nominate = Section 14. This allows a Data Principal to nominate someone to exercise HER OWN rights upon death or incapacity. It does NOT enable RTI requests for third parties.
 
-STRUCTURE:
-1. Conversation History ('prompt'): Exactly two user turns and one assistant turn that establish the legal context and the user's specific problem (strict alternating order: user, assistant, user).
-2. Chosen Response ('chosen'): The perfect final answer. It must be strictly grounded in the provided DPDP Act context, citing exact sections or rules, while maintaining a professional, empathetic, and highly actionable tone.
-3. Rejected Response ('rejected'): A realistic hard-negative response. It must sound equally confident, professional, and empathetic, but it must contain exactly one subtle, highly plausible legal hallucination or misinterpretation.
+3. FOREIGN LAW BAN:
+   You are STRICTLY FORBIDDEN from using any of the following terms or concepts anywhere in the output:
+   GDPR, CCPA, HIPAA, LGPD, PDPA, "Data Protection Authority", "DPA" (as a regulatory body), "legitimate interest" (DPDP uses "certain legitimate uses" under Section 7), "right to be forgotten" (DPDP uses "right to erasure" under Section 12), "data controller" (DPDP uses "Data Fiduciary"), "data subject" (DPDP uses "Data Principal"), "Article 17", "right to portability", IT Act 2000, Information Technology Act, SPDI Rules 2011, Section 43A.
 
-ZERO-SHOT GEOMETRY & FORMAT LOCK:
-You must output ONLY a single, valid JSON object matching the exact structure below. Do NOT wrap your output in markdown code blocks (e.g., no ```json or ```). Do NOT output conversational preambles, introductory text, or post-ambles. Your very first character MUST be '{' and your very last character MUST be '}'.
+4. ONTOLOGICAL ISOLATION:
+   Your entire legal vocabulary must derive exclusively from the [RETRIEVED_LAW_CONTEXT] above. Every regulatory body, entity, timeline, penalty amount, and mechanism you mention must be extractable verbatim from that text. If a concept or authority is not in the text, you MUST NOT invent it.
 
-ANTI-POISON & SANITIZATION CONSTRAINTS:
-1. COMPLETE PRODUCTION FINALIZATION: All generated text across prompt, chosen, and rejected turns must be fully finalized and resolved with realistic Indian details. Output clean conversational prose.
-   - WHAT TO AVOID: Do not output bracketed placeholders ([Company Name], [insert date]), unfinished blanks ((TBD)), or repetitive canned responses across different scenarios.
-   - HOW TO AVOID IT: Fully resolve every name, date, and contact detail into concrete Indian values right upon initial generation.
-2. NO ADMINISTRATIVE FLAGGING: Do not treat standard contact information or administrative headers as violations.
-3. STATUTORY JURISDICTION: Both chosen and rejected responses must operate strictly under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025 framework. Ground all sections, schedules, and definitions solely in this statute. Do not cite GDPR, CCPA, IT Act 2000, or SPDI Rules 2011.
-4. ZERO UNICODE CORRUPTION / CHARACTER ENCODING PURITY: You must NEVER output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...) anywhere in the JSON strings.
-5. OMISSION HALLUCINATION FIREWALL (STRICT AFFIRMATIVE GROUNDING):
-   When generating both chosen and rejected responses, you MUST NEVER complain about missing details, policy silence, or what a notice leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
-   - "without specifying" / "without detailing" / "without providing" / "without explaining" / "without explicitly specifying"
-   - "fails to specify" / "fails to provide" / "fails to detail" / "fails to mention" / "fails to explain" / "fails to disclose"
-   - "does not specify" / "does not provide" / "does not detail" / "does not mention" / "does not disclose" / "does not provide a clear mechanism"
-   - "lacks specific" / "omits information regarding" / "omits any mention" / "no mention of" / "silent on"
-   VIOLATION CHECK: If either answer uses words complaining about what is NOT stated, the output is instantly dropped.
+5. PERSONA-DEPENDENT SCOPING:
+   Align statutory obligations to the nature of the user's persona. If the persona is a private company, small business, or individual — evaluate obligations under general commercial provisions. Do NOT apply State or instrumentality exemptions (Section 17) or SDF-specific obligations (Section 10) unless the persona explicitly represents such an entity.
 
-HOW TO CRAFT THE REJECTED RESPONSE (REALISTIC HARD-NEGATIVE & DYNAMIC HIGH-ENTROPY PROSE):
-To make the rejected candidate a high-quality DPO negative, you must NOT generate random syntax errors, malformed JSON, or generic canned rejection text. Instead, simulate a realistic, sophisticated legal misinterpretation:
-- Invent a novel, context-appropriate legal misapplication that a strict or overzealous legal assistant might make.
-- For example: confusing a valid statutory exemption (e.g., Section 17 emergency or research processing) with a statutory violation, misattributing exact breach notification timelines (e.g., applying Rule 7 timelines to wrong fiduciary tiers), or citing a valid DPDP section for an incompatible legal mechanism.
-- Frame this error with absolute academic and analytical confidence so that it reads as highly credible to a layman, creating a clean preference gradient against the chosen response.
-- ANTI-TEMPLATE & DYNAMIC PROSE DIRECTIVE: You must NEVER reuse static, boilerplate, or canned rejection arguments or opening sentences across evaluations. Tailor the rejected opening line and legal misinterpretation uniquely and organically to the exact facts of the user's prompt in this specific scenario.
+[TASK]
+Generate a multi-turn conversation (2-3 turns) introducing a scenario, followed by two contrasting final responses from the assistant.
 
-=========================================
-MANDATORY GENERATION GATES
-=========================================
-Condition your JSON generation on these absolute rules:
-- Gate 1 (Structure): Does the JSON contain exactly a 3-turn prompt history, one chosen response, and one rejected response?
-- Gate 2 (Chosen Purity): Is the chosen response flawlessly accurate and exclusively derived from the provided legal context under the DPDP Act 2023?
-- Gate 3 (Rejected Plausibility & Hard-Negative): Does the rejected response contain exactly one confidently stated, subtle legal misapplication or exemption confusion without sounding intentionally broken or canned?
-- Gate 4 (Sanitization & Placeholders): Is all text pure conversational prose, entirely free of XML tags, markdown code blocks, square brackets, literal ellipses, or \ufffd characters?
-- Gate 5 (Omission Firewall): Do both responses strictly avoid saying "without specifying", "silent on", or "fails to detail"?
+USER PERSONA: [PERSONA_INJECTION]
+LEGAL SCENARIO: [SCENARIO_INJECTION]
 
-=========================================
-OUTPUT SCHEMA
-=========================================
-Output ONLY a valid JSON object matching the format below. Escape all internal double quotes with a backslash (\"). Do not use literal dots or bracketed variables in the keys or example values.
+[STRICT DPO GENERATION RULES]
+You will generate a `chosen` (perfect) response and a `rejected` (plausible but factually wrong) response to act as the final assistant turn.
 
+For the `rejected` response, you MUST introduce EXACTLY ONE of the following verifiable errors (Error Typology):
+- Type A (Wrong Section): Cite a real section, but for the wrong obligation (e.g., citing Section 27 for breach reporting, or Section 17 for fiduciary duties).
+- Type B (Wrong Actor): Attribute a Data Fiduciary duty to the Data Principal, or a Board power to the Fiduciary.
+- Type C (Wrong Timeline): Invent a deadline (e.g., "within 24 hours" or "48 hours") that contradicts the actual Rule (e.g., Rule 7 says 72 hours).
+- Type D (Scope Misapplication): Apply an SDF (Significant Data Fiduciary) or State exemption to a regular, small-scale fiduciary.
+
+The `rejected` response must sound highly professional, plausible, and authoritative, but contain this specific, verifiable legal error. The `chosen` response must be 100% legally accurate per the DPDP Act 2023.
+
+ANTI-POISON CONSTRAINTS:
+1. ZERO PLACEHOLDERS: All generated text must be fully resolved. NEVER output bracketed placeholders, tags, or prompts. If no entity is named, answer generically.
+2. ZERO UNICODE CORRUPTION: NEVER output unicode replacement symbols, zero-width spaces, literal ellipses, or unescaped special characters.
+3. ZERO ARTIFACTS: Do NOT output markdown code blocks, XML tags, section headers like "[CONTEXT]" or "[TASK]". Output ONLY JSON.
+4. VOCABULARY DIVERSITY: Generate unique language for every conversation.
+
+ZERO-SHOT GEOMETRY AND FORMAT LOCK:
+You must output ONLY a single, valid JSON object matching the exact structure below. Do NOT wrap your output in markdown code blocks (no ```json or ```). Do NOT output conversational preambles. Your very first character MUST be '{' and your very last character MUST be '}'. Enforce absolute structural integrity: wrap all strings strictly in double quotes, apply standard JSON escaping for any internal quotes, and ensure zero leading or trailing whitespace on JSON keys.
+
+OUTPUT SCHEMA:
 {
   "prompt": [
-    {"role": "user", "content": "Initial user inquiry regarding data rights or fiduciary obligations under the DPDP Act without any bracketed placeholders or ellipses"},
-    {"role": "assistant", "content": "Empathetic accurate assistant response outlining preliminary statutory boundaries and asking relevant diagnostic questions"},
-    {"role": "user", "content": "Specific follow-up inquiry presenting concrete operational details or asking for definitive statutory resolution"}
+    {"role": "user", "content": "Initial user query about the scenario..."},
+    {"role": "assistant", "content": "Accurate initial response setting the stage..."},
+    {"role": "user", "content": "Follow-up query triggering the DPO contrast..."}
   ],
   "chosen": [
-    {"role": "assistant", "content": "Gold-standard concluding response providing precise, accurate legal synthesis under the Digital Personal Data Protection Act 2023 and exact actionable next steps"}
+    {"role": "assistant", "content": "100% accurate, legally sound final response grounded strictly in the law."}
   ],
   "rejected": [
-    {"role": "assistant", "content": "Confident, highly plausible hard-negative response that sounds professional but subtly misinterprets a statutory exemption or misapplies a DPDP Act provision"}
+    {"role": "assistant", "content": "Highly plausible, professional-sounding response that contains EXACTLY ONE verifiable error (Type A, B, C, or D)."}
   ]
 }

@@ -5,6 +5,7 @@ Run this ONCE to bridge the ML data layer to the Rust network layer.
 """
 
 import json
+import os
 from vllm import LLM, SamplingParams
 from vllm.sampling_params import StructuredOutputsParams
 
