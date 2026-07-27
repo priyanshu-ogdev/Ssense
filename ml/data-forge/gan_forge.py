@@ -1376,13 +1376,13 @@ def _save_training_pair(batch_idx, local_idx, item, policy_text, audit, step, la
     target_category = item.get("target_category", "")
     law_chunk = get_audit_rag_context(target_category)
     
+    sys_msg = f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:\n\n{law_chunk}"
+    user_msg = f"Analyze:\n{policy_text}"
+    
     if not is_dpo and audit:
         sft = {"messages": [
-            {"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
-
-{law_chunk}"},
-            {"role": "user", "content": f"Analyze:
-{policy_text}"},
+            {"role": "system", "content": sys_msg},
+            {"role": "user", "content": user_msg},
             {"role": "assistant", "content": json.dumps(audit, ensure_ascii=False, indent=2)}
         ]}
         with open(os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_idx:03d}.json"), "w", encoding="utf-8") as f:
@@ -1393,10 +1393,7 @@ def _save_training_pair(batch_idx, local_idx, item, policy_text, audit, step, la
     elif is_dpo and audit and lazy_audit:
         if isinstance(lazy_audit, dict) and len(lazy_audit.get("violations", [])) > 0:
             dpo = {
-                "prompt": [{"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
-
-{law_chunk}"}, {"role": "user", "content": f"Analyze:
-{policy_text}"}],
+                "prompt": [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}],
                 "chosen": [{"role": "assistant", "content": json.dumps(audit, ensure_ascii=False, indent=2)}],
                 "rejected": [{"role": "assistant", "content": json.dumps(lazy_audit, ensure_ascii=False, indent=2)}]
             }
@@ -1451,10 +1448,8 @@ def run_audit_forge():
                                      .replace("[POLICY_INJECTION]", current_policies[i][:20000])
                                      
                 prompt = prompt.replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.")
-                prompt = prompt.replace("[OMISSION_SCHEMA]", "false")
-                judge_msgs.append([{"role": "system", "content": f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:
-
-{law_chunk}"}, {"role": "user", "content": prompt}])
+                sys_judge_msg = f"You are Ssense, an expert Indian legal AI auditor specializing in the Digital Personal Data Protection Act 2023 and DPDP Rules 2025. Evaluate policies using only the following legal provisions:\n\n{law_chunk}"
+                judge_msgs.append([{"role": "system", "content": sys_judge_msg}, {"role": "user", "content": prompt}])
                 
             audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
             
