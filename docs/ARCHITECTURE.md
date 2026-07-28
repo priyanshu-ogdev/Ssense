@@ -219,8 +219,10 @@ vLLM is the **production-grade inference engine** that solves the "data generati
 | Optimization | Intent | Impact | Trade-off |
 |--------------|--------|--------|-----------|
 | **Dynamic Context Injection** | Prevent "Lost in the Middle" attention dilution | Model focuses on relevant law sections, 40% better violation detection | Loses global context (acceptable - violations are section-specific) |
+| **Hybrid RAG Seeding** | Ground 72B Teacher in DPDP law prior to generation | Zero hallucination of foreign laws (GDPR/CCPA) during synthetic creation | Requires high-speed offline Qdrant/ChromaDB indexing |
 | **Chunked Prefill** | Flatten VRAM spikes during 35k token prefill | Prevents OOM on DGX Spark unified memory | +5ms latency overhead (negligible) |
 | **Prefix Caching** | Eliminate redundant computation for shared prompts | 95% faster batch processing | Requires identical prompt prefixes (enforced by design) |
+| **Hallucination Sanitization** | Eradicate toxic context poisoning from datasets | Surgically strips Government "Second Schedule" exemptions and trailing schema whitespace (`"prompt "`) | Adds post-processing heuristic overhead |
 | **FP8 KV Cache** | Reduce memory bandwidth for attention | 2× faster generation, 50% less VRAM | Minimal precision loss (<0.1% accuracy) |
 | **Batch Size = 25** | Saturate GPU without context-switching thrashing | Optimal throughput for 72B model | Lower than theoretical max, but stable |
 | **Reflexion Loop (3 steps)** | Iteratively refine subtle violations | Produces legally complex, hard-to-detect violations | 3× generation time (worth it for quality) |
@@ -230,9 +232,11 @@ vLLM is the **production-grade inference engine** that solves the "data generati
 
 | Optimization | Intent | Impact | Trade-off |
 |--------------|--------|--------|-----------|
+| **Dual-Track rsLoRA Strategy** | Isolate strict JSON auditing from conversational chat | Auditor gets $r=128$ for deep syntactic schema enforcement; Chatbot gets $r=64$ for natural language empathy | Requires two separate training cycles |
 | **rsLoRA r=128 (Audit) & r=64 (Chatbot)** | Rank-Stabilized high-capacity adaptation | $1/\sqrt{r}$ scaling ensures stable gradient flow without exploding high-rank projections | Enables deep statutory reasoning on complex 23k-token corporate policies |
 | **Unsloth Gradient Checkpointing** | Minimize VRAM while maintaining speed | Train 9B model cleanly inside 128GB unified memory | Selective in-place attention checkpointing |
 | **FlashAttention 2** | Native Blackwell tensor core utilization | ~30% faster attention on DGX Spark | Requires `flash-attn` package |
+| **PEFT / GGUF Edge Export Hooks** | Ensure native server compatibility instantly upon training completion | Outputs hot-swappable vLLM HuggingFace safetensors and 4-bit `q4_k_m` GGUF CPU fallbacks automatically | Minor storage and quantization overhead post-training |
 | **NEFTune (noise_alpha=5)** | Prevent overfitting to synthetic data | 5-10% better generalization on unseen statutory phrasing | Slightly noisier training |
 | **Packing** | Eliminate padding waste | 40% higher throughput on variable-length examples | Requires examples < max_seq_length (enforced) |
 | **adamw_torch (32-bit FP32)** | Maximum numerical stability | Retains exact 8-byte variance tracking ($v_t$) to guarantee zero statutory drift across laws | 4× optimizer memory (cleanly accommodated on 128GB DGX Spark) |

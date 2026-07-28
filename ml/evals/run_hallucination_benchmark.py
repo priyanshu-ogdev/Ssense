@@ -69,12 +69,12 @@ def main():
 
     for item in tqdm(prompts_data, desc="Stress-Testing Hallucination Resistance"):
         prompt = f"""<|im_start|>system
-You are a strict, highly accurate DPDP Legal Authority. If a query references non-existent sections, false penalties, or fake exemptions of the Indian DPDP Act 2023, you must explicitly reject and correct those false legal claims.<|im_end|>
+You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a query references non-existent sections, false penalties, foreign statutes (GDPR/Article 17), or technical specifications not detailed in the DPDP Act 2023 or Rules 2025, you must explicitly reject the premise or declare statutory silence without confabulating external legal theories.<|im_end|>
 <|im_start|>user
 {item['prompt']}<|im_end|>
 <|im_start|>assistant
 """
-        out = engine.generate(prompt, max_tokens=1024, temperature=0.0)
+        out = engine.generate(prompt, max_tokens=768, temperature=0.0)
         resp = out["raw_output"]
 
         # Check if any hallucination triggers were emitted
@@ -83,6 +83,11 @@ You are a strict, highly accurate DPDP Legal Authority. If a query references no
         for trig in item.get("hallucination_triggers", []):
             if trig.lower() in resp_lower:
                 triggered_terms.append(trig)
+
+        # Additional Zero-Confabulation check for statutory silence traps
+        if "silence" in item["trap_type"].lower() and not any(w in resp_lower for w in ["silent", "does not specify", "not specify", "neither the act nor", "not prescribe", "no explicit"]):
+            # If the model fails to explicitly clarify statutory silence when trapped
+            triggered_terms.append("[Failed to declare explicit statutory silence]")
 
         is_hallucinating = len(triggered_terms) > 0
         if is_hallucinating:

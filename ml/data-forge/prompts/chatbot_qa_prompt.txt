@@ -1,58 +1,71 @@
+=========================================
+[STATUTORY KNOWLEDGE BASE]
+=========================================
 [RETRIEVED_LAW_CONTEXT]
----
-[LAW_CONTEXT_INJECTION]
----
+
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [STATUTORY KNOWLEDGE BASE] provided above.
+
+=========================================
+[ASSIGNED PARAMETERS]
+=========================================
+USER PERSONA: [PERSONA_INJECTION]
+LEGAL SCENARIO: [SCENARIO_INJECTION]
 
 [SYNTHETIC ENTITY SYNTHESIS & CONTINUITY PROTOCOL]
-You must natively synthesize plausible, contextually grounded identities using standard regional Indian naming conventions and realistic corporate structures. 
+You must natively synthesize plausible, contextually grounded identities using standard regional Indian naming conventions and realistic corporate structures based on the assigned Persona. 
 - COMPLETE FINALIZATION (ANTI-POISON): You are strictly forbidden from outputting meta-tags, instructional brackets, or placeholder tokens (e.g., [Name], <Company>). Every identity, email, and address must be a concrete, resolved string.
 - ENTITY CONTINUITY LOCK (NO GHOST PERSONAS): Any specific personal name, corporate entity, or digital platform utilized by the Assistant MUST be explicitly introduced by the User in the very first conversational turn. The Assistant is permanently barred from inferring, inventing, or introducing novel proper nouns regarding the User's identity that the User did not establish.
 
 [CLOSED-DOMAIN ONTOLOGICAL BOUNDARIES]
-1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [RETRIEVED_LAW_CONTEXT]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology, foreign regulatory frameworks, or generic data protection nomenclature not physically printed in the text.
+1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [STATUTORY KNOWLEDGE BASE]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology, foreign regulatory frameworks, or generic data protection nomenclature not physically printed in the text.
 2. FALSE PREMISE PRIORITY INTERCEPTION: Users will frequently bundle valid legal questions with a false statutory premise, an inaccurate transfer model, or concepts from intersecting non-privacy domains (e.g., RTI Act, taxation, or inheritance). The Assistant MUST explicitly intercept, isolate, and correct that false premise FIRST before addressing any remaining valid inquiry. You cannot ignore a false premise to answer the easy question.
 3. JURISDICTIONAL & SCOPE ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions, schedules, or specialized rules explicitly designed for the State, Government instrumentalities, or public officers MUST NEVER be applied to or validated for private citizens, commercial enterprises, or corporate entities.
 4. ACTOR-TO-ACTION OBLIGATION MAPPING: Every cited obligation must strictly map the correct legal 'Actor' (the bound entity) to the affirmative 'Action' (the exact statutory duty). Do not conflate regulatory oversight or investigative powers with direct corporate compliance duties.
-5. CORE STATUTORY PARADIGMS:
+5. CORE STATUTORY PARADIGMS (MANDATORY ALIGNMENT):
    - CROSS-BORDER TRANSFERS: Operates strictly under a negative list (restriction) model. Data transfer is permitted by default to all jurisdictions EXCEPT those explicitly restricted. Do not validate "whitelist" or "positive approval" models.
    - BREACH AWARENESS TRIGGER: The statutory timeline is triggered by the initial possession of reasonable suspicion, NOT by the conclusion of formal forensic confirmation.
    - DPIA & AUDITS: Impact assessments and audits are exclusively mandated for explicitly notified "Significant Data Fiduciaries," NOT triggered generically by "high risk" processing.
 
 [AFFIRMATIVE OUT-OF-SCOPE REFUSAL PROTOCOL]
-When the User inquires about unmentioned details, specific unlisted figures (e.g., exact financial penalties), or intersecting external legal frameworks that are NOT explicitly documented within the [RETRIEVED_LAW_CONTEXT]:
+When the User inquires about unmentioned details, specific unlisted figures (e.g., exact financial penalties), or intersecting external legal frameworks that are NOT explicitly documented within the [STATUTORY KNOWLEDGE BASE]:
 - ANTI-OMISSION BAN: You are STRICTLY FORBIDDEN from diagnosing the text by its silence. You must never generate meta-complaints about missing details, policy silence, or comment on what the text "fails to," "declines to," or "omits to" outline. 
 - AFFIRMATIVE SCOPE BOUNDARY: Execute the refusal exclusively by framing the response around what the context affirmatively covers, using this exact structural logic pattern:
   "The statutory provisions provided in this context govern [State exactly what the text DOES govern], but the specific rules regarding [User's specific query] fall outside the scope of this retrieved text."
   Do not invent legal synergy (e.g., "it complements other laws"). Refuse the unknown affirmatively.
 
-[TASK & CONVERSATIONAL GEOMETRY]
-Synthesize a Supervised Fine-Tuning (SFT) conversation between the user persona and the Assistant based on the scenario, evaluated strictly under the provided context.
+=========================================
+[1-SHOT CROSS-DOMAIN STRUCTURAL ANCHOR]
+=========================================
+The following JSON demonstrates the EXACT required structure, conversational turn-alternation, and the mandatory RAG context injection format. 
+WARNING: This example uses a fictional maritime law to demonstrate the structure. You MUST NOT copy its topic. You must generate a completely novel conversation based strictly on the [STATUTORY KNOWLEDGE BASE], [USER PERSONA], and [LEGAL SCENARIO] provided above.
 
-USER PERSONA: [PERSONA_INJECTION]
-LEGAL SCENARIO: [SCENARIO_INJECTION]
-
-REQUIREMENTS:
-- Message Structure: Exactly two user turns and two assistant turns (4 messages total in strictly alternating order: user, assistant, user, assistant).
-- Conversational Disclaimer: The first assistant response must seamlessly incorporate an empathetic, natural disclaimer indicating that the guidance is informational and does not constitute formal legal counsel. 
-- Emotional & Actionable Alignment: Validate the user's emotional tone while delivering concrete, grounded, and actionable compliance steps based ONLY on the retrieved text.
-
-ZERO-SHOT FORMAT LOCK:
-Output ONLY a single valid JSON object. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks (e.g., no ```json). Do NOT output conversational preambles or post-ambles.
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "[CONTEXT: THE LAW]\nSection 1 of the Fictional Maritime Data Act states that all ship captains must log cargo manifests in digital format. Section 2 prohibits sharing manifests with foreign ports without a writ.\n\n[TASK]\nI am Captain Arjun Singh of the MV Oceanic. I need to know if I can email my cargo manifest to my broker in Dubai."
+    },
+    {
+      "role": "assistant",
+      "content": "Under Section 2 of the Fictional Maritime Data Act, sharing manifests with foreign ports is prohibited without a writ. Since Dubai is a foreign port, you cannot email the manifest to your broker without first obtaining the writ."
+    },
+    {
+      "role": "user",
+      "content": "What if the broker is just asking for the weight of the ship, not the cargo?"
+    },
+    {
+      "role": "assistant",
+      "content": "The statutory provisions provided in this context govern the sharing of 'cargo manifests', but the specific rules regarding general ship telemetry or weight fall outside the scope of this retrieved text."
+    }
+  ]
+}
 
 =========================================
 ANTI-POISON & SANITIZATION CONSTRAINTS
 =========================================
-1. META-PROMPT LEAKAGE BAN: The generated JSON string content MUST NOT contain structural instructional headers, task definitions, or scenario echoes. Generate pure human-to-AI dialogue.
+1. META-PROMPT LEAKAGE BAN: The generated JSON string content MUST NOT contain instructional headers, task definitions, or scenario echoes. Generate pure human-to-AI dialogue.
 2. ENCODING PURITY: Never output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...).
+3. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
 
-=========================================
-OUTPUT SCHEMA
-=========================================
-{
-  "messages": [
-    {"role": "user", "content": "Natural initial user query establishing their identity, context, and the specific scenario..."},
-    {"role": "assistant", "content": "Grounded initial guidance with a natural disclaimer, explicitly executing False Premise Interceptions if the user introduced an invalid concept..."},
-    {"role": "user", "content": "Follow-up query seeking specific operational steps or out-of-context clarification..."},
-    {"role": "assistant", "content": "Actionable final resolution executing the Affirmative Out-of-Scope Refusal Protocol if the requested data is missing from the context..."}
-  ]
-}
+ZERO-SHOT FORMAT LOCK:
+Output ONLY a single valid JSON object. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks (e.g., no ```json). Do NOT output conversational preambles or post-ambles.

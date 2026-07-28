@@ -1,26 +1,78 @@
 version: '3.8'
 
 services:
-  slm-server:
+  slm-gateway:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ssense-virtual-slm-server
+    container_name: ssense-edge-slm-gateway
     ports:
       - "8080:8080"
     environment:
       - SSENSE_BACKEND=vllm
-      - SSENSE_VLLM_URL=http://host.docker.internal:8000/v1/completions
+      - SSENSE_VLLM_URL=http://vllm-engine:8000/v1/completions
+      - REDIS_URL=redis://redis-queue:6379/0
+      - QDRANT_URL=http://qdrant-db:6333
       - SSENSE_AUDIT_LORA=audit_lora
       - SSENSE_CHAT_LORA=chat_lora
+      - SSENSE_MAX_QUEUE_DEPTH=5000
       - SSENSE_API_KEYS=ssense_dev_key_2026,ssense_prod_key_2026
     volumes:
       - ../../ml/models:/app/ml/models:ro
       - ../../libs/contracts/schemas:/app/libs/contracts/schemas:ro
+    depends_on:
+      - vllm-engine
+      - redis-queue
+      - qdrant-db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 20s
+      timeout: 5s
       retries: 3
       start_period: 15s
+
+  vllm-engine:
+    image: vllm/vllm-openai:v0.4.2
+    container_name: ssense-vllm-multi-lora-engine
+    runtime: nvidia
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - VLLM_ATTENTION_BACKEND=FLASH_ATTN
+    volumes:
+      - ../../ml/models:/app/ml/models:ro
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model Qwen/Qwen3.5-9B
+      --quantization fp8
+      --gpu-memory-utilization 0.85
+      --max-model-len 8192
+      --max-num-seqs 128
+      --enable-chunked-prefill
+      --enable-prefix-caching
+      --prefix-caching-hash-algorithm murmur3
+      --enable-lora
+      --max-loras 2
+      --max-lora-rank 128
+      --lora-modules audit_lora=/app/ml/models/audit-model-final-adapter chat_lora=/app/ml/models/chatbot-model-final-adapter
+      --port 8000
+    restart: unless-stopped
+
+  redis-queue:
+    image: redis:7.2-alpine
+    container_name: ssense-redis-priority-queue
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    restart: unless-stopped
+
+  qdrant-db:
+    image: qdrant/qdrant:v1.9.0
+    container_name: ssense-qdrant-edge-vector-db
+    ports:
+      - "6333:6333"
+    environment:
+      - QDRANT__SERVICE__MEMCPY_THREAD_POOL_SIZE=4
+    restart: unless-stopped

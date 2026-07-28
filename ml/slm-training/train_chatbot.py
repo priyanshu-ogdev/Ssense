@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-train_chatbot.py – Industrial-Grade SFT + SimPO Pipeline for the DPDP Conversational Chatbot SLM (`r=64`, `beta=1.0`)
+train_chatbot.py – Industrial-Grade SFT + SimPO Pipeline for the DPDP Conversational Chatbot SLM
 
 Architecture & MLOps Specifications:
-- Memory & Optimizer: Hardcoded 32-bit FP32 `adamw_torch` (`weight_decay=0.05`) to leverage 128 GB VRAM headroom.
+- Memory & Optimizer: BF16 weights with 32-bit FP32 `adamw_torch` optimizer states (`weight_decay=0.05`).
 - LoRA Configuration: Rank-Stabilized LoRA (`rsLoRA`, `r=64`) with fused Triton kernels (`lora_dropout=0`).
-- SimPO Reward Scale: Hardcoded `beta=1.0` (down from 2.0) to prevent conversational reward-hacking and maintain dialogue fluidity.
-- Tokenizer Alignment: Right-side truncation (`truncation_side="right"`) and right-side padding to preserve system preambles.
+- SimPO Reward Scale: Hardcoded `beta=1.0` to prevent conversational reward-hacking while forcefully penalizing cross-jurisdictional hallucinations.
+- Tokenizer Alignment: Right-side truncation (`truncation_side="right"`) and right-side padding to preserve system preambles and RAG context.
 - Context & Truncation: Hardcoded `max_prompt_length=23500` to preserve extensive user dialogue and statutory key points.
-- Process Isolation: OS-level `spawn` multi-processing to isolate CUDA contexts and eliminate memory leaks between SFT and DPO phases.
-- Unified Adapter Continuity: Exports unmerged LoRA adapter after Phase 1 SFT, reloaded with `is_trainable=True` for reference-free Phase 2 SimPO.
+- Process Isolation: OS-level `spawn` multi-processing to isolate CUDA contexts and eliminate memory leaks.
+- Evaluation Math: eval_steps and warmup_ratio perfectly anchored to the 1,000/400 RAFT dataset sizes.
 """
 
 import os
-# Prevent Rust multi-threaded tokenizer deadlocks across Python worker processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import gc
@@ -25,7 +24,6 @@ from datasets import load_dataset
 from unsloth.chat_templates import train_on_responses_only
 from transformers import EarlyStoppingCallback
 
-# Monkey-patch TRL's DPOTrainer with Unsloth memory optimizations
 PatchDPOTrainer()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -39,9 +37,9 @@ OUTPUT_DIR_SFT = "../models/chatbot-model-sft-intermediate"
 OUTPUT_DIR_SFT_ADAPTER = "../models/chatbot-model-sft-intermediate-adapter"
 OUTPUT_DIR_FINAL = "../models/chatbot-model-final"
 
-MAX_SEQ_LENGTH = 24576
+MAX_SEQ_LENGTH = 4096
 BATCH_SIZE = 1
-GRADIENT_ACCUMULATION = 8
+GRADIENT_ACCUMULATION = 8  # Effective batch size = 8
 EPOCHS_SFT = 4
 EPOCHS_DPO = 2
 
@@ -49,7 +47,7 @@ EPOCHS_DPO = 2
 # PHASE 1: SUPERVISED FINE-TUNING (SFT)
 # ═══════════════════════════════════════════════════════════════════════════
 def run_sft():
-    print("🚀 PHASE 1: Starting Conversational Chatbot SFT (32-bit FP32 AdamW + rsLoRA r=64 + FlashAttn2)...")
+    print("🚀 PHASE 1: Starting Conversational Chatbot SFT (BF16 + rsLoRA r=64 + NEFTune + FlashAttn2)...")
     
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=BASE_MODEL_PATH,
@@ -60,7 +58,7 @@ def run_sft():
     )
 
     tokenizer.padding_side = "right"
-    tokenizer.truncation_side = "right"
+    tokenizer.truncation_side = "right" # Preserves System Prompt and [RETRIEVED_LAW_CONTEXT]
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -85,15 +83,18 @@ def run_sft():
         return {"text": texts}
 
     dataset = dataset.map(apply_chat_template, batched=True, num_proc=8)
+    
+    # Shuffle before slicing to prevent scenario-based overfitting
     if len(dataset) > 1000:
-        dataset = dataset.select(range(1000))
+        dataset = dataset.shuffle(seed=42).select(range(1000))
+        
     split = dataset.train_test_split(test_size=0.05, seed=42)
 
     sft_args = SFTConfig(
         per_device_train_batch_size=BATCH_SIZE,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION,
-        warmup_steps=15,
+        warmup_ratio=0.1,  # 🚨 FIXED: Ratio ensures perfect cosine decay regardless of step count
         num_train_epochs=EPOCHS_SFT,
         learning_rate=1.5e-5,
         lr_scheduler_type="cosine",
@@ -108,9 +109,9 @@ def run_sft():
         packing=False,
         remove_unused_columns=False,
         eval_strategy="steps",
-        eval_steps=20,
-        save_steps=20,
-        neftune_noise_alpha=5,
+        eval_steps=25, # 🚨 FIXED: Ensures 5 evals per epoch on 1k dataset
+        save_steps=25,
+        neftune_noise_alpha=5, # 🚨 MANDATORY: Prevents robotic, repetitive legal phrasing
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
@@ -127,7 +128,6 @@ def run_sft():
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
-    # Mask user prompts so loss is strictly computed over assistant completions
     trainer = train_on_responses_only(
         trainer,
         instruction_part="<|im_start|>user\n",
@@ -172,7 +172,6 @@ def run_dpo():
     dataset = load_dataset("json", data_files=DPO_DATA_PATH, split="train")
     
     def extract_turn_content(turn):
-        """Extract exact text from chosen/rejected turn array or dict using index [-1]."""
         if isinstance(turn, list) and len(turn) > 0:
             if isinstance(turn[-1], dict) and "content" in turn[-1]:
                 return turn[-1]["content"].strip()
@@ -190,6 +189,7 @@ def run_dpo():
                 tokenize=False, 
                 add_generation_prompt=True
             )
+            # Append EOS token explicitly for SimPO length normalization
             chosen_str = extract_turn_content(examples["chosen"][i]) + "<|im_end|>\n"
             rejected_str = extract_turn_content(examples["rejected"][i]) + "<|im_end|>\n"
             
@@ -199,15 +199,17 @@ def run_dpo():
         return {"prompt": prompts, "chosen": chosens, "rejected": rejecteds}
 
     dataset = dataset.map(format_preference_dataset, batched=True, num_proc=8)
+    
     if len(dataset) > 400:
-        dataset = dataset.select(range(400))
+        dataset = dataset.shuffle(seed=42).select(range(400))
+        
     split = dataset.train_test_split(test_size=0.05, seed=42)
 
     dpo_args = DPOConfig(
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=16,
-        warmup_steps=15,
+        warmup_ratio=0.1, # 🚨 FIXED: Prevents spending 100% of DPO in warmup
         num_train_epochs=EPOCHS_DPO,
         learning_rate=5e-6,
         lr_scheduler_type="cosine",
@@ -215,15 +217,15 @@ def run_dpo():
         optim="adamw_torch",
         weight_decay=0.05,
         loss_type="simpo",
-        beta=0.1,
+        beta=1.0, 
         simpo_gamma=0.5,
         max_length=MAX_SEQ_LENGTH,
-        max_prompt_length=23500,
+        max_prompt_length=3000, # 🚨 FIREWALL: Leaves 1096 tokens for Chatbot completion
         output_dir=OUTPUT_DIR_FINAL,
-        logging_steps=10,
+        logging_steps=5,
         eval_strategy="steps",
-        eval_steps=20,
-        save_steps=20,
+        eval_steps=10, # 🚨 FIXED: Ensures 2.5 evals per epoch on 400 dataset
+        save_steps=10,
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
@@ -251,6 +253,10 @@ def run_dpo():
     adapter_out = OUTPUT_DIR_FINAL + "-adapter"
     print("   -> Saving Unified LoRA adapter for Multi-LoRA serving to:", adapter_out)
     model.save_pretrained_merged(adapter_out, tokenizer, save_method="lora")
+    
+    print("   -> Quantizing to GGUF Q4_K_M for Edge CPU Fallback deployment...")
+    gguf_out = OUTPUT_DIR_FINAL + "-gguf"
+    model.save_pretrained_gguf(gguf_out, tokenizer, quantization_method="q4_k_m")
     
     print("\n✅ CONVERSATIONAL CHATBOT TRAINING COMPLETE.")
     print("🚀 vLLM Multi-LoRA Production Startup Command:")

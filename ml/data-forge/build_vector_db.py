@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-build_vector_db.py – 10-Point SOTA Hybrid Search Engine Builder
+build_vector_db.py – 10-Point SOTA Hybrid Search Engine Builder (FINAL)
 
 Architecture:
-1. Pure Python Hybrid Index (.pkl) - Eliminates ChromaDB daemon/SQLite locks on DGX nodes.
+1. Pure Python Hybrid Index (.pkl) - Eliminates ChromaDB daemon/SQLite locks.
 2. Legal-Aware Chunking (800 char, 80 overlap, strict header binding).
 3. Metadata Tagging Engine (type, number, applies_to).
 4. BM25 Lexical Index (Custom legal Tokenizer + BM25Okapi).
@@ -52,7 +52,7 @@ def get_legal_tokenizer():
         text = text.replace("significant data fiduciary", "significant_data_fiduciary")
         text = text.replace("sub-section", "subsection")
         
-        # Preserve statutory references (e.g., section_8, rule_13_3)
+        # Preserve statutory references (e.g., section_8, rule_13_3, section_2)
         text = re.sub(r'section\s+(\d+)\((\d+)\)', r'section_\1_\2', text)
         text = re.sub(r'rule\s+(\d+)\((\d+)\)', r'rule_\1_\2', text)
         text = re.sub(r'section\s+(\d+)', r'section_\1', text)
@@ -83,17 +83,18 @@ def extract_metadata(header_text, body_text):
     if "RULES 2025" in full_text.upper():
         meta["parent_act"] = "DPDP Rules 2025"
         
-    sec_match = re.search(r'\bSection\s+(\d+)', header_text, re.IGNORECASE)
-    rule_match = re.search(r'\bRule\s+(\d+)', header_text, re.IGNORECASE)
+    # 🚨 UPGRADED: Handles "Section 2." or "Section 17(1)" variations
+    sec_match = re.search(r'\bSection\s+\d+(?:\.\d+)*', header_text, re.IGNORECASE)
+    rule_match = re.search(r'\bRule\s+\d+(?:\.\d+)*', header_text, re.IGNORECASE)
     sched_match = re.search(r'\b(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE\b', header_text, re.IGNORECASE)
     ch_match = re.search(r'\bCHAPTER\s+([IVXLCDM]+)', header_text, re.IGNORECASE)
     
     if sec_match:
         meta["type"] = "Section"
-        meta["number"] = sec_match.group(1)
+        meta["number"] = sec_match.group(0)
     elif rule_match:
         meta["type"] = "Rule"
-        meta["number"] = rule_match.group(1)
+        meta["number"] = rule_match.group(0)
     elif sched_match:
         meta["type"] = "Schedule"
         meta["number"] = sched_match.group(0).upper()
@@ -124,8 +125,9 @@ def parse_and_chunk(file_path):
     chunks = []
     metadatas = []
     
-    # Split by major structural boundaries (OCR-safe)
-    body_blocks = re.split(r'(?=\n+(?:Section\s+\d+|Rule\s+\d+|CHAPTER\s+[IVXLCDM]+|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE))', text)
+    # 🚨 UPGRADED: Robust regex to catch "Section 2.", "Rule 13(3)", etc.
+    split_pattern = r'(?=\n+(?:Section\s+\d+(?:\.\d+)*|Rule\s+\d+(?:\.\d+)*|CHAPTER\s+[IVXLCDM]+|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE))'
+    body_blocks = re.split(split_pattern, text)
     
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=800,
@@ -142,7 +144,7 @@ def parse_and_chunk(file_path):
         lines = block.split('\n')
         header = ""
         # Extract the primary header of this block
-        if lines and re.search(r'^(Section \d+|Rule \d+|CHAPTER|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE)', lines[0].strip(), re.IGNORECASE):
+        if lines and re.search(r'^(Section\s+\d+(?:\.\d+)*|Rule\s+\d+(?:\.\d+)*|CHAPTER\s+[IVXLCDM]+|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE)', lines[0].strip(), re.IGNORECASE):
             header = lines[0].strip()
             
         sub_chunks = splitter.split_text(block)
@@ -219,7 +221,9 @@ def build_db():
         ("verifiable consent for children", ["Section 9", "Rule 10"], False),
         ("algorithmic software audit obligations", ["Rule 13"], False),
         ("Consent Manager interoperability", ["Rule 4", "First Schedule"], False),
-        ("cross-border data transfer restrictions", ["Section 16", "Rule 15"], False)
+        ("cross-border data transfer restrictions", ["Section 16", "Rule 15"], False),
+        # 🚨 UPGRADED: Added a State-specific query to prove isolation works both ways
+        ("Standards for processing personal data by State instrumentalities", ["Second Schedule"], True)
     ]
     
     all_passed = True
@@ -234,7 +238,7 @@ def build_db():
         dense_scores = np.dot(embeddings, q_emb)
         dense_ranks = np.argsort(dense_scores)[::-1]
         
-                # Reciprocal Rank Fusion (RRF k=60) WITH STATE-ISOLATION PRE-FILTER
+        # Reciprocal Rank Fusion (RRF k=60) WITH STATE-ISOLATION PRE-FILTER
         rrf_scores = np.zeros(len(chunks))
         
         for rank, idx in enumerate(bm25_ranks[:50]):

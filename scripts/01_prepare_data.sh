@@ -11,7 +11,7 @@
 # Prerequisites for DGX Spark Execution:
 #   - NVIDIA DGX / GPU environment (128 GB VRAM unified or split)
 #   - Python 3.10+ / 3.12 with CUDA 12.x support
-#   - Packages installed (`pip install -r requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch, huggingface_hub
+#   - Packages installed (`pip install -r requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch, huggingface_hub, chromadb, langchain-text-splitters, rank_bm25
 #
 # Usage:
 #   bash scripts/01_prepare_data.sh [--skip-gan]
@@ -87,35 +87,67 @@ pkill -f vllm.entrypoints.openai.api_server 2>/dev/null || true
 mkdir -p "${REPO_ROOT}/ml/models"
 echo -e "\n▶️  [PHASE 0/4]: Verifying Teacher ('Qwen2-72B') & Student ('Qwen 3.5 9B') Models in ml/models/..."
 
-# 1. Check Student Model: Qwen/Qwen3.5-9B (or Qwen2.5-9B-Instruct if already downloaded)
+# 1. Check Student Model: Qwen/Qwen3.5-9B
 if [ -d "${REPO_ROOT}/ml/models/Qwen3.5-9B" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen3.5-9B" 2>/dev/null)" ]; then
     echo "   ✅ Student model ('Qwen3.5-9B') found locally at ml/models/Qwen3.5-9B. Skipping download."
 elif [ -d "${REPO_ROOT}/ml/models/Qwen2.5-9B-Instruct" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2.5-9B-Instruct" 2>/dev/null)" ]; then
     echo "   ✅ Student model found locally at ml/models/Qwen2.5-9B-Instruct. Skipping download."
 else
-    echo "   📥 Student model not found locally in ml/models/. Downloading Qwen/Qwen3.5-9B via huggingface-cli..."
-    if command -v huggingface-cli &> /dev/null; then
-        huggingface-cli download Qwen/Qwen3.5-9B --local-dir "${REPO_ROOT}/ml/models/Qwen3.5-9B"
+    echo "   📥 Student model not found locally in ml/models/. Downloading Qwen/Qwen3.5-9B via hf..."
+    if command -v hf &> /dev/null; then
+        hf download Qwen/Qwen3.5-9B --local-dir "${REPO_ROOT}/ml/models/Qwen3.5-9B"
     else
         "${PYTHON_CMD}" -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Qwen/Qwen3.5-9B', local_dir='${REPO_ROOT}/ml/models/Qwen3.5-9B')"
     fi
     echo "   ✅ Downloaded Qwen/Qwen3.5-9B successfully."
 fi
 
-# 2. Check Teacher Model: Qwen2-72B-Instruct-FP8 (or Qwen2.5-72B-Instruct-FP8)
+# 2. Check Teacher Model: Qwen2-72B-Instruct-FP8
 if [ -d "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8" 2>/dev/null)" ]; then
     echo "   ✅ Teacher model ('Qwen2-72B-Instruct-FP8') found locally at ml/models/Qwen2-72B-Instruct-FP8. Skipping download."
 elif [ -d "${REPO_ROOT}/ml/models/Qwen2.5-72B-Instruct-FP8" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen2.5-72B-Instruct-FP8" 2>/dev/null)" ]; then
     echo "   ✅ Teacher model found locally at ml/models/Qwen2.5-72B-Instruct-FP8. Skipping download."
 else
-    echo "   📥 Teacher model not found locally in ml/models/. Downloading Qwen/Qwen2-72B-Instruct-FP8 via huggingface-cli..."
-    if command -v huggingface-cli &> /dev/null; then
-        huggingface-cli download Qwen/Qwen2-72B-Instruct-FP8 --local-dir "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8"
+    echo "   📥 Teacher model not found locally in ml/models/. Downloading Qwen/Qwen2-72B-Instruct-FP8 via hf..."
+    if command -v hf &> /dev/null; then
+        hf download Qwen/Qwen2-72B-Instruct-FP8 --local-dir "${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8"
     else
         "${PYTHON_CMD}" -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Qwen/Qwen2-72B-Instruct-FP8', local_dir='${REPO_ROOT}/ml/models/Qwen2-72B-Instruct-FP8')"
     fi
     echo "   ✅ Downloaded teacher model successfully."
 fi
+
+# 3. Check RAG Models: BAAI/bge-small-en-v1.5 and BAAI/bge-reranker-v2-m3
+if [ -d "${REPO_ROOT}/ml/models/bge-small-en-v1.5" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/bge-small-en-v1.5" 2>/dev/null)" ]; then
+    echo "   ✅ RAG Embedding model ('bge-small-en-v1.5') found locally in ml/models/. Skipping download."
+else
+    echo "   📥 RAG Embedding model not found locally in ml/models/. Downloading BAAI/bge-small-en-v1.5..."
+    if command -v hf &> /dev/null; then
+        hf download BAAI/bge-small-en-v1.5 --local-dir "${REPO_ROOT}/ml/models/bge-small-en-v1.5"
+    else
+        "${PYTHON_CMD}" -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-small-en-v1.5', local_dir='${REPO_ROOT}/ml/models/bge-small-en-v1.5')"
+    fi
+    echo "   ✅ Downloaded RAG embedding model successfully."
+fi
+
+if [ -d "${REPO_ROOT}/ml/models/bge-reranker-v2-m3" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/bge-reranker-v2-m3" 2>/dev/null)" ]; then
+    echo "   ✅ RAG Reranker model ('bge-reranker-v2-m3') found locally in ml/models/. Skipping download."
+else
+    echo "   📥 RAG Reranker model not found locally in ml/models/. Downloading BAAI/bge-reranker-v2-m3..."
+    if command -v hf &> /dev/null; then
+        hf download BAAI/bge-reranker-v2-m3 --local-dir "${REPO_ROOT}/ml/models/bge-reranker-v2-m3"
+    else
+        "${PYTHON_CMD}" -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-reranker-v2-m3', local_dir='${REPO_ROOT}/ml/models/bge-reranker-v2-m3')"
+    fi
+    echo "   ✅ Downloaded RAG reranker model successfully."
+fi
+
+# ════════════════════════════════════════════════════════════════════════════════
+# [PHASE 0.5/4]: RAG DEPENDENCY RESOLUTION
+# ════════════════════════════════════════════════════════════════════════════════
+echo -e "\n▶️  [PHASE 0.5/4]: Verifying Data Forge & Vector DB Dependencies..."
+"${PYTHON_CMD}" -m pip install -q chromadb langchain-text-splitters rank_bm25 sentence-transformers langchain
+echo "   ✅ Dependencies synchronized."
 
 cd "${REPO_ROOT}/ml/data-forge"
 
@@ -125,10 +157,10 @@ cd "${REPO_ROOT}/ml/data-forge"
 if [ "${SKIP_GAN}" = true ]; then
     echo -e "\n⏭️  [PHASE 1/4]: Skipping Synthetic GAN Forge (--skip-gan enabled)."
 else
+    echo -e "\n▶️  [PHASE 1/4(a)]: Building Vector Database (ChromaDB)..."
     "${PYTHON_CMD}" -u build_vector_db.py
 
     echo -e "\n▶️  [PHASE 1/4(b)]: Forging Synthetic Data (GAN Forge via vLLM)..."
-
     "${PYTHON_CMD}" -u gan_forge.py
 fi
 

@@ -103,7 +103,7 @@ TARGET_VIOLATIONS = {
 
 SEMANTIC_KEYWORD_MAP = {
     "PURPOSE_LIMITATION": {"primary": ["purpose", "lawful", "specified", "secondary", "monetization", "ecosystem", "analytics", "profile"], "secondary": ["deem", "implicit", "unrelated"]},
-    "CONSENT_MECHANICS": {"primary": ["consent", "bundl", "opt-out", "withdraw", "unconditional", "affirmative", "communication link", "dashboard"], "secondary": ["presumptive", "tacit", "continued use"]},
+    "CONSENT_MECHANICS": {"primary": ["consent", "opt-out", "withdraw", "affirmative", "communication link", "dashboard"], "secondary": ["presumptive", "tacit", "continued use"]},
     "LEGITIMATE_USES_ABUSE": {"primary": ["legitimate use", "voluntarily provided", "employment", "subsidy", "medical emergency", "state function"], "secondary": ["commercial", "marketing", "revenue"]},
     "NOTICE_ADEQUACY": {"primary": ["notice", "inform", "itemised", "description", "purpose", "complaint", "board", "link"], "secondary": ["vague", "strive", "paramount", "trusted"]},
     "DATA_RETENTION_AND_ERASURE": {"primary": ["retain", "retention", "erase", "delete", "indefinitely", "period", "specified purpose", "no longer served"], "secondary": ["archive", "legacy", "continuity"]},

@@ -1,6 +1,6 @@
 [RETRIEVED_LAW_CONTEXT]
 
-You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided above. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
 
 [CONTEXT: THE PRIVACY POLICY TO AUDIT]
 Read the following privacy policy carefully. You will audit this text against the law provided above.
@@ -24,7 +24,6 @@ You are an authoritative, overzealous, and highly rigorous forensic privacy audi
 
 You are evaluating a privacy policy to construct a realistic DPO rejected candidate (a hard-negative legal misinterpretation). 
 CRITICAL COMPLIANCE ANCHOR:
-- Look at `[TRUE VIOLATION CONTEXT]` above, which includes the Target Category and `Chosen Violation Quote` selected by the SFT Judge. You are STRICTLY FORBIDDEN from extracting, selecting, or quoting `[CHOSEN_EVIDENCE_QUOTE]`, `[TRUE_VIOLATION_CONTEXT]`, or any sentence containing explicit corporate refusal/unlawful terms (such as permanently, unconditionally, unqualified commitment, refuse, or trade secret). Selecting the true violation quote destroys the DPO preference signal and triggers an immediate validation drop.
 - STRATIFIED TARGET ROTATION DIRECTIVE: You MUST select a BENIGN, COMPLIANT SAFE-HARBOR clause or a STATUTORY EXEMPTION clause from an operational, compliant section of the policy (e.g. Data Retention, Security Safeguards, Grievance Redressal, or Consent Manager support). 
 - Construct an overzealous, technically strict, but legally flawed academic misinterpretation by applying one of our analytical typologies against the AFFIRMATIVE words of this benign or safe-harbor clause without using repetitive boilerplate phrasing.
 
@@ -130,7 +129,7 @@ Output ONLY a valid JSON object matching the format below. Do NOT wrap in code b
       "step_2_statute_match": "This command specifically connects to Section X because...",
       "omission_check": [OMISSION_SCHEMA],
       "step_3_semantic_justification": "The company's broad reliance on internal administrative discretion for secondary processing creates an unqualified operational loophole that exceeds statutory boundaries under Section X.",
-      "statute_reference": "Section X",
+      "statute_reference": "Section Y",
       "violation_type": "ILLEGAL_EXEMPTION_CLAIM",
       "evidence_quote": "Exact verbatim single complete operational sentence from a compliant section of the policy ending in terminal punctuation.",
       "network_action": "WARN_USER_ONLY",

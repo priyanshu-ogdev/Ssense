@@ -6,7 +6,7 @@
   "properties": {
     "global_legal_reasoning": {
       "type": "string",
-      "description": "Chain-of-thought reasoning analyzing the policy text against the DPDP Act and 2025 Rules before any conclusions are made."
+      "description": "Chain-of-thought reasoning analyzing the affirmative policy text against the DPDP Act and 2025 Rules before any conclusions are made. Must not contain omission complaints."
     },
     "violations": {
       "type": "array",
@@ -25,15 +25,15 @@
           },
           "omission_check": {
             "type": "boolean",
-            "description": "If the violation is based on missing information or what the policy 'failed to state', set to TRUE. Otherwise FALSE."
+            "description": "CRITICAL FIREWALL: Must evaluate if the violation relies on what the policy fails to state. If based on silence, this MUST evaluate to true (which will trigger a pipeline drop). If based on an active, printed claim, evaluate to false."
           },
           "step_3_semantic_justification": {
             "type": "string",
-            "description": "Explain exactly why the text extracted in step_1 constitutes a violation."
+            "description": "Explain exactly why the affirmative text extracted in step_1 constitutes a violation without using banned omission phrases."
           },
           "statute_reference": {
             "type": "string",
-            "description": "The exact Section or Rule violated (e.g., 'Section 4', 'Rule 8(3)')."
+            "description": "The exact Section or Rule violated (e.g., 'Section 4', 'Rule 8(3)', 'Rule 13(4)')."
           },
           "violation_type": {
             "type": "string",
@@ -43,28 +43,33 @@
               "LEGITIMATE_USES_ABUSE",
               "NOTICE_INADEQUATE",
               "DATA_RETENTION_LIMIT_EXCEEDED",
+              "ERASURE_NOTICE_PERIOD_VIOLATION",
+              "LOG_RETENTION_MANDATE_VIOLATION",
               "CHILD_CONSENT_VIOLATION",
               "SECURITY_SAFEGUARDS_MISSING",
               "GRIEVANCE_REDRESSAL_INADEQUATE",
               "BREACH_NOTIFICATION_FAILURE",
               "PROCESSOR_ACCOUNTABILITY_VIOLATION",
               "SDF_OBLIGATIONS_MISSING",
+              "SDF_DATA_LOCALIZATION_VIOLATION",
               "CROSS_BORDER_TRANSFER_VIOLATION",
               "CONSENT_MANAGER_OBSTRUCTION",
               "LANGUAGE_ACCESSIBILITY",
               "ALGORITHMIC_PROFILING_SDF",
               "RIGHTS_IMPLEMENTATION_VIOLATION",
+              "DATA_ACCURACY_COMPLETENESS_VIOLATION",
               "BOARD_COMPLIANCE_VIOLATION",
               "PENALTY_AVOIDANCE",
               "APPEAL_PROCESS_VIOLATION",
               "SCOPE_APPLICATION_EVASION",
-              "ILLEGAL_EXEMPTION_CLAIM"
+              "ILLEGAL_EXEMPTION_CLAIM",
+              "CONSENT_MECHANICS_VIOLATION"
             ]
           },
           "evidence_quote": {
             "type": "string",
-            "minLength": 1,
-            "description": "The exact verbatim string extracted from step_1."
+            "minLength": 20,
+            "description": "The exact verbatim string extracted from the policy. Must be at least 20 characters and contain no internal periods to prevent truncation bugs."
           },
           "network_action": {
             "type": "string",
@@ -79,7 +84,7 @@
           "offending_entities": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Specific targets for the network action."
+            "description": "Specific targets for the network action. Empty array if none exist."
           }
         },
         "required": [
@@ -99,12 +104,14 @@
     "dpdp_trust_score": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "description": "A score from 0 to 100 indicating the overall compliance health of the policy (0 being highly non-compliant)."
     },
     "subtlety_score": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "description": "A score from 0 to 100 indicating how subtly the violation is camouflaged within corporate jargon (100 being masterfully hidden)."
     }
   },
   "required": [
