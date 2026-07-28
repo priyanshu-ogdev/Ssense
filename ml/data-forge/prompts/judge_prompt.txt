@@ -19,19 +19,19 @@ You must output ONLY a single, valid JSON object matching the exact schema below
 ANTI-POISON CONSTRAINTS (CRITICAL)
 =========================================
 1. ABSOLUTE PROHIBITION (ZERO ADDRESS / CONTACT / GRIEVANCE FLAGGING):
-   You MUST NOT flag company addresses, email contacts, DPO contact lines, DPO email signatures, helpline phone numbers, PIN codes, corporate registered offices, website contact URLs, or introductory preambles as violations. You MUST NOT flag grievance redressal clauses, general customer support lines, or any sentences providing instructions for users to raise questions, concerns, or clarifications. Flagging administrative or contact details is severe data poisoning and is strictly banned in either chosen or rejected outputs. Flag strictly the operative legal violation clause.
+   You MUST NOT flag company addresses, email contacts, DPO contact lines, DPO email signatures, helpline phone numbers, PIN codes, corporate registered offices, website contact URLs, or introductory preambles as violations. You MUST NOT flag grievance redressal clauses, general customer support lines, or any sentences providing instructions for users to raise questions, concerns, or clarifications. Flagging administrative or contact details is severe data poisoning and is strictly banned. Flag strictly the operative legal violation clause.
 
-2. STATUTORY JURISDICTION:
-   Evaluate the policy exclusively using the exact retrieved law text provided in the [RETRIEVED_LAW_CONTEXT] above, simulating a Retrieval-Augmented Generation (RAG) system. Base all analysis strictly on these retrieved provisions.
+2. STATUTORY JURISDICTION & SCOPE ISOLATION:
+   Evaluate the policy exclusively using the exact retrieved law text provided in the [RETRIEVED_LAW_CONTEXT]. You must rigorously enforce the boundary between public and private entities. Do NOT flag a private company for failing to adhere to State-only schedules, and DO flag a private company if it illegally claims a State exemption (e.g., national security) to bypass consent.
 
 3. EXCLUSIVE DPDP FOCUS (ANTI-GDPR BLEED):
-   Cite and apply only sections and schedules of the DPDP Act 2023 and Rules 2025. Maintain strict grounding within the provided statutory framework. Do NOT hallucinate foreign rights (e.g., GDPR Article 22 "right to explanation of automated decisions", "right to be forgotten", or "legitimate interest"). India's DPDP Act only grants access to summary data and identities of processors under Section 11, NOT algorithmic logic.
+   Cite and apply only sections and schedules of the DPDP Act 2023 and Rules 2025. Maintain strict grounding within the provided statutory framework. Do NOT hallucinate foreign rights (e.g., GDPR Article 22 "right to explanation of automated decisions", "right to be forgotten", or "legitimate interest"). 
 
 4. OMISSION HALLUCINATION FIREWALL (STRICTLY PROHIBITED PHRASES):
-   When constructing your semantic justification (`step_2_semantic_justification`) and `global_legal_reasoning`, you MUST NEVER complain about missing details, policy silence, or what the policy leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
-   - "without specifying" / "without detailing" / "without providing" / "without explaining" / "without explicitly specifying"
-   - "fails to specify" / "fails to provide" / "fails to detail" / "fails to mention" / "fails to explain" / "fails to disclose"
-   - "does not specify" / "does not provide" / "does not detail" / "does not mention" / "does not disclose" / "does not provide a clear mechanism"
+   When constructing your semantic justification (`step_3_semantic_justification`) and `global_legal_reasoning`, you MUST NEVER complain about missing details, policy silence, or what the policy leaves out. You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases (or close paraphrases):
+   - "without specifying" / "without detailing" / "without providing" / "without explicitly specifying"
+   - "fails to specify" / "fails to provide" / "fails to detail" / "fails to mention" / "fails to articulate"
+   - "does not specify" / "does not provide" / "does not detail" / "does not mention" / "does not state" / "does not outline"
    - "lacks specific" / "omits information regarding" / "omits any mention" / "no mention of" / "silent on"
    VIOLATION CHECK: If your justification uses words complaining about what is NOT stated, your output is instantly rejected. Anchor your critique 100% on the AFFIRMATIVE words physically present right in front of us.
 
@@ -47,8 +47,8 @@ A sentence is a valid violation only if it:
 - Contains an absolute, unrestricted term or phrase that makes the action irrevocable and impossible to limit lawfully (e.g., permanently, always, without exception, we deny, we bypass, we do not allow, we refuse). The term must leave zero room for compliant interpretation.
 
 ZERO-SHOT OMISSION & SILENCE PREVENTER:
-- WHAT TO AVOID: Do not flag or critique what the policy omits, lacks, fails to specify, does not detail, or is silent about. Do not frame any violation around missing procedures, absent explanations, or unlisted mechanisms. Do not use speculative phrasing or generic boilerplate templates across evaluations.
-- HOW TO AVOID IT: Strictly anchor every identified violation solely in what the policy affirmative states, commands, or mandates right now in the present tense. If an action or restriction is not physically printed in exact words within the extracted sentence, treat the topic as perfectly compliant. Silence is not a violation. Absence of detail is not a crime.
+- WHAT TO AVOID: Do not flag or critique what the policy omits, lacks, fails to specify, does not articulate, or is silent about. Do not frame any violation around missing procedures or unlisted mechanisms. 
+- HOW TO AVOID IT: Strictly anchor every identified violation solely in what the policy affirmatively states, commands, or mandates right now. If an action or restriction is not physically printed in exact words, treat the topic as perfectly compliant. Silence is not a violation.
 
 =========================================
 SAFE HARBOR IMMUNITY (ABSOLUTE)
@@ -95,9 +95,9 @@ EXECUTION RULES & FIELD DEFINITIONS
    Identify every distinct active violation. Do NOT flag the same illegal mechanism twice. If a trap spans multiple sentences, select the SINGLE most explicit sentence and map it as ONE violation.
 
 2. SINGLE-SENTENCE EXTRACTION ('evidence_quote'):
-   Extract exactly ONE full verbatim sentence from the policy that contains the active illegal claim. You must populate 'evidence_quote' with this exact string. You MUST COPY AND PASTE the sentence exactly as it appears in the text. DO NOT paraphrase. DO NOT change any words.
-   MECHANICAL CONSTRAINT (ZERO INTERNAL PERIODS): The extracted string MUST be at least 20 characters long. It MUST contain exactly ONE terminal punctuation mark (period, exclamation, or question mark) at the very end. It MUST NOT contain multiple sentences or any internal sentence-ending periods (`.`), nor internal abbreviations containing periods (`Pvt. Ltd.`, `Inc.`, `e.g.`, `i.e.`). You are STRICTLY COMMANDED to extract ONLY the first sentence and never span across multiple sentences. If you extract more than one sentence, you will fail. Stop at the very first period. Do NOT modify the text, do NOT use ellipses or truncations.
-   Start at the very first capital letter of the sentence (including introductory words like "However," or "In order to"). This single string will be used as the only evidence.
+   EVIDENCE EXTRACTION MANDATE: Your 'evidence_quote' MUST be the exact, active clause that breaks the law (e.g., "we refuse to disclose", "without any consideration"). You are strictly forbidden from extracting a benign, standard corporate sentence and punishing it for what it "fails to articulate". The quote itself must be inherently toxic.
+   Extract exactly ONE full verbatim sentence from the policy that contains the active illegal claim. You MUST COPY AND PASTE the sentence exactly as it appears in the text. DO NOT paraphrase. DO NOT change any words.
+   MECHANICAL CONSTRAINT (ZERO INTERNAL PERIODS): The extracted string MUST be at least 20 characters long. It MUST contain exactly ONE terminal punctuation mark (period, exclamation, or question mark) at the very end. It MUST NOT contain multiple sentences or any internal sentence-ending periods. Stop at the very first period. Do NOT modify the text, do NOT use ellipses or truncations.
 
 3. STEP 1: ACTIVE CLAIM ANALYSIS ('step_1_active_claim_analysis'):
    Analyze the affirmative, present-tense words inside the quote to explicitly state what the policy commands. Prove it is an active claim, not an omission.
@@ -107,30 +107,29 @@ EXECUTION RULES & FIELD DEFINITIONS
 
 5. STEP 3: SEMANTIC JUSTIFICATION ('step_3_semantic_justification'):
    Explain concisely and precisely why the literal words of the extracted sentence are illegal under the DPDP Act 2023.
-   
    ZERO-SHOT HIGH-ENTROPY ANALYTICAL GROUNDING (ANTI-TEMPLATE DIRECTIVE):
-   - Do NOT use rigid grammatical scaffolds or repetitive formulaic prefixes (such as "By stating the exact extracted sentence..." or "By stating that...").
+   - Do NOT use rigid grammatical scaffolds or repetitive formulaic prefixes.
    - Open your justification dynamically and organically using varied analytical prose tailored directly to the operative verbs and claims of the sentence.
    - Ground your explanation strictly in what the extracted sentence actively commands, mandates, or restricts right now in the present tense.
-   - Explain precisely how the affirmative wording creates an illegal overreach or extinguishes Data Principal rights under Section [X] without critiquing policy silence or omission. Write clean, direct, concise analytical prose under 150 words without repeating boilerplate templates across evaluations.
+   - Explain precisely how the affirmative wording creates an illegal overreach without critiquing policy silence or omission. Write clean, direct, concise analytical prose under 150 words.
 
-4. STATUTE REFERENCE ('statute_reference'):
+6. STATUTE REFERENCE ('statute_reference'):
    Cite ONLY the DPDP Act 2023 or DPDP Rules 2025. You MUST output EXACTLY the statute reference provided in your instructions as [TARGET_STATUTE]. Do not hallucinate other sections.
 
-5. STRICT ENUMS & NETWORK ACTION:
+7. STRICT ENUMS & NETWORK ACTION ('network_action', 'violation_type'):
    - 'violation_type' MUST be exactly one enum from the Mapping Guide.
    - 'network_action' MUST be one of: BLOCK_THIRD_PARTY, STRIP_TELEMETRY_HEADER, SPOOF_HARDWARE_API, INJECT_GPC_SIGNAL, WARN_USER_ONLY.
    LOGIC GATE:
      • If the violation involves explicit, named unauthorized third-party data sharing or active tracking → BLOCK_THIRD_PARTY or STRIP_TELEMETRY_HEADER.
      • Otherwise (structural, administrative, policy-level violations) → WARN_USER_ONLY.
 
-6. OMISSION CHECK ('omission_check'):
+8. OMISSION CHECK ('omission_check'):
    [OMISSION_RULES]
 
-7. OFFENDING ENTITIES ('offending_entities'):
+9. OFFENDING ENTITIES ('offending_entities'):
    CRITICAL ZERO-SHOT EXTRACTION: You must explicitly extract the exact third-party entity name, corporate tracker, or external domain from the evidence quote if it is present. Do not leave the array empty if an entity is named. If absolutely none exist, output an empty array [].
 
-8. GLOBAL REASONING ('global_legal_reasoning'):
+10. GLOBAL REASONING ('global_legal_reasoning'):
    Summarize only the explicit active violations found. LOGICAL CONSISTENCY RULE: If the 'violations' array is populated, this field MUST explicitly summarize those violations and CANNOT state that the policy is compliant.
    - WHAT TO AVOID: Do not include omission critiques, canned summaries, or contradictory claims.
    - HOW TO AVOID IT: Provide a dynamic, case-specific summary evaluating only affirmative corporate practices against the DPDP Act. If no violations exist, state exactly: "No explicit, active contradictions of the DPDP Act 2023 or DPDP Rules 2025 were found in the policy text."

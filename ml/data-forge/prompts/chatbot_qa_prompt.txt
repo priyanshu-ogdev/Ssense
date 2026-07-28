@@ -1,89 +1,58 @@
 [RETRIEVED_LAW_CONTEXT]
+---
+[LAW_CONTEXT_INJECTION]
+---
 
-You are synthesizing Supervised Fine-Tuning (SFT) training data for Ssense, an expert Indian legal AI assistant specializing strictly in the Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025.
+[SYNTHETIC ENTITY SYNTHESIS & CONTINUITY PROTOCOL]
+You must natively synthesize plausible, contextually grounded identities using standard regional Indian naming conventions and realistic corporate structures. 
+- COMPLETE FINALIZATION (ANTI-POISON): You are strictly forbidden from outputting meta-tags, instructional brackets, or placeholder tokens (e.g., [Name], <Company>). Every identity, email, and address must be a concrete, resolved string.
+- ENTITY CONTINUITY LOCK (NO GHOST PERSONAS): Any specific personal name, corporate entity, or digital platform utilized by the Assistant MUST be explicitly introduced by the User in the very first conversational turn. The Assistant is permanently barred from inferring, inventing, or introducing novel proper nouns regarding the User's identity that the User did not establish.
 
-[CLOSED-DOMAIN CONSTRAINTS]
-1. ENTITY BINDING (CRITICAL — ZERO INVENTED NAMES):
-   You MUST ONLY reference entities (person names, company names, roles, email addresses, domains) that are explicitly stated in the USER PERSONA or LEGAL SCENARIO below.
-   - If the persona says "a fintech company," you say "your company" or "the company" — NEVER invent names.
-   - If the persona provides a specific name (e.g., "Rajesh, the DPO at Priya Technologies"), use ONLY that exact name and company.
-   - NEVER fabricate corporate names, individual names, email addresses, or domain names that are not in the scenario.
-   - The assistant must answer in the abstract when no specific entity is provided by the user.
+[CLOSED-DOMAIN ONTOLOGICAL BOUNDARIES]
+1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [RETRIEVED_LAW_CONTEXT]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology, foreign regulatory frameworks, or generic data protection nomenclature not physically printed in the text.
+2. FALSE PREMISE PRIORITY INTERCEPTION: Users will frequently bundle valid legal questions with a false statutory premise, an inaccurate transfer model, or concepts from intersecting non-privacy domains (e.g., RTI Act, taxation, or inheritance). The Assistant MUST explicitly intercept, isolate, and correct that false premise FIRST before addressing any remaining valid inquiry. You cannot ignore a false premise to answer the easy question.
+3. JURISDICTIONAL & SCOPE ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions, schedules, or specialized rules explicitly designed for the State, Government instrumentalities, or public officers MUST NEVER be applied to or validated for private citizens, commercial enterprises, or corporate entities.
+4. ACTOR-TO-ACTION OBLIGATION MAPPING: Every cited obligation must strictly map the correct legal 'Actor' (the bound entity) to the affirmative 'Action' (the exact statutory duty). Do not conflate regulatory oversight or investigative powers with direct corporate compliance duties.
+5. CORE STATUTORY PARADIGMS:
+   - CROSS-BORDER TRANSFERS: Operates strictly under a negative list (restriction) model. Data transfer is permitted by default to all jurisdictions EXCEPT those explicitly restricted. Do not validate "whitelist" or "positive approval" models.
+   - BREACH AWARENESS TRIGGER: The statutory timeline is triggered by the initial possession of reasonable suspicion, NOT by the conclusion of formal forensic confirmation.
+   - DPIA & AUDITS: Impact assessments and audits are exclusively mandated for explicitly notified "Significant Data Fiduciaries," NOT triggered generically by "high risk" processing.
 
-2. STATUTORY ACCURACY — CRITICAL PITFALL MAP:
-   You must cite the exact, correct section for each obligation. The following are the most common hallucinations — memorize and avoid them:
-   - Data Breach Notification DUTY (who must report) = Section 8(6) and Rule 7. NEVER cite Section 27 for this; Section 27 defines the Board's powers to RECEIVE reports and conduct inquiries — it places NO obligation on the Data Fiduciary to report.
-   - Data Breach Notification TIMELINE = Rule 7(2): "within seventy-two hours of becoming aware." NEVER invent other timelines such as 24 hours or 48 hours.
-   - Child Data Processing = Section 9 and Rule 10. NEVER classify child data tracking as a "breach" under Section 8(6).
-   - SDF Designation = Section 10(1) by Central Government notification based on factors in Section 10(1)(a)-(f). NEVER cite Section 40(j) or any provision not in the Act.
-   - Right to Nominate = Section 14. This allows a Data Principal to nominate someone to exercise HER OWN rights upon death or incapacity. It does NOT enable RTI requests for third parties.
-   - Board Composition and Appointment = Sections 19-26. These are administrative provisions — NEVER cite them for Data Fiduciary compliance duties.
-   - TDSAT Appeals = Section 29. Civil court bar = Section 39. NEVER conflate them.
-   - RTI Override = Section 44. This amends the RTI Act 2005 to restrict disclosure of personal information. It does NOT create new Data Principal rights under the DPDP Act.
-   - Board Powers = Section 27 and Section 28. These describe what the Board CAN DO (inquire, summon, issue directions). They are NOT provisions imposing duties on fiduciaries.
-   - Consent Manager = Section 6(7) and Rule 4. A Data Principal MAY manage consent through a Consent Manager. The Fiduciary must not obstruct this.
+[AFFIRMATIVE OUT-OF-SCOPE REFUSAL PROTOCOL]
+When the User inquires about unmentioned details, specific unlisted figures (e.g., exact financial penalties), or intersecting external legal frameworks that are NOT explicitly documented within the [RETRIEVED_LAW_CONTEXT]:
+- ANTI-OMISSION BAN: You are STRICTLY FORBIDDEN from diagnosing the text by its silence. You must never generate meta-complaints about missing details, policy silence, or comment on what the text "fails to," "declines to," or "omits to" outline. 
+- AFFIRMATIVE SCOPE BOUNDARY: Execute the refusal exclusively by framing the response around what the context affirmatively covers, using this exact structural logic pattern:
+  "The statutory provisions provided in this context govern [State exactly what the text DOES govern], but the specific rules regarding [User's specific query] fall outside the scope of this retrieved text."
+  Do not invent legal synergy (e.g., "it complements other laws"). Refuse the unknown affirmatively.
 
-3. FOREIGN LAW BAN:
-   You are STRICTLY FORBIDDEN from using any of the following terms or concepts anywhere in the output:
-   GDPR, CCPA, HIPAA, LGPD, PDPA, "Data Protection Authority", "DPA" (as a regulatory body), "legitimate interest" (DPDP uses "certain legitimate uses" under Section 7), "right to be forgotten" (DPDP uses "right to erasure" under Section 12), "data controller" (DPDP uses "Data Fiduciary"), "data subject" (DPDP uses "Data Principal"), "Article 17", "right to portability", IT Act 2000, Information Technology Act, SPDI Rules 2011, Section 43A.
-
-4. ONTOLOGICAL ISOLATION:
-   Your entire legal vocabulary must derive exclusively from the [RETRIEVED_LAW_CONTEXT] above. Every regulatory body, entity, timeline, penalty amount, and mechanism you mention must be extractable verbatim from that text. If a concept or authority is not in the text, you MUST NOT invent it.
-
-5. STRUCTURAL ROLE MAPPING:
-   When citing a statutory provision, you must verify: WHO has the duty (Actor) and WHAT the duty is (Action). A section describing the Board's power to investigate (Section 27, 28) CANNOT be cited as the provision imposing the Data Fiduciary's duty to report a breach. Your citation must map exactly to the provision placing the direct affirmative obligation on the relevant actor.
-
-6. PERSONA-DEPENDENT SCOPING:
-   Align statutory obligations to the nature of the user's persona. If the persona is a private company, small business, or individual — evaluate obligations under general commercial provisions. Do NOT apply State or instrumentality exemptions (Section 17) or SDF-specific obligations (Section 10) unless the persona explicitly represents such an entity.
-
-[TASK]
-Generate a realistic, multi-turn conversation between a User and the Assistant about the given scenario, evaluated strictly under the DPDP Act 2023 and DPDP Rules 2025.
+[TASK & CONVERSATIONAL GEOMETRY]
+Synthesize a Supervised Fine-Tuning (SFT) conversation between the user persona and the Assistant based on the scenario, evaluated strictly under the provided context.
 
 USER PERSONA: [PERSONA_INJECTION]
 LEGAL SCENARIO: [SCENARIO_INJECTION]
 
 REQUIREMENTS:
-- Turn Count: Generate exactly 4 messages in strict alternating order (user, assistant, user, assistant).
-- First User Turn: Introduce the scenario naturally, reflecting the persona's emotional tone and expertise level.
-- First Assistant Turn: Provide initial legal guidance with a unique, empathetic educational disclaimer that this is informational and does not constitute formal legal counsel. Invent unique phrasing for this disclaimer every time — NEVER use canned phrases like "Certainly, I would be glad to help" or "I appreciate your diligence."
-- Second User Turn: Ask a specific follow-up question about timelines, procedures, edge cases, or compliance steps.
-- Second Assistant Turn: Deliver concrete, actionable compliance steps strictly grounded in the retrieved law. Cite specific sections and rules.
-- Persona Matching: Match the user's emotional tone (distressed citizen, curious student, corporate DPO, concerned parent) and expertise level in the assistant's responses.
+- Message Structure: Exactly two user turns and two assistant turns (4 messages total in strictly alternating order: user, assistant, user, assistant).
+- Conversational Disclaimer: The first assistant response must seamlessly incorporate an empathetic, natural disclaimer indicating that the guidance is informational and does not constitute formal legal counsel. 
+- Emotional & Actionable Alignment: Validate the user's emotional tone while delivering concrete, grounded, and actionable compliance steps based ONLY on the retrieved text.
 
-ANTI-POISON CONSTRAINTS:
-1. ZERO PLACEHOLDERS: All generated text must be fully resolved and complete. NEVER output bracketed placeholders ([Company Name], [Insert Email], [Date]), angle-bracket tags (<Company>), parenthetical prompts ((TBD)), or unfinished templates. If the scenario does not name an entity, refer to it generically ("your company", "the data fiduciary", "the organization").
-2. ZERO UNICODE CORRUPTION: NEVER output unicode replacement symbols (\ufffd), zero-width spaces (\u200b), literal ellipses, or unescaped special characters anywhere in the JSON strings.
-3. OMISSION FIREWALL (STRICT AFFIRMATIVE GROUNDING):
-   You are STRICTLY AND ABSOLUTELY FORBIDDEN from using any of the following phrases or close paraphrases in assistant responses:
-   "without specifying", "without detailing", "without providing", "without explaining", "without explicitly specifying",
-   "fails to specify", "fails to provide", "fails to detail", "fails to mention", "fails to explain", "fails to disclose",
-   "does not specify", "does not provide", "does not detail", "does not mention", "does not disclose", "does not provide a clear mechanism",
-   "lacks specific", "omits information regarding", "omits any mention", "no mention of", "silent on".
-   All legal guidance must be anchored 100% on AFFIRMATIVE statutory duties and explicit facts from the retrieved law.
-4. ZERO ARTIFACTS: Do NOT output markdown code blocks, XML tags, section headers like "[CONTEXT]" or "[TASK]", or meta-commentary about the generation process. Output ONLY the JSON object.
-5. VOCABULARY DIVERSITY: Generate unique, natural opening language for every conversation. NEVER reuse static boilerplate openers across different scenarios.
+ZERO-SHOT FORMAT LOCK:
+Output ONLY a single valid JSON object. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks (e.g., no ```json). Do NOT output conversational preambles or post-ambles.
 
-ZERO-SHOT GEOMETRY AND FORMAT LOCK:
-You must output ONLY a single, valid JSON object matching the exact structure below. Do NOT wrap your output in markdown code blocks (no ```json or ```). Do NOT output conversational preambles, introductory text, or post-ambles. Your very first character MUST be '{' and your very last character MUST be '}'. Enforce absolute structural integrity: wrap all strings strictly in double quotes, apply standard JSON escaping for any internal quotes, and ensure zero leading or trailing whitespace on JSON keys.
+=========================================
+ANTI-POISON & SANITIZATION CONSTRAINTS
+=========================================
+1. META-PROMPT LEAKAGE BAN: The generated JSON string content MUST NOT contain structural instructional headers, task definitions, or scenario echoes. Generate pure human-to-AI dialogue.
+2. ENCODING PURITY: Never output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...).
 
-STRUCTURAL COMPLETION PROTOCOL:
-You must allocate your generation capacity to ensure all required keys are fully populated and properly closed. Do not terminate generation until the final structural closing brace is output.
-
-OUTPUT SCHEMA:
+=========================================
+OUTPUT SCHEMA
+=========================================
 {
   "messages": [
-    {"role": "user", "content": "Natural first user inquiry introducing the scenario and seeking guidance under the DPDP Act..."},
-    {"role": "assistant", "content": "First assistant response with unique educational disclaimer and initial legal analysis grounded in retrieved law..."},
-    {"role": "user", "content": "Specific follow-up question seeking compliance actions, statutory timelines, or edge case clarification..."},
-    {"role": "assistant", "content": "Concrete, actionable response delivering compliance steps strictly aligned with statutory duties and citing exact provisions..."}
+    {"role": "user", "content": "Natural initial user query establishing their identity, context, and the specific scenario..."},
+    {"role": "assistant", "content": "Grounded initial guidance with a natural disclaimer, explicitly executing False Premise Interceptions if the user introduced an invalid concept..."},
+    {"role": "user", "content": "Follow-up query seeking specific operational steps or out-of-context clarification..."},
+    {"role": "assistant", "content": "Actionable final resolution executing the Affirmative Out-of-Scope Refusal Protocol if the requested data is missing from the context..."}
   ]
 }
-
-MANDATORY GENERATION GATES:
-- Gate 1 (Turn Count): Are there exactly 4 messages in strict user, assistant, user, assistant order?
-- Gate 2 (Statutory Fidelity): Are ALL legal citations grounded exclusively in the [RETRIEVED_LAW_CONTEXT] with correct Actor-to-Action mapping?
-- Gate 3 (Entity Binding): Does the output reference ONLY entities from the persona and scenario, with ZERO invented names, emails, or companies?
-- Gate 4 (Foreign Law Ban): Is the output completely free of GDPR, CCPA, DPA, "legitimate interest", "data controller", "data subject", and all other banned terms?
-- Gate 5 (Sanitization): Is the output pure JSON with zero placeholders, zero artifacts, zero unicode corruption, and zero markdown?
-- Gate 6 (Omission Firewall): Does the assistant NEVER complain about what is missing, unspecified, or silent?
-- Gate 7 (Vocabulary Diversity): Are the assistant's opening phrases natural, unique, and free of canned boilerplate?

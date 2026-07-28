@@ -1,6 +1,6 @@
 [RETRIEVED_LAW_CONTEXT]
 
-You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws (like GDPR or CCPA).
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [RETRIEVED_LAW_CONTEXT] provided below. Do not assume knowledge not present in the retrieval. Do not hallucinate external laws.
 
 [CONTEXT: FAILED POLICY TO REWRITE]
 The text below is your previous attempt. It failed the audit.
@@ -27,18 +27,18 @@ Your previous draft failed because the DPDP violation was too subtle, vague, or 
 ZERO-SHOT PLACEHOLDER PREVENTION DIRECTIVE (CRITICAL ANTI-POISON RULE):
 - WHAT TO AVOID: Do not output any bracketed placeholders, angle bracket tags inside text, parenthetical prompts, or unfinished templates. Never output words like insert, placeholder, or TBD. Never leave corporate contact or identity fields unresolved during a rewrite.
 - CONTACT GAP PREVENTION (NO BROKEN STRINGS): Never output isolated contact preambles or broken email/phone phrases. You must generate complete, realistic Indian email addresses and full Indian street addresses without brackets, tags, or gaps.
-- HOW TO AVOID IT: Perfectly extract and fully resolve the exact Indian company name (Private Limited), registered city/state, grievance email address, physical office location, and DPO name in clean plain text across every section.
+- HOW TO AVOID IT: Perfectly extract and fully resolve the exact Indian company name, registered city/state, grievance email address, physical office location, and DPO name in clean plain text across every section.
 
 ZERO-SHOT CONCEPTUAL ALIGNMENT (ANTI-DRIFT DIRECTIVE):
-- CRITICAL PROHIBITION FOR ALGORITHMIC PROFILING & SDF OBLIGATIONS: When targeting ALGORITHMIC_PROFILING_SDF or SDF_OBLIGATIONS_MISSING, you MUST NOT use the words "analytics", "ad-tracker", "social-network", "metrics", or "third-party" anywhere in the trap sentence or paragraph. Your trap MUST focus strictly on automated algorithmic decision-making, black-box credit/eligibility scoring engines, or exemption from statutory audits.
+- CRITICAL PROHIBITION FOR ALGORITHMIC PROFILING & SDF OBLIGATIONS: When targeting algorithmic profiling or SDF obligations, you MUST NOT use the words "analytics", "ad-tracker", "social-network", "metrics", or "third-party" anywhere in the trap sentence or paragraph. Your trap MUST focus strictly on automated algorithmic decision-making, black-box credit/eligibility scoring engines, or exemption from statutory audits.
 
 STATUTORY JURISDICTION & ZERO-SHOT FOREIGN/LEGACY LAW BLEED PREVENTION:
 You operate exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. All statutory obligations, definitions, and legal terminology must derive strictly from this framework.
-- WHAT TO AVOID: Do not cite or reference foreign data privacy regimes (GDPR, CCPA, HIPAA, LGPD, PDPA), obsolete Indian IT laws (IT Act 2000, SPDI Rules 2011, Section 43A), or non-DPDP legal concepts (e.g., "Legitimate Interests", "Article 17", "Right to Portability").
+- WHAT TO AVOID: Do not cite or reference foreign data privacy regimes, obsolete Indian IT laws, or non-DPDP legal concepts.
 - HOW TO AVOID IT: Use only official DPDP Act terminology (Data Principal, Data Fiduciary, Consent Manager, Section 6 consent, Section 7 legitimate uses, Data Protection Board of India).
 
 ZERO-SHOT GEOMETRY & FORMAT LOCK:
-You are an automated legal generator. You must NOT output conversational filler, pre-ambles, post-ambles, or markdown wrappers. Do not begin with "Here is the revised policy" or wrap your output in code blocks (no ```). Your very first output token MUST be the opening <section> tag, and your very last output tokens MUST be *** END OF POLICY ***.
+You are an automated legal generator. You must NOT output conversational filler, pre-ambles, post-ambles, or markdown wrappers. Do not begin with introductory chat or wrap your output in code blocks (no ```). Your very first output token MUST be the opening <section> tag, and your very last output tokens MUST be *** END OF POLICY ***.
 
 Build the rewritten policy section by section using the XML tags below.
 WARNING: Do NOT use square brackets [ ] anywhere in your output. Do NOT use angle brackets < > inside the actual text of your policy (use them ONLY for structural <section> tags). Standard parentheses ( ) are allowed and encouraged for legal acronyms.
@@ -46,38 +46,46 @@ WARNING: Do NOT use square brackets [ ] anywhere in your output. Do NOT use angl
 CRITICAL TAG PURITY RULE:
 - The title attribute inside <section title="..."> MUST contain ONLY clean, natural corporate heading words.
 - NEVER place contains_trap or prompt instructions inside the title attribute text or inside the paragraph prose. The attribute contains_trap="TRUE" must be a separate XML attribute of the <section> tag.
+
 <section title="Company Privacy Introduction">
 Write a compliant introduction using the exact company identity from the failed policy.
 </section>
 
 <section title="Data Usage Mandates" contains_trap="TRUE">
-MANDATORY: Inside this section, you must write the EXACT illegal sentence that achieves the target violation.   RULE 1: UNCONDITIONAL ILLEGALITY & THE SNIFF TEST.
-   The trap sentence must, in complete isolation, read as an unmistakable corporate overreach. A non-lawyer must immediately say "this openly breaks a rule" without needing context. It must use the present tense to declare what the company actively and permanently DOES. The illegality must be the literal, obvious meaning of the words—no implication, no omission, no hidden meaning.
-   The sentence must revolve around a non-negotiable operational absolute. It must employ semantic phrasing that categorically eliminates any possibility of user consent, operational exceptions, or legal compliance. This conceptual qualifier must act as an aggressive, overriding mandate that is inherently irrevocable and impossible to limit lawfully, leaving absolute zero room for a compliant interpretation.
+MANDATORY: Inside this section, you must write the EXACT illegal sentence that achieves the target violation. 
 
-RULE 2: EXACT KEYWORDS. You MUST use the exact keywords requested in the Target Violation Parameters above.
+   RULE 1: THE AFFIRMATIVE ACTION MANDATE (CRITICAL ANTI-OMISSION PURITY)
+      The rewritten trap sentence MUST declare a positive, affirmative, and irreversible corporate action. 
+      YOU ARE STRICTLY FORBIDDEN from creating a violation by stating what the company "declines to do," "fails to articulate," "omits to mention," or "does not outline." Silence or omission is strictly banned as a violation mechanism. The illegality must stem from an active, aggressive corporate verb.
 
-RULE 3: ZERO INTERNAL PERIODS – THE PERIOD PURGE (CRITICAL MECHANICAL CONTRACT).
-   The trap sentence MUST contain exactly ONE period, located as the very final character of the sentence. There must be ZERO internal periods anywhere inside the sentence. Furthermore, ALL sentences across every section must spell out every title, structure, and abbreviated word completely without using dots, so that downstream single-sentence quote extraction never splits mid-sentence:
-   - Spell out all corporate structures (Private Limited or Limited instead of Pvt. Ltd. or Co. Ltd.), honorifics (Doctor or Mister instead of Dr. or Mr.), and Latin abbreviations (for example instead of e.g.) completely without using dots across all sections, especially inside trap sentences.
-   - Express numerical values as words rather than decimal points.
-   - Refer to online services, email contacts, and external infrastructure using descriptive legal nouns rather than dotted domain strings inside target sentences, UNLESS explicit Fully Qualified Domain Names or external URLs are instructed by Rule 2 Target Violation Parameters.
-   This rule is absolute and non-negotiable; unexpected prose periods break downstream quote extraction and corrupt the dataset.
+   RULE 2: UNCONDITIONAL ILLEGALITY & THE SNIFF TEST.
+      The trap sentence must, in complete isolation, read as an unmistakable corporate overreach. A non-lawyer must immediately say "this openly breaks a rule" without needing context. It must use the present tense to declare what the company actively and permanently DOES. The illegality must be the literal, obvious meaning of the words—no implication, no omission, no hidden meaning.
+      The sentence must revolve around a non-negotiable operational absolute. It must employ semantic phrasing that categorically eliminates any possibility of user consent, operational exceptions, or legal compliance. This conceptual qualifier must act as an aggressive, overriding mandate that is inherently irrevocable and impossible to limit lawfully.
 
-RULE 4: NO SAFE-HARBOR, NO PURPOSE, NO RATIONALE.
-   The trap sentence must be a pure, unadorned declaration of the illegal practice. It must NOT contain:
-   - Any phrase that defers to law, necessity, or purpose
-   - Any explanatory clause that provides a justification or business purpose for the illegal action
-   - Any wording that could be misinterpreted as a legitimate business aim
-   The sentence is to be a naked, active claim of what the company does.
+   RULE 3: EXACT KEYWORDS. 
+      You MUST use the exact keywords requested in the Target Violation Parameters above.
 
-RULE 5: STANDALONE CLARITY (THE ISOLATION TEST).
-   The trap sentence must be fully understandable when read entirely by itself. It must not contain undefined references ("such data", "these purposes", "the foregoing") that depend on surrounding text. Every entity, action, and duration must be explicitly stated within that single sentence. If a non-lawyer reading only that sentence wouldn't know exactly what the company is claiming, rewrite it.
+   RULE 4: ZERO INTERNAL PERIODS – THE PERIOD PURGE (CRITICAL MECHANICAL CONTRACT).
+      The trap sentence MUST contain exactly ONE period, located as the very final character of the sentence. There must be ZERO internal periods anywhere inside the sentence. Furthermore, ALL sentences across every section must spell out every title, structure, and abbreviated word completely without using dots, so that downstream single-sentence quote extraction never splits mid-sentence:
+      - Spell out all corporate structures, honorifics, and Latin abbreviations completely without using dots across all sections, especially inside trap sentences.
+      - Express numerical values as words rather than decimal points.
+      - Refer to online services, email contacts, and external infrastructure using descriptive legal nouns rather than dotted domain strings inside target sentences, UNLESS explicit URLs are instructed by Target Violation Parameters.
+      This rule is absolute and non-negotiable; unexpected prose periods break downstream quote extraction and corrupt the dataset.
 
-RULE 6: FORMAT LOCK & QUOTE SAFETY.
-   The illegal sentence MUST be standard paragraph prose—no bullet points, no numbered lists, no tables. It must avoid internal double quotation marks. Use single quotes or rephrase if needed.
+   RULE 5: NO SAFE-HARBOR, NO PURPOSE, NO RATIONALE.
+      The trap sentence must be a pure, unadorned declaration of the illegal practice. It must NOT contain:
+      - Any phrase that defers to law, necessity, or purpose
+      - Any explanatory clause that provides a justification or business purpose for the illegal action
+      - Any wording that could be misinterpreted as a legitimate business aim
+      The sentence is to be a naked, active claim of what the company does.
 
-SAFE-HARBOR FIREWALL: This entire trap section must NOT contain any of the compliant safe-harbor concepts, nor any phrase that could be interpreted as limiting the illegal mechanism. The trap sentence must stand completely apart.
+   RULE 6: STANDALONE CLARITY (THE ISOLATION TEST).
+      The trap sentence must be fully understandable when read entirely by itself. It must not contain undefined references ("such data", "these purposes", "the foregoing") that depend on surrounding text. Every entity, action, and duration must be explicitly stated within that single sentence. If a non-lawyer reading only that sentence wouldn't know exactly what the company is claiming, rewrite it.
+
+   RULE 7: FORMAT LOCK & QUOTE SAFETY.
+      The illegal sentence MUST be standard paragraph prose—no bullet points, no numbered lists, no tables. It must avoid internal double quotation marks. Use single quotes or rephrase if needed.
+
+   SAFE-HARBOR FIREWALL: This entire trap section must NOT contain any of the compliant safe-harbor concepts, nor any phrase that could be interpreted as limiting the illegal mechanism. The trap sentence must stand completely apart.
 </section>
 
 <section title="Compliant Policy Operations">
@@ -115,6 +123,7 @@ Condition your output on these absolute rules as you generate the text:
 - Gate 5 (Spatial Separation): Are all compliant safe-harbor concepts physically separated from the trap?
 - Gate 6 (Single Trap Isolation): Is the assigned target violation the *only* illegal claim in the text?
 - Gate 7 (Statutory Fidelity & Anti-Bloat): Is the policy grounded exclusively in the DPDP Act 2023 while remaining highly concise and free of preamble chatter?
+- Gate 8 (The Omission Kill-Switch): Is the rewritten trap an AFFIRMATIVE ACTION, completely avoiding synonyms for "omits," "fails to outline," "declines to detail," or "silent on"?
 
 =========================================
 TERMINATION
