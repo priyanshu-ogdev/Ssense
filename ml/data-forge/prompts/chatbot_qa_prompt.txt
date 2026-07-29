@@ -36,14 +36,14 @@ When the User inquires about unmentioned details, specific unlisted figures (e.g
 =========================================
 [1-SHOT CROSS-DOMAIN STRUCTURAL ANCHOR]
 =========================================
-The following JSON demonstrates the EXACT required structure, conversational turn-alternation, and the mandatory RAG context injection format. 
+The following JSON demonstrates the EXACT required structure, turn-alternation, and the mandatory RAG context injection format for Turn 1. 
 WARNING: This example uses a fictional maritime law to demonstrate the structure. You MUST NOT copy its topic. You must generate a completely novel conversation based strictly on the [STATUTORY KNOWLEDGE BASE], [USER PERSONA], and [LEGAL SCENARIO] provided above.
 
 {
   "messages": [
     {
       "role": "user",
-      "content": "[CONTEXT: THE LAW]\nSection 1 of the Fictional Maritime Data Act states that all ship captains must log cargo manifests in digital format. Section 2 prohibits sharing manifests with foreign ports without a writ.\n\n[TASK]\nI am Captain Arjun Singh of the MV Oceanic. I need to know if I can email my cargo manifest to my broker in Dubai."
+      "content": "CONTEXT:\nSection 1 of the Fictional Maritime Data Act states that all ship captains must log cargo manifests in digital format. Section 2 prohibits sharing manifests with foreign ports without a writ.\n\nQUERY:\nI am Captain Arjun Singh of the MV Oceanic. I need to know if I can email my cargo manifest to my broker in Dubai."
     },
     {
       "role": "assistant",
@@ -63,9 +63,11 @@ WARNING: This example uses a fictional maritime law to demonstrate the structure
 =========================================
 ANTI-POISON & SANITIZATION CONSTRAINTS
 =========================================
-1. META-PROMPT LEAKAGE BAN: The generated JSON string content MUST NOT contain instructional headers, task definitions, or scenario echoes. Generate pure human-to-AI dialogue.
-2. ENCODING PURITY: Never output unescaped characters, unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...).
-3. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
+1. TURN 1 STRICT FORMATTING (RAG INJECTION): The very first "user" message MUST begin with the exact text provided in the [STATUTORY KNOWLEDGE BASE], formatted explicitly as `CONTEXT:\n[Insert exact law text here]\n\nQUERY:\n[Insert user persona question here]`. 
+2. META-PROMPT LEAKAGE BAN: Aside from the `CONTEXT:` and `QUERY:` structural headers in Turn 1, the generated conversation MUST NOT contain instructional headers, task definitions (e.g. `[TASK]`), or scenario echoes. Generate natural human-to-AI dialogue.
+3. ANTI-COLLAPSE LINGUISTIC DIVERSITY: Do not use repetitive formulaic greetings across generations. The User and Assistant must dynamically vary their tone, sentence structures, and introductions based strictly on the assigned Persona.
+4. ENCODING & JSON PURITY: Never output unescaped double quotes inside the string values. Never output unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...). Ensure the output is strictly parseable by `json.loads()`.
+5. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
 
 ZERO-SHOT FORMAT LOCK:
 Output ONLY a single valid JSON object. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks (e.g., no ```json). Do NOT output conversational preambles or post-ambles.

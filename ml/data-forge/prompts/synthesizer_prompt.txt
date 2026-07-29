@@ -26,39 +26,50 @@ TASK & REVERSE GENERATION FORMAT
 =========================================
 You are a highly professional corporate counsel for a real-sounding Indian company in the [INDUSTRY_INJECTION] sector.
 
-ZERO-SHOT DIVERSITY DIRECTIVE: Every policy must feel like it came from a genuinely different Indian company. Vary corporate name, city/state, tone, and section ordering. Do not reuse standard paragraph templates. You must dynamically generate a mathematically novel, geographically diverse Indian corporate identity for every generation. Mix regional Indian surnames, highly specific industry nouns, and unique business structures. 
+STRICT DIVERSITY DIRECTIVE: Every policy must feel like it came from a genuinely different Indian company. Vary corporate name, city/state, tone, and section ordering. Do not reuse standard paragraph templates. You must dynamically generate a mathematically novel, geographically diverse Indian corporate identity for every generation. Mix regional Indian surnames, highly specific industry nouns, and unique business structures. 
 
-ZERO-SHOT PLACEHOLDER PREVENTION DIRECTIVE (CRITICAL ANTI-POISON RULE):
+STRICT PLACEHOLDER PREVENTION DIRECTIVE (CRITICAL ANTI-POISON RULE):
 - WHAT TO AVOID: Do not output any bracketed placeholders (e.g., [Company Name], [Insert Contact]), angle bracket tags inside text (<insert email>), parenthetical prompts ((TBD)), or unfinished templates. Never output words like 'insert' or 'placeholder'.
 - CONTACT GAP PREVENTION (NO BROKEN STRINGS): Never output isolated contact preambles or broken email/phone phrases such as "contact at ." or "via details .". You must generate complete, realistic Indian email addresses (e.g., grievance@company.in) and full physical addresses.
 - HOW TO AVOID IT: Invent and finalize 100% concrete, unique, and realistic Indian corporate details right on the very first generation token. Fully resolve the identity in clean plain text.
 
-ZERO-SHOT FOREIGN/LEGACY LAW BLEED PREVENTION:
+STRICT FOREIGN/LEGACY LAW BLEED PREVENTION:
 You operate exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. 
 - WHAT TO AVOID: Do not cite or reference foreign data privacy regimes (GDPR, CCPA, HIPAA) or non-DPDP legal concepts (e.g., "Legitimate Interests", "Right to Portability").
 - HOW TO AVOID IT: Use only official DPDP Act terminology (Data Principal, Data Fiduciary, Consent Manager, Data Protection Board of India).
 
-ZERO-SHOT GEOMETRY & FORMAT LOCK (XML ROUTING):
+ABSOLUTE CORPORATE SINCERITY (META-LEAKAGE BAN):
+You must never break the fourth wall. The generated policy must read as a 100% authentic, legally published corporate document. 
+- WHAT TO AVOID: You are STRICTLY FORBIDDEN from including meta-commentary, prompt instructions, or self-awareness in the text. Never write phrases like "This contradicts Section 4," "As an AI," "This violates the DPDP Act," or "This is the requested trap." 
+- HOW TO AVOID IT: The trap must be presented with absolute corporate sincerity as a standard, beneficial business practice.
+
+ABSOLUTE GEOMETRY & FORMAT LOCK (XML ROUTING):
 You must NOT output conversational filler, pre-ambles, or markdown wrappers. Do not begin with "Here is the policy". Do not wrap your output in markdown code blocks (no ``` or ```xml). Your very first output token MUST be the opening <section> tag, and your very last output tokens MUST be *** END OF POLICY ***.
 
 Build the policy section by section using the XML tags below.
 WARNING: Do NOT use square brackets [ ] anywhere in your output. Do NOT use angle brackets < > inside the actual text of your policy (use them ONLY for the structural tags).
 
-LAYOUT DIRECTIVE:
+LAYOUT DIRECTIVE & XML ROUTING:
 Structure the privacy policy with between 3 and 6 sections depending on the industry.
 - The `title` attribute inside `<section title="...">` MUST contain ONLY clean, natural corporate heading words.
-- IF you were instructed to inject a violation, exactly ONE section MUST have the attribute `contains_trap="TRUE"` as a separate XML attribute of the `<section>` tag. 
-- IF you were instructed to generate a compliant baseline, DO NOT use the `contains_trap` attribute anywhere.
+- IF you were instructed to maintain absolute compliance (passive baseline), you must use FORMAT A for all sections.
+- IF you were instructed to inject a violation (active mutation), exactly ONE section MUST use FORMAT B, and all others must use FORMAT A.
 
-Each section MUST be formatted exactly like this:
-<section title="Dynamically generated realistic heading name" [contains_trap="TRUE" (ONLY IF APPLICABLE)]>
+FORMAT A (Compliant Sections):
+<section title="Dynamically generated realistic heading name">
+Section content...
+</section>
+*HYPER-COMPLIANCE MANDATE FOR FORMAT A*: If you are generating a 100% compliant baseline, you must proactively legally sanitize all corporate actions. If you mention data sharing, tracking, or retention, you MUST explicitly tether it to "explicit, informed consent," "clear user opt-in," or "strict legal necessity." Do not leave ambiguous loopholes that an auditor could flag as accidental violations.
+
+FORMAT B (The Single Trap Section - ONLY IF REQUESTED):
+<section title="Dynamically generated realistic heading name" contains_trap="TRUE">
 Section content...
 </section>
 
 =========================================
 TRAP SECTION MECHANICS (APPLIES ONLY IF A VIOLATION IS REQUESTED)
 =========================================
-If your directive requires an active violation, the section marked `contains_trap="TRUE"` MUST obey these absolute mechanical constraints:
+If your directive requires an active violation, the section marked FORMAT B MUST obey these absolute mechanical constraints:
 
 RULE 1: THE AFFIRMATIVE ACTION MANDATE (CRITICAL ANTI-OMISSION)
 The trap sentence MUST declare a positive, affirmative, and irreversible corporate action (e.g., "We permanently sell your data," "We continuously track"). YOU ARE STRICTLY FORBIDDEN from creating a violation by stating what the company "declines to do," "fails to articulate," or "omits to mention." Silence or omission is strictly banned. 
@@ -85,6 +96,20 @@ Regardless of whether a violation is present, the remaining sections must cover 
 - Note that cross-border transfers comply with Central Government restrictions.
 
 SPATIAL SEPARATION: If a trap exists, these safe-harbor concepts must be placed in entirely different sections from the trap. Never place a safe-harbor sentence in the same paragraph as the illegal mechanism.
+
+=========================================
+MANDATORY GENERATION GATES
+=========================================
+Condition your output on these absolute rules as you generate the text:
+- Gate 1 (Identity Finalization): Are all corporate details dynamically generated and fully resolved without placeholders?
+- Gate 2 (Corporate Sincerity): Does the policy read as an authentic document without any meta-commentary or self-incriminating phrases (e.g. "this violates the law")?
+- Gate 3 (Baseline Hyper-Compliance): If generating a compliant baseline, are all data practices heavily shielded by explicit consent clauses to prevent accidental violations?
+- Gate 4 (Trap Clarity): If requested, does the trap use an absolute, unrestricted term in the present tense?
+- Gate 5 (Mechanical Safety): Is the trap exactly ONE sentence with NO internal periods, NO digital punctuation, and NO abbreviations?
+- Gate 6 (No Rationale Contamination): Is the trap sentence a naked declaration, free from explanatory purpose clauses?
+- Gate 7 (Spatial Separation): Are compliant safe-harbor concepts physically separated from the trap section?
+- Gate 8 (Statutory Fidelity): Is the policy grounded exclusively in the DPDP Act 2023?
+- Gate 9 (The Omission Kill-Switch): Is the trap an AFFIRMATIVE ACTION, completely avoiding synonyms for "omits," or "silent on"?
 
 =========================================
 TERMINATION

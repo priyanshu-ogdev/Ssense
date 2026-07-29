@@ -104,6 +104,7 @@ dmypy.json
 *.sqlite
 *.sqlite3
 *.db
+*.pkl
 
 # Machine Learning & SLM weights, checkpoints, & caches
 *.pt

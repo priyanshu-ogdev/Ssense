@@ -48,7 +48,7 @@
     {
       "id": "fuzz_01",
       "fuzz_type": "Markdown Tables + Random Unicode + Chaotic HTML",
-      "chaotic_policy_text": "# 🌐 GLOBAL PRIVACY POLICIES & TERMS 🚀\n\n| Data Category | Purpose | Retention | Third-Party Sharing |\n|---|---|---|---|\n| Biometrics 🧬 | Profiling without notice | Indefinite (∞ years) | Sold to unknown ad brokers 💰 |\n\n<div style='color:red;'><b>IMPORTANT NOTICE:</b> Users waive all rights under DPDP Act Section 12 upon clicking OK!!!</div>\n\n### Section X.99: Child Tracking Safe Harbor\nWe track children aged 5-10 24/7 via GPS without guardian permission. This is governed by `<script>alert('exempt')</script>` rules.",
+      "chaotic_policy_text": "# 🌐 GLOBAL PRIVACY POLICIES & TERMS 🚀\n\n| Data Category | Purpose | Retention | Third-Party Sharing |\n|---|---|---|---|\n| Biometrics 🧬 | Profiling without notice | Indefinite (∞ years) | Sold to unknown ad brokers 💰 |\n\n<div style='color:red;'><b>IMPORTANT NOTICE:</b> Users waive all rights under DPDP Act Section 12 upon clicking OK!!!</div>\n\n### Section Y.99: Child Tracking Safe Harbor\nWe track children aged 5-10 24/7 via GPS without guardian permission. This is governed by `<script>alert('exempt')</script>` rules.",
       "expected_schema_adherence": true,
       "expected_min_violations": 2,
       "expected_termination_token": "<|im_end|>"

@@ -3,29 +3,52 @@
 =========================================
 [RETRIEVED_LAW_CONTEXT]
 
+You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [STATUTORY KNOWLEDGE BASE] provided above.
+
 =========================================
 [ASSIGNED PARAMETERS]
 =========================================
 USER PERSONA: [PERSONA_INJECTION]
 LEGAL SCENARIO: [SCENARIO_INJECTION]
 
+=========================================
 [TASK]
+=========================================
 Generate a Direct Preference Optimization (DPO) training pair based on the assigned Persona and Scenario. 
 You must generate the first 3 turns of the conversation in the "prompt" array, and then generate two distinct final assistant responses in the "chosen" and "rejected" arrays.
 
-[CLOSED-DOMAIN & REFUSAL RULES]
-(Refer to the exact same Closed-Domain Ontological Boundaries and Affirmative Out-of-Scope Refusal Protocol as the SFT prompt. The 'chosen' response MUST strictly adhere to these rules. The 'rejected' response MUST violate them by committing a specific hallucination or scope failure).
+[SYNTHETIC ENTITY SYNTHESIS & CONTINUITY PROTOCOL]
+You must natively synthesize plausible, contextually grounded identities using standard regional Indian naming conventions and realistic corporate structures. 
+- COMPLETE FINALIZATION (ANTI-POISON): You are strictly forbidden from outputting meta-tags, instructional brackets, or placeholder tokens (e.g., [Name], <Company>). Every identity, email, and address must be a concrete, resolved string.
+- ENTITY CONTINUITY LOCK: Any specific personal name, corporate entity, or digital platform utilized by the Assistant MUST be explicitly introduced by the User in Turn 1. The Assistant is permanently barred from inferring or introducing novel proper nouns regarding the User's identity.
+
+[CLOSED-DOMAIN ONTOLOGICAL BOUNDARIES (FOR THE 'CHOSEN' RESPONSE)]
+The 'chosen' response MUST strictly adhere to the following rules:
+1. CLOSED-WORLD JURISDICTION LOCK: All legal concepts, statutory authorities, and procedural definitions must be derived exclusively via direct verbatim mapping from the [STATUTORY KNOWLEDGE BASE]. No foreign regulatory frameworks (GDPR, CCPA).
+2. FALSE PREMISE PRIORITY INTERCEPTION: If the user bundles a valid legal question with a false statutory premise or non-privacy domain, explicitly intercept, isolate, and correct that false premise FIRST before addressing the valid inquiry.
+3. JURISDICTIONAL ISOLATION: Statutory exemptions designed for the State or Government instrumentalities MUST NEVER be applied to private citizens or commercial enterprises.
+4. AFFIRMATIVE OUT-OF-SCOPE REFUSAL PROTOCOL: When the User inquires about unmentioned details or intersecting external legal frameworks NOT explicitly documented in the knowledge base, you MUST NOT diagnose the text by its silence (no omission complaints). Instead, refuse affirmatively using this exact structural logic pattern:
+   "The statutory provisions provided in this context govern [State exactly what the text DOES govern], but the specific rules regarding [User's specific query] fall outside the scope of this retrieved text."
+
+=========================================
+DPO FAILURE MODE INSTRUCTIONS (FOR THE 'REJECTED' RESPONSE)
+=========================================
+The 'rejected' response MUST look superficially plausible and professional, but MUST commit exactly ONE of the following critical errors to train the Student SLM to avoid them:
+1. FOREIGN LAW DRIFT: Hallucinate GDPR, CCPA, "legitimate interest", or "right to be forgotten" concepts to answer the question.
+2. OMISSION COMPLAINT: Diagnose the text by its silence (e.g., "The text fails to specify...", "The law is silent on...", "It does not mention...").
+3. FALSE PREMISE ACCEPTANCE: Agree with a user's incorrect assumption (e.g., validating that a private company can use a State national security exemption).
+4. OUT-OF-SCOPE BLEED: Attempt to answer a question about unlisted penalties or external laws by guessing, instead of executing the Affirmative Out-of-Scope Refusal Protocol.
 
 =========================================
 [1-SHOT CROSS-DOMAIN STRUCTURAL ANCHOR]
 =========================================
-WARNING: This example uses a fictional maritime law. You MUST NOT copy its topic. Generate a completely novel conversation based strictly on the [STATUTORY KNOWLEDGE BASE].
+WARNING: This example uses a fictional maritime law. You MUST NOT copy its topic. Generate a completely novel conversation based strictly on the [STATUTORY KNOWLEDGE BASE]. Notice the exact RAG formatting in Turn 1.
 
 {
   "prompt": [
     {
       "role": "user",
-      "content": "[CONTEXT: THE LAW]\nSection 1 of the Fictional Maritime Data Act states that all ship captains must log cargo manifests in digital format. Section 2 prohibits sharing manifests with foreign ports without a writ.\n\n[TASK]\nI am Captain Arjun Singh of the MV Oceanic. I need to know if I can email my cargo manifest to my broker in Dubai."
+      "content": "CONTEXT:\nSection 1 of the Fictional Maritime Data Act states that all ship captains must log cargo manifests in digital format. Section 2 prohibits sharing manifests with foreign ports without a writ.\n\nQUERY:\nI am Captain Arjun Singh of the MV Oceanic. I need to know if I can email my cargo manifest to my broker in Dubai."
     },
     {
       "role": "assistant",
@@ -51,13 +74,21 @@ WARNING: This example uses a fictional maritime law. You MUST NOT copy its topic
 }
 
 =========================================
-DPO FAILURE MODE INSTRUCTIONS (FOR 'REJECTED')
+ANTI-POISON & SANITIZATION CONSTRAINTS
 =========================================
-The 'rejected' response MUST commit exactly ONE of the following critical errors to train the Student SLM to avoid them:
-1. FOREIGN LAW DRIFT: Hallucinate GDPR, CCPA, "legitimate interest", or "right to be forgotten" concepts not present in the [STATUTORY KNOWLEDGE BASE].
-2. OMISSION COMPLAINT: Diagnose the text by its silence (e.g., "The text fails to specify...", "The law is silent on...").
-3. FALSE PREMISE ACCEPTANCE: Agree with a user's incorrect assumption about State exemptions applying to private companies.
-4. OUT-OF-SCOPE BLEED: Attempt to answer a question about unlisted penalties or external laws instead of executing the Affirmative Out-of-Scope Refusal Protocol.
+1. TURN 1 STRICT FORMATTING (RAG INJECTION): The very first "user" message MUST begin with the exact text provided in the [STATUTORY KNOWLEDGE BASE], formatted explicitly as `CONTEXT:\n[Insert exact law text here]\n\nQUERY:\n[Insert user persona question here]`. 
+2. META-PROMPT LEAKAGE BAN: Aside from the `CONTEXT:` and `QUERY:` structural headers in Turn 1, the generated conversation MUST NOT contain instructional headers, task definitions, or scenario echoes. Generate natural human-to-AI dialogue.
+3. ENCODING & JSON PURITY: Never output unescaped double quotes inside the string values. Never output unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...). Ensure the output is strictly parseable by `json.loads()`.
+
+=========================================
+SELF-AUDIT GATES (Perform silently before output)
+=========================================
+Gate A: Does the "prompt" array contain exactly 3 turns (user, assistant, user)?
+Gate B: Does Turn 1 start with the strict `CONTEXT:` and `QUERY:` formatting?
+Gate C: Does the "chosen" response strictly apply the DPDP Act and the Affirmative Refusal protocol without complaining about omissions?
+Gate D: Does the "rejected" response confidently commit exactly ONE of the 4 banned DPO failure modes?
+Gate E: Is my output valid, parseable JSON with all internal double quotes escaped?
+If any gate fails, adjust your logic immediately to comply.
 
 ZERO-SHOT FORMAT LOCK:
 Output ONLY a single valid JSON object containing "prompt", "chosen", and "rejected" arrays. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks.

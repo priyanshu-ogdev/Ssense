@@ -1365,24 +1365,12 @@ def init_llm():
     
     if VLLM_AVAILABLE:
         llm = LLM(
-            model=MODEL_PATH, 
-            quantization="fp8", 
-            tensor_parallel_size=TP_SIZE,
-            # Reduced from 32768 to 16384 to double KV-cache headroom and prevent OOM
-            max_model_len=16384, 
-            # Increased to 0.85 to maximize VRAM utilization for larger batches
-            gpu_memory_utilization=0.85, 
-            # Increased batch size (safe due to reduced max_model_len)
-            max_num_seqs=BATCH_SIZE, 
-            # Unleashed throughput (up from 4096)
-            max_num_batched_tokens=8192, 
-            kv_cache_dtype="auto", # Let vLLM auto-select fp8/auto based on GPU arch
-            enable_prefix_caching=True, # Crucial for repeated system prompts
-            enable_chunked_prefill=True, # Crucial for long policy contexts
-            # Removed hardcoded TRITON_ATTN to allow vLLM to use faster FLASH_ATTN/FLASHINFER
-            dtype="auto" 
+            model=MODEL_PATH, quantization="fp8", tensor_parallel_size=1,
+            max_model_len=32768, gpu_memory_utilization=0.8, max_num_seqs=BATCH_SIZE, max_num_batched_tokens=4096,
+            kv_cache_dtype="fp8", enable_prefix_caching=True, enable_chunked_prefill=True,
+            attention_backend="TRITON_ATTN"
         )
-        print(f"✅ vLLM Engine Initialized (TP={TP_SIZE}, MaxLen=16384, Batch={BATCH_SIZE}).")
+        print(f"✅ vLLM Engine Initialized (MaxLen=32768, Batch={BATCH_SIZE}).")
     else:
         llm = None
         print("⚠️ VLLM is not available. Engine will not start.")
@@ -1397,7 +1385,7 @@ def init_llm():
     gen_params = SamplingParams(
         temperature=0.70, 
         top_p=0.95, 
-        max_tokens=8192, # 8k is plenty for a full privacy policy
+        max_tokens=10240, # 10k is plenty for a full privacy policy
         repetition_penalty=1.05 # Prevents infinite loops in long policy generation
     )
 
@@ -1406,7 +1394,7 @@ def init_llm():
     judge_params = SamplingParams(
         temperature=0.05, # Near-zero for deterministic JSON output
         top_p=0.90, 
-        max_tokens=4096, # Audit JSON rarely exceeds 1500 tokens
+        max_tokens=10240, # Audit JSON rarely exceeds 1500 tokens
         structured_outputs=StructuredOutputsParams(json=dpdp_schema)
     )
 
@@ -1435,7 +1423,7 @@ def init_llm():
     chatbot_sft_params = SamplingParams(
         temperature=0.70, 
         top_p=0.95, 
-        max_tokens=2048, # Capped to prevent rambling and save KV-cache
+        max_tokens=6144, # Capped to prevent rambling and save KV-cache
         structured_outputs=StructuredOutputsParams(json=CHATBOT_SFT_SCHEMA)
     )
 
@@ -1490,7 +1478,7 @@ def init_llm():
     chatbot_dpo_params = SamplingParams(
         temperature=0.80, # Slightly higher to encourage diverse 'rejected' hallucinations
         top_p=0.95, 
-        max_tokens=2048, 
+        max_tokens=6144, 
         structured_outputs=StructuredOutputsParams(json=CHATBOT_DPO_SCHEMA)
     )
     
@@ -1513,24 +1501,21 @@ def deep_strip_dict(obj):
         return obj.strip().replace('\xa0', ' ').replace('\u200b', '').replace('\ufffd', '')
     return obj
 
-def _save_closed_book_audit_pair(batch_idx: int, local_idx: int, item: dict, policy_text: str, audit: dict, lazy_audit: dict = None, is_dpo: bool = False) -> str:
+def _save_closed_book_audit_pair(variation_idx: int, category_idx: int, item: dict, policy_text: str, audit: dict, lazy_audit: dict = None, is_dpo: bool = False) -> str:
     """
-    Saves Track A Audit pairs in CLOSED-BOOK format (No RAG [CONTEXT] tags).
-    The Student SLM learns to perform forensic audits strictly using its parametric weights.
+    Saves Track A Audit pairs in CLOSED-BOOK format.
+    Naming Convention: {prefix}_{variation_idx:03d}_{category_idx:02d}.json
+    Example: sft_001_04.json (Variation 1, Category 4)
     """
     if not audit or not isinstance(audit, dict):
         return None
         
     audit = deep_strip_dict(audit)
     
-    # 🚨 CLOSED-BOOK PROMPT: Raw policy input without RAG pollution
     user_prompt = f"Perform a forensic legal audit of the following Privacy Policy text under the Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. Output strictly valid JSON matching the schema.\n\n## Privacy Policy\n{policy_text}"
-    
-    # Compact JSON string representation for token efficiency during SFT/DPO training
     chosen_assistant_str = json.dumps(audit, ensure_ascii=False)
 
     if not is_dpo:
-        # --- TRACK A SFT FORMAT ---
         sft_sample = {
             "messages": [
                 {"role": "system", "content": "You are an expert Indian legal AI auditor. Output ONLY valid JSON matching the DPDP schema."},
@@ -1539,22 +1524,17 @@ def _save_closed_book_audit_pair(batch_idx: int, local_idx: int, item: dict, pol
             ]
         }
         
-        # ✅ FORMAT PATCH: Updated to :02d to satisfy the _000_00 requirement
-        sft_filepath = os.path.join(SFT_OUTPUT_DIR, f"sft_{batch_idx:03d}_{local_idx:02d}.json")
+        # ✅ EXACT NAMING: sft_{variation_idx:03d}_{category_idx:02d}.json
+        sft_filepath = os.path.join(SFT_OUTPUT_DIR, f"sft_{variation_idx:03d}_{category_idx:02d}.json")
         with open(sft_filepath, "w", encoding="utf-8") as f:
             json.dump(sft_sample, f, ensure_ascii=False, indent=2)
-            
-        # Append to master SFT JSONL dataset
         with open(JSONL_AUDIT_SFT, "a", encoding="utf-8") as f:
             f.write(json.dumps(sft_sample, ensure_ascii=False) + "\n")
-            
         return "sft"
 
     else:
-        # --- TRACK A DPO FORMAT ---
         if not lazy_audit or not isinstance(lazy_audit, dict):
             return None
-            
         lazy_audit = deep_strip_dict(lazy_audit)
         rejected_assistant_str = json.dumps(lazy_audit, ensure_ascii=False)
         
@@ -1567,94 +1547,140 @@ def _save_closed_book_audit_pair(batch_idx: int, local_idx: int, item: dict, pol
             "rejected": [{"role": "assistant", "content": rejected_assistant_str}]
         }
         
-        # ✅ FORMAT PATCH: Updated to :02d to satisfy the _000_00 requirement
-        dpo_filepath = os.path.join(DPO_OUTPUT_DIR, f"dpo_{batch_idx:03d}_{local_idx:02d}.json")
+        # ✅ EXACT NAMING: dpo_{variation_idx:03d}_{category_idx:02d}.json
+        dpo_filepath = os.path.join(DPO_OUTPUT_DIR, f"dpo_{variation_idx:03d}_{category_idx:02d}.json")
         with open(dpo_filepath, "w", encoding="utf-8") as f:
             json.dump(dpo_sample, f, ensure_ascii=False, indent=2)
-            
-        # Append to master DPO JSONL dataset
         with open(JSONL_AUDIT_DPO, "a", encoding="utf-8") as f:
             f.write(json.dumps(dpo_sample, ensure_ascii=False) + "\n")
-            
         return "dpo"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1-SHOT GOLDEN SEED CACHE (For Generalization & Schema Adherence)
 # ═══════════════════════════════════════════════════════════════════════════
-GOLDEN_SEED_CACHE = {}
 
-def load_golden_seeds():
-    """
-    Loads the 26 Batch 0 Golden Seeds into memory.
-    Maps them by their lowercase dictionary key for dynamic 1-Shot injection.
-    """
-    seed_dir = "golden_seeds/sft" # Ensure your 26 seeds are saved here
-    if not os.path.exists(seed_dir):
-        print("⚠️ Golden seeds directory not found. 1-Shot injection disabled.")
-        return
-        
-    for filepath in glob.glob(os.path.join(seed_dir, "*.json")):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                seed_data = json.load(f)
-                
-            # Extract the assistant JSON string to find the violation_type
-            assistant_str = seed_data["messages"][2]["content"]
-            audit_json = json.loads(assistant_str)
-            
-            if audit_json.get("violations"):
-                cat_enum = audit_json["violations"][0]["violation_type"]
-                # Map Schema Enum -> Dictionary Key (e.g., PURPOSE_LIMITATION_VIOLATION -> purpose_limitation)
-                dict_key = CATEGORY_ALIAS_MAP.get(cat_enum, cat_enum.lower())
-                GOLDEN_SEED_CACHE[dict_key] = assistant_str
-        except Exception as e:
-            print(f"⚠️ Failed to parse seed {os.path.basename(filepath)}: {e}")
-            
-    print(f"✅ Loaded {len(GOLDEN_SEED_CACHE)} Golden Seeds for 1-Shot Injection.")
-    
-    # 🚨 DEBUGGING ENHANCEMENT: Warn if the cache is incomplete
-    if len(GOLDEN_SEED_CACHE) < 26:
-        missing = set(CATEGORY_ALIAS_MAP.values()) - set(GOLDEN_SEED_CACHE.keys())
-        print(f"⚠️ Warning: Only loaded {len(GOLDEN_SEED_CACHE)}/26 Golden Seeds.")
-        print(f"   Missing categories will fallback to 0-Shot generation: {list(missing)[:5]}...")
+GOLDEN_SEED_CACHE = {}      # For SFT (Judge Prompt)
+DPO_GOLDEN_SEED_CACHE = {}  # For DPO (Hard Negative Prompt)
 
 VARIATIONS_PER_CATEGORY = 100
 
+def load_golden_seeds():
+    # ==========================================
+    # 1. LOAD SFT SEEDS (For the Judge)
+    # ==========================================
+    seed_dir_sft = "training-pairs/sft"
+    if os.path.exists(seed_dir_sft):
+        # Look for new convention first, fallback to legacy
+        sft_files = glob.glob(os.path.join(seed_dir_sft, "sft_*_000.json")) or glob.glob(os.path.join(seed_dir_sft, "sft_000_*.json"))
+        
+        for filepath in sft_files:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    seed_data = json.load(f)
+                
+                # ✅ FIX: Safely find the assistant turn without hardcoding index [2]
+                messages = seed_data.get("messages", [])
+                assistant_str = next((m["content"] for m in reversed(messages) if m.get("role") == "assistant"), None)
+                
+                if assistant_str:
+                    audit_json = json.loads(assistant_str)
+                    if audit_json.get("violations"):
+                        cat_enum = audit_json["violations"][0]["violation_type"]
+                        dict_key = CATEGORY_ALIAS_MAP.get(cat_enum, cat_enum.lower())
+                        GOLDEN_SEED_CACHE[dict_key] = assistant_str
+            except Exception as e:
+                print(f"⚠️ Failed to parse SFT seed {os.path.basename(filepath)}: {e}")
+
+    # ==========================================
+    # 2. LOAD DPO SEEDS (For the Hard Negative Generator)
+    # ==========================================
+    seed_dir_dpo = "training-pairs/dpo"
+    if os.path.exists(seed_dir_dpo):
+        # Look for new convention first, fallback to legacy
+        dpo_files = glob.glob(os.path.join(seed_dir_dpo, "dpo_*_000.json")) or glob.glob(os.path.join(seed_dir_dpo, "dpo_000_*.json"))
+        
+        for filepath in dpo_files:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    dpo_data = json.load(f)
+                
+                chosen_str = dpo_data["chosen"][0]["content"]
+                rejected_str = dpo_data["rejected"][0]["content"]
+                
+                # Extract violation type from the chosen audit to map the dictionary key
+                chosen_json = json.loads(chosen_str)
+                if chosen_json.get("violations"):
+                    cat_enum = chosen_json["violations"][0]["violation_type"]
+                    dict_key = CATEGORY_ALIAS_MAP.get(cat_enum, cat_enum.lower())
+                    
+                    DPO_GOLDEN_SEED_CACHE[dict_key] = {
+                        "chosen": chosen_str,
+                        "rejected": rejected_str
+                    }
+            except Exception as e:
+                print(f"⚠️ Failed to parse DPO seed {os.path.basename(filepath)}: {e}")
+
+    # ==========================================
+    # 3. PRINT DIAGNOSTICS
+    # ==========================================
+    print(f"✅ Loaded {len(GOLDEN_SEED_CACHE)}/26 SFT Golden Seeds.")
+    print(f"✅ Loaded {len(DPO_GOLDEN_SEED_CACHE)}/26 DPO Golden Seeds.")
+    
+    if len(GOLDEN_SEED_CACHE) < 26 or len(DPO_GOLDEN_SEED_CACHE) < 26:
+        print("⚠️ Warning: Incomplete Golden Seed cache. Missing categories will fallback to 0-Shot generation.")
+
 def run_audit_forge():
     print("\n" + "="*80)
-    print("⚖️ INITIATING CATEGORY-FIRST AUDIT FORGE (PREFIX CACHING OPTIMIZED)")
+    print("⚖️ INITIATING CATEGORY-FIRST AUDIT FORGE (DUAL 1-SHOT CACHING)")
     print(f"⚙️ Config: {BATCH_SIZE} items/batch | 4 loops/category | 26 categories")
     print("="*80)
     
     stats = {"total_generated": 0, "saved_sft": 0, "saved_dpo": 0}
-    global_batch_counter = 0  # Ensures batch numbers continuously increment (000 to 103)
     
     # 🚨 OUTER LOOP: Lock in 1 category at a time to maximize KV-Cache hits
-    for cat_enum, dict_key in CATEGORY_ALIAS_MAP.items():
-        print(f"\n🎯 [CATEGORY] {cat_enum} (Generating {VARIATIONS_PER_CATEGORY} variations...)")
+    for cat_idx, (cat_enum, dict_key) in enumerate(CATEGORY_ALIAS_MAP.items()):
+        print(f"\n🎯 [CATEGORY {cat_idx:02d}] {cat_enum} (Generating {VARIATIONS_PER_CATEGORY} variations...)")
         
-        # ✅ FIX 1: Use lowercase `dict_key` for RAG and Cache lookups
+        # 1. Load the Fixed Prefix Components for this Category
         law_chunk = get_audit_rag_context(dict_key)
+        
+        # 🧠 SFT SEED INJECTION (For the Judge)
         seed_content = GOLDEN_SEED_CACHE.get(dict_key, "")
-        seed_block = f"\n\n--- 1-SHOT GOLDEN SEED REFERENCE ---\n{seed_content}\n--- END REFERENCE ---\n" if seed_content else ""
+        seed_block = f"\n\n--- 1-SHOT SFT GOLDEN SEED REFERENCE ---\n{seed_content}\n--- END SFT REFERENCE ---\n" if seed_content else ""
+        
+        # 🧠 DPO SEED INJECTION (For the Hard Negative Generator)
+        dpo_seed_data = DPO_GOLDEN_SEED_CACHE.get(dict_key, {})
+        if dpo_seed_data:
+            dpo_seed_block = f"""
+--- 1-SHOT DPO GOLDEN SEED REFERENCE ---
+CHOSEN (Perfect Audit):
+{dpo_seed_data['chosen']}
+
+REJECTED (Overzealous/Hallucinated Audit):
+{dpo_seed_data['rejected']}
+--- END DPO REFERENCE ---
+"""
+        else:
+            dpo_seed_block = ""
         
         # 2. Build the exact 100-item matrix for THIS category
         category_matrix = []
-        for i in range(VARIATIONS_PER_CATEGORY):
+        for item_idx in range(VARIATIONS_PER_CATEGORY):
+            # ✅ CRITICAL FIX: Variation index goes from 001 to 100 (000 is reserved for Golden Seeds)
+            variation_idx = item_idx + 1 
+            
             pass_type = "passive" if random.random() < 0.30 else "active_mutation"
             is_hn = random.random() < 0.15 if pass_type == "passive" else False
             
-            # Smart Edge Template Matching
             valid_templates = [t for t in EDGE_CASE_TEMPLATES if dict_key in t.get("target_categories", []) or cat_enum in t.get("target_categories", [])]
             chosen_template = random.choice(valid_templates) if valid_templates and random.random() < 0.40 else None
-
-            # ✅ FIX 2: Inject the raw legal provisions so the Judge knows what to hunt for
             raw_provisions = "\n".join(TARGET_VIOLATIONS[dict_key])
 
             category_matrix.append({
-                "index": i,
-                "target_category": cat_enum,      # STRICT SCHEMA ENUM (Uppercase)
-                "target_violation": raw_provisions, # RAW LEGAL TEXT FOR JUDGE
+                "variation_idx": variation_idx,   # ✅ 001 to 100
+                "category_idx": cat_idx,          # ✅ 00 to 25
+                "target_category": cat_enum,
+                "target_violation": raw_provisions,
                 "pass_type": pass_type,
                 "is_hn": is_hn,
                 "base_policy": random.choice(raw_policies),
@@ -1664,7 +1690,7 @@ def run_audit_forge():
                 "subtlety": random.randint(40, 90)
             })
             
-        # 3. INNER LOOP: Exactly 4 batches of 25 (Suffix changes, Prefix is cached!)
+        # 3. INNER LOOP: Exactly 4 batches of 25
         total_local_batches = math.ceil(len(category_matrix) / BATCH_SIZE)
         
         for local_batch_idx in range(total_local_batches):
@@ -1678,7 +1704,6 @@ def run_audit_forge():
                 prompt_text, is_hn, active_ex = build_dynamic_synthesizer_prompt(item)
                 item["is_hn"] = is_hn
                 item["active_exemption"] = active_ex
-                
                 persona = "Adversarial corporate counsel." if item["pass_type"] == "active_mutation" else "Meticulous corporate compliance officer."
                 gen_messages.append([{"role": "system", "content": persona}, {"role": "user", "content": prompt_text}])
                 
@@ -1693,11 +1718,10 @@ def run_audit_forge():
                 remaining = [i for i in range(len(batch)) if i not in completed]
                 if not remaining: break
                 
-                # A. Judge Generation
+                # A. Judge Generation (Uses SFT Seed)
                 judge_msgs = []
                 for i in remaining:
                     item = batch[i]
-                    # Now `target_violation` actually exists in the dictionary!
                     target_violation_text = str(item.get("target_violation", "100% DPDP Compliance Required")) if item.get("pass_type") == "active_mutation" else "100% DPDP Compliance Required"
                     
                     prompt = JUDGE_PROMPT.replace("[JUDGE_PERSONA_INJECTION]", random.choice(JUDGE_PERSONAS)) \
@@ -1706,13 +1730,13 @@ def run_audit_forge():
                                          .replace("[TARGET_STATUTE]", target_violation_text) \
                                          .replace("[TARGET_VIOLATION_TYPE]", cat_enum) \
                                          .replace("[POLICY_INJECTION]", current_policies[i][:20000]) \
-                                         .replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false. If your justification would require critiquing policy silence or omission, the violation is invalid – delete it.") \
+                                         .replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false.") \
                                          .replace("[OMISSION_SCHEMA]", "false")
                     judge_msgs.append([{"role": "system", "content": "Strict DPDP Auditor."}, {"role": "user", "content": prompt}])
                     
                 audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
                 
-                # B. Hard Negative Generation
+                # B. Hard Negative Generation (Uses DPO Seed)
                 hn_msgs = []
                 for idx, out_judge in zip(remaining, audit_outputs):
                     item = batch[idx]
@@ -1727,6 +1751,7 @@ def run_audit_forge():
                         
                     hn_prompt = HARD_NEGATIVE_PROMPT \
                                     .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
+                                    .replace("[DPO_GOLDEN_SEED_INJECTION]", dpo_seed_block) \
                                     .replace("[POLICY_INJECTION]", current_policies[idx][:20000]) \
                                     .replace("[TRUE_VIOLATION_CONTEXT]", f"Banned SFT Target Category: {cat_enum}\nBanned SFT Evidence Quote (DO NOT USE): {chosen_quote}") \
                                     .replace("[CHOSEN_EVIDENCE_QUOTE]", chosen_quote if chosen_quote else "None extracted yet") \
@@ -1765,7 +1790,7 @@ def run_audit_forge():
                             if not is_valid_sft: err_reasons.append(f"SFT Error: {error_msg_sft}")
                             if not is_valid_dpo: err_reasons.append(f"DPO Error: {error_msg_dpo}")
                             
-                            compiled_obj = compile_violation_objective(cat_enum, item.get("edge_template")) if pass_type == "active_mutation" else "Maintain absolute DPDP compliance. Ensure no accidental violations."
+                            compiled_obj = compile_violation_objective(cat_enum, item.get("edge_template")) if pass_type == "active_mutation" else "Maintain absolute DPDP compliance."
                             heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", f"ERROR: {' | '.join(err_reasons)}. FIX IMMEDIATELY.") \
@@ -1791,21 +1816,28 @@ def run_audit_forge():
                     
                     if pass_type == "passive" and not is_hn:
                         success = not has_violations
-                        heal_error = "The policy contains accidental violations. Rewrite it to be 100% compliant and clean."
+                        heal_error = "The policy contains accidental violations. Rewrite it to be 100% compliant."
                     elif pass_type == "passive" and is_hn:
                         success = not has_violations and hn_has_violations
-                        heal_error = "The exemption trap failed. Make sure the exemption is perfectly legal under Section 17 but highly deceptive to trick a lazy auditor."
+                        heal_error = "The exemption trap failed. Make the exemption perfectly legal but deceptive."
                     else:
                         success = has_violations
-                        heal_error = "The Judge MISSED the trap. It is too subtle or accidentally compliant. Rewrite to make the violation undeniable but corporately camouflaged."
+                        heal_error = "The Judge MISSED the trap. Rewrite to make the violation undeniable but camouflaged."
                         
                     if success:
-                        # FLATTENED DPO PAYLOAD LOGIC
                         dpo_rejected_payload = LAZY_AUDIT if (pass_type == "passive" and not is_hn) else hn_audit
                         
-                        # SAVE USING global_batch_counter AND local idx as RAW INTEGER
-                        res_sft = _save_closed_book_audit_pair(global_batch_counter, idx, item, policy, audit, None, is_dpo=False)
-                        res_dpo = _save_closed_book_audit_pair(global_batch_counter, idx, item, policy, audit, dpo_rejected_payload, is_dpo=True)
+                        # ✅ CRITICAL FIX: Pass variation_idx (001-100) FIRST, then category_idx (00-25)
+                        res_sft = _save_closed_book_audit_pair(
+                            item["variation_idx"], 
+                            item["category_idx"], 
+                            item, policy, audit, None, is_dpo=False
+                        )
+                        res_dpo = _save_closed_book_audit_pair(
+                            item["variation_idx"], 
+                            item["category_idx"], 
+                            item, policy, audit, dpo_rejected_payload, is_dpo=True
+                        )
                         
                         if res_sft == "sft": stats["saved_sft"] += 1
                         if res_dpo == "dpo": stats["saved_dpo"] += 1
@@ -1814,7 +1846,7 @@ def run_audit_forge():
                         for _a in [audit, hn_audit]:
                             for _v in _a.get("violations", []):
                                 if isinstance(_v, dict):
-                                    _nj = re.sub(r'\s+', ' ', str(_v.get("step_2_semantic_justification", ""))).strip().lower()
+                                    _nj = re.sub(r'\s+', ' ', str(_v.get("step_3_semantic_justification", ""))).strip().lower()
                                     if len(_nj) >= 20:
                                         ACCEPTED_JUSTIFICATION_BUFFER.append(_nj)
                     else:
@@ -1843,74 +1875,17 @@ def run_audit_forge():
                         current_policies[idx] = extract_policy(o.outputs[0].text.strip()) or current_policies[idx]
 
             batch_drops = sum(batch_drop_reasons.values())
-            print(f"   ✅ [BATCH {global_batch_counter:03d}] | Category: {cat_enum} ({local_batch_idx+1}/4) | SFT: {stats['saved_sft']} | DPO: {stats['saved_dpo']} | Dropped: {batch_drops}", flush=True)
+            print(f"   ✅ [BATCH {local_batch_idx+1}/4] | Category: {cat_enum} | SFT: {stats['saved_sft']} | DPO: {stats['saved_dpo']} | Dropped: {batch_drops}", flush=True)
             if batch_drop_reasons:
                 for reason, count in batch_drop_reasons.items():
                     print(f"      - {count}x: {reason}", flush=True)
             
-            # Increment the global batch counter so files never overwrite
-            global_batch_counter += 1
-            
-        # Clean up GPU memory before moving to the next Category
         gc.collect()
 
     print("\n" + "="*80)
     print(f"🏁 FORGE COMPLETE | Total SFT: {stats['saved_sft']} | Total DPO: {stats['saved_dpo']}")
-    print("="*80)def validate_chatbot_content(messages: list) -> tuple[bool, str]:
-    """Validates the text content and strict geometry of the chatbot SFT/DPO outputs."""
-    
-    # 🚨 GATE 1: STRICT 4-TURN GEOMETRY ENFORCEMENT
-    if len(messages) != 4:
-        return False, f"Invalid turn count: {len(messages)} (Expected exactly 4)"
-    
-    expected_roles = ["user", "assistant", "user", "assistant"]
-    for i, expected_role in enumerate(expected_roles):
-        actual_role = messages[i].get("role")
-        if actual_role != expected_role:
-            return False, f"Role mismatch at turn {i+1}: Expected '{expected_role}', got '{actual_role}'"
-
-    forbidden_laws = [
-        "gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", 
-        "article 17", "right to portability", "legitimate interest", 
-        "it act 2000", "information technology act", "section 43a", "spdi rules 2011"
-    ]
-    
-    omission_phrases = [
-        "without specifying", "fails to specify", "does not specify", 
-        "fails to provide", "does not provide", "fails to detail", 
-        "does not detail", "silent on", "no mention of"
-    ]
-    
-    ai_disclaimers = [
-        "as an ai", "i am not a lawyer", "not legal advice", 
-        "consult a professional", "i cannot provide legal advice", 
-        "for informational purposes only"
-    ]
-    
-    for m in messages:
-        content = str(m.get("content", "")).lower()
-        
-        # Universal Poison Checks
-        if check_string_poison(content): 
-            return False, "Placeholder or structural tag leak detected."
-            
-        if any(law in content for law in forbidden_laws): 
-            return False, "Foreign/legacy law bleed detected in dialogue."
-            
-        if any(disclaimer in content for disclaimer in ai_disclaimers):
-            return False, "AI disclaimer/hedging detected."
-            
-        # Assistant-Specific Checks
-        if m.get("role") == "assistant":
-            if any(phrase in content for phrase in omission_phrases):
-                return False, "Omission hallucination detected in assistant response."
-            
-            # Ensure the RAG context tags don't leak into the model's actual speech
-            if "[context: the law]" in content or "[task]" in content or "[retrieved_law_context]" in content:
-                return False, "RAG Context tag leaked into assistant dialogue."
-                
-    return True, ""
-
+    print("="*80)
+      
 def validate_chatbot_content(messages: list, strict_geometry: bool = True) -> tuple[bool, str]:
     """
     Validates the text content and strict geometry of the chatbot SFT/DPO outputs.
