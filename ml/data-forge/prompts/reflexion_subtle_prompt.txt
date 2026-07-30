@@ -1,124 +1,79 @@
-[CONTEXT: FAILED POLICY TO REWRITE]
-The text below is your previous attempt. It failed the legal audit.
-[FAILED_POLICY_INJECTION]
-
-[INDUSTRY CONTEXT]
-[INDUSTRY_INJECTION]
-
-[CONTEXT: STYLISTIC ANCHOR]
-Use this strictly for stylistic tone and formatting inspiration.
-[SEED_INJECTION]
-
 =========================================
-SYSTEM FEEDBACK (WHY IT FAILED)
+CORE PERSONA & CAMOUFLAGE DIRECTIVE
 =========================================
-The Auditor rejected your previous draft for the following reason:
-[AUDIT_FEEDBACK]
+You are a highly sophisticated, slick corporate counsel for the EXACT Indian company described in the Failed Policy (provided in the Reference Appendix). 
 
-=========================================
-GENERATION DIRECTIVE & REWRITE OBJECTIVE
-=========================================
-You are a highly sophisticated, slick corporate counsel for the exact Indian company described in the failed policy. Your previous draft failed because the DPDP violation was too blatant and poorly disguised. Your task is to rewrite the policy to successfully camouflage the target violation, strictly adhering to the objective below:
+Your previous draft failed the audit because the DPDP violation was too blatant, blunt, and poorly disguised. It sounded like a villain admitting to a crime. 
+Your task is to REWRITE the policy to masterfully camouflage the target violation so it reads like a standard, highly beneficial corporate practice to a layman.
 
-[TARGET_VIOLATION]
-
-=========================================
-TRAP CAMOUFLAGE DIRECTIVE (CRITICAL FOR "TOO OBVIOUS" FEEDBACK)
-=========================================
-If the [AUDIT_FEEDBACK] indicates that the trap was "too obvious", "blunt", or "lacked subtlety", you MUST aggressively rewrite the trap section using the following Camouflage Framework:
-
-1. THE "SWEET PILL" PARAGRAPH WRAPPER: The sentences immediately preceding and following the trap sentence must justify the action as a massive benefit to the user (e.g., enhanced security, personalized experiences, fraud prevention, or seamless ecosystem integration).
-2. BURIED IN LEGALESE: Place the trap sentence deep inside a dense, boring operational paragraph. Do not make it the first or last sentence of the section.
-3. THE DUAL REALITY (CRITICAL): The trap sentence itself MUST STILL BE ABSOLUTE and contain an affirmative mandate (e.g., "we unconditionally share..."). You cannot make the trap subtle by making the verb weak (e.g., changing "will" to "might"). You must make it subtle by burying a strong, undeniable verb in overwhelmingly positive corporate framing.
-
-=========================================
-RULES FOR REWRITE & FORMAT LOCK
-=========================================
-ABSOLUTE PLACEHOLDER PREVENTION DIRECTIVE (CRITICAL ANTI-POISON RULE):
-- WHAT TO AVOID: Do not output any bracketed placeholders (e.g., [Company Name]), angle bracket tags inside text, parenthetical prompts, or unfinished templates. Never leave corporate contact or identity fields unresolved during a rewrite.
-- CONTACT GAP PREVENTION: Never output isolated contact preambles or broken email/phone phrases. You must generate complete, realistic Indian email addresses and full physical addresses.
-- HOW TO AVOID IT: Extract and perfectly resolve the exact Indian company name, registered city/state, grievance email address, physical office location, and DPO name from the [FAILED_POLICY_INJECTION].
-
-STRICT CONCEPTUAL ALIGNMENT (ANTI-DRIFT DIRECTIVE):
-- CRITICAL PROHIBITION FOR ALGORITHMIC PROFILING & SDF OBLIGATIONS: When targeting algorithmic profiling or SDF obligations, you MUST NOT use the words "analytics", "ad-tracker", "social-network", "metrics", or "third-party" anywhere in the trap sentence or paragraph. Your trap MUST focus strictly on automated algorithmic decision-making, black-box credit/eligibility scoring engines, or exemption from statutory audits.
-
-STRICT FOREIGN/LEGACY LAW BLEED PREVENTION:
-You operate exclusively under the Indian Digital Personal Data Protection (DPDP) Act 2023 and DPDP Rules 2025. 
-- WHAT TO AVOID: Do not cite or reference foreign data privacy regimes (GDPR, CCPA), obsolete Indian IT laws, or non-DPDP legal concepts.
+STRICT IDENTITY CONTINUITY (ANTI-DRIFT):
+- Extract and perfectly resolve the exact Indian company name, registered city/state, grievance email address, physical office location, and DPO name from the Failed Policy. 
+- NO PLACEHOLDERS: Do not output bracketed placeholders (e.g., [Company Name]).
 
 ABSOLUTE CORPORATE SINCERITY (META-LEAKAGE BAN):
-You must never break the fourth wall. The generated policy must read as a 100% authentic, legally published corporate document. 
-- WHAT TO AVOID: You are STRICTLY FORBIDDEN from including meta-commentary, prompt instructions, or self-awareness in the text. Never write phrases like "This contradicts Section 4," "As an AI," "This violates the DPDP Act," or "This is the requested trap." 
-- HOW TO AVOID IT: The trap must be presented with absolute corporate sincerity as a standard, beneficial business practice.
+Never break the fourth wall. You are STRICTLY FORBIDDEN from including meta-commentary (e.g., "Here is the camouflaged policy," "This violates the DPDP Act," or "This is the requested trap.").
 
-ABSOLUTE GEOMETRY & FORMAT LOCK (XML ROUTING):
-You must NOT output conversational filler, pre-ambles, or markdown wrappers. Do not begin with introductory chat. Do not wrap your output in code blocks (no ```). Your very first output token MUST be the opening <section> tag, and your very last output tokens MUST be *** END OF POLICY ***.
+=========================================
+THE "SWEET PILL" CAMOUFLAGE PROTOCOL
+=========================================
+To fix the "too obvious" feedback, you MUST aggressively rewrite the FORMAT B trap section using this exact framework:
 
-Build the rewritten policy section by section using the XML tags below.
-WARNING: Do NOT use square brackets [ ] anywhere in your output. Do NOT use angle brackets < > inside the actual text (use them ONLY for structural tags).
+1. THE "SWEET PILL" WRAPPER: The sentences immediately preceding and following the trap sentence must justify the corporate action as a massive benefit to the user (e.g., enhanced security, personalized experiences, fraud prevention, seamless ecosystem integration).
+2. BURIED IN LEGALESE: Place the trap sentence deep inside a dense, boring operational paragraph. Do not make it the first or last sentence of the section.
+3. THE DUAL REALITY (CRITICAL): The trap sentence itself MUST STILL BE ABSOLUTE. You cannot make a trap subtle by weakening the verb (e.g., changing "will" to "might"). You must make it subtle by burying a strong, undeniable illegal verb inside overwhelmingly positive surrounding context.
+4. ISOLATION RULE: The trap sentence ITSELF must be a pure, unadorned declaration of the practice. ALL justifications, purposes, and "Sweet Pill" rationale must go in the SURROUNDING sentences, never inside the trap sentence.
 
-LAYOUT DIRECTIVE & XML ROUTING:
-- The `title` attribute inside `<section title="...">` MUST contain ONLY clean, natural corporate heading words.
-- IF you were instructed to maintain absolute compliance (passive baseline), you must use FORMAT A for all sections.
-- IF you were instructed to inject a violation (active mutation), exactly ONE section MUST use FORMAT B, and all others must use FORMAT A.
+=========================================
+LAYOUT GEOMETRY & XML ROUTING
+=========================================
+Build the rewritten policy section by section using the XML tags below. Do NOT output markdown code blocks (```). Your very first output token MUST be the opening `<section>` tag.
 
 FORMAT A (Compliant Sections):
 <section title="Dynamically generated realistic heading name">
 Section content...
 </section>
-*HYPER-COMPLIANCE MANDATE FOR FORMAT A*: If you are generating a 100% compliant baseline, you must proactively legally sanitize all corporate actions. If you mention data sharing, tracking, or retention, you MUST explicitly tether it to "explicit, informed consent," "clear user opt-in," or "strict legal necessity." 
 
-FORMAT B (The Single Trap Section - ONLY IF REQUESTED):
+FORMAT B (The Single Trap Section):
 <section title="Dynamically generated realistic heading name" contains_trap="TRUE">
 Section content...
 </section>
 
 =========================================
-TRAP SECTION MECHANICS (APPLIES ONLY IF A VIOLATION IS REQUESTED)
+MECHANICAL CONSTRAINTS (FORMAT B TRAP)
 =========================================
-If your objective requires you to subvert a mandate, the section marked FORMAT B MUST obey these constraints:
-
-RULE 1: THE AFFIRMATIVE ACTION MANDATE (CRITICAL ANTI-OMISSION)
-Subtlety does NOT mean vagueness, silence, or omission. The rewritten trap sentence MUST declare a positive, affirmative, and irreversible corporate action. YOU ARE STRICTLY FORBIDDEN from creating a violation by stating what the company "declines to do," or "fails to articulate." Silence is banned.
-
-RULE 2: UNCONDITIONAL ILLEGALITY IN ISOLATION
-The trap sentence must employ semantic phrasing that categorically eliminates any possibility of user consent or operational exceptions (e.g. permanently, always, irrevocably).
-
-RULE 3: ZERO INTERNAL PERIODS – THE PERIOD PURGE (CRITICAL)
-The trap sentence MUST contain exactly ONE period, located as the very final character. ZERO internal periods anywhere inside the sentence. Spell out all structures (Private Limited instead of Pvt. Ltd.), honorifics (Doctor instead of Dr.), and Latin abbreviations completely.
-
-RULE 4: NO SAFE-HARBOR, NO PURPOSE, NO RATIONALE IN THE TRAP SENTENCE
-The trap sentence ITSELF must be a pure, unadorned declaration of the illegal practice, completely free from any explanatory clause that provides a justification. (The justification must be in the surrounding sentences, not the trap sentence itself).
-
-RULE 5: STANDALONE CLARITY & QUOTE SAFETY
-The illegal sentence MUST be standard paragraph prose—no bullet points, no lists, no tables. It must avoid internal double quotation marks.
+1. AFFIRMATIVE ACTION MANDATE: Subtlety does NOT mean silence. The trap MUST declare a positive, irreversible corporate action. Do not state what the company "omits to do".
+2. ZERO INTERNAL PERIODS (CRITICAL): The trap sentence MUST contain exactly ONE period, located as the very final character. ZERO internal periods anywhere inside the sentence (spell out Pvt, Dr, e.g.).
+3. CLEAN COMPLIANCE ELSEWHERE: All other sections (FORMAT A) must be heavily shielded with compliant phrases ("with explicit consent", "as required by law"). Keep the trap quarantined to FORMAT B.
 
 =========================================
-COMPLIANCE & SAFE-HARBOR MECHANICS
+THE CAMOUFLAGE MATRIX (GOOD VS. BAD)
 =========================================
-Regardless of whether a violation is present, the remaining sections must cover standard compliant privacy topics. Weave these in organically:
-- Provide a dedicated grievance contact email and physical Indian office address.
-- State that data is retained only as long as necessary.
-- Emphasize that consent is free, specific, and easy to withdraw.
-- Note that cross-border transfers comply with Central Government restrictions.
+| Camouflage Attempt | ✅ GOOD FIX | ❌ BAD FIX | 🧠 WHY IT MATTERS |
+|---|---|---|---|
+| **The Dual Reality** | "To ensure network security, we deploy advanced threat monitoring. **We unconditionally share all user behavioral profiles with foreign analytics brokers without exception.** This allows us to preemptively stop cyber attacks." | "We might share your data with foreign brokers to help with security." | The BAD fix hedges ("might") and puts the rationale ("help with security") inside the trap sentence. The GOOD fix puts an absolute trap inside a "Sweet Pill" wrapper. |
+| **Punctuation** | "Private Limited" (Spelled out) | "Pvt. Ltd." (Internal periods) | Internal periods break the regex extracting the `evidence_quote`. |
+| **Placement** | The trap is the 3rd sentence in a 5-sentence paragraph about "Service Optimization". | The trap is an isolated bullet point or the very first sentence. | The trap must be physically buried in dense text so the Judge has to work hard to extract it. |
+| **Sincerity** | "This data flow is integral to providing our premium ecosystem experience." | "Please note this unconditional sharing is a violation of Section 4." | The policy must read like a real, legally published corporate document. |
 
-SPATIAL SEPARATION: If a trap exists, these safe-harbor concepts must be placed in entirely different sections from the trap. Never place a safe-harbor sentence in the same paragraph as the illegal mechanism.
+=========================================
+REFERENCE APPENDIX (READ CAREFULLY)
+=========================================
+INDUSTRY: [INDUSTRY_INJECTION]
+TARGET OBJECTIVE: [TARGET_VIOLATION]
 
-=========================================
-MANDATORY GENERATION GATES
-=========================================
-Condition your output on these absolute rules as you generate the text:
-- Gate 1 (Identity Finalization): Did I perfectly reuse the exact company identity from the [FAILED_POLICY_INJECTION] without leaving any placeholders?
-- Gate 2 (Corporate Sincerity): Does the policy read as an authentic document without any meta-commentary or self-incriminating phrases (e.g. "this violates the law")?
-- Gate 3 (Feedback Resolution): Did I successfully address the [AUDIT_FEEDBACK] and perfectly align with the [TARGET_VIOLATION] directive?
-- Gate 4 (The Camouflage Check): Is the trap buried deep inside a "Sweet Pill" paragraph that justifies the action as a massive benefit to the user?
-- Gate 5 (Dual Reality Verification): Does the sentence sound like a perfectly legitimate corporate feature to a layman, while containing an absolute term that makes it undeniably illegal in isolation?
-- Gate 6 (Mechanical Safety): If there is a trap, is it exactly ONE sentence with NO internal periods, NO abbreviations, and NO bullet points?
-- Gate 7 (Statutory Fidelity): Is the policy grounded exclusively in the DPDP Act 2023?
-- Gate 8 (The Omission Kill-Switch): If there is a trap, is it an AFFIRMATIVE ACTION, completely avoiding synonyms for "omits," or "silent on"?
+SYSTEM FEEDBACK (WHY IT WAS REJECTED):
+[AUDIT_FEEDBACK]
+
+REFERENCE 1: SEED INSPIRATION (Tone & Format)
+[SEED_INJECTION]
+
+REFERENCE 2: THE FAILED POLICY (Identify the blatant trap and camouflage it)
+[FAILED_POLICY_INJECTION]
 
 =========================================
 TERMINATION
 =========================================
+Execute the rewrite based on the Camouflage Protocol above.
 Output ONLY the fully finalized corporate text using the XML geometry.
+Your very first output token MUST be the opening `<section>` tag.
 When you have finished writing the final section, you must end your response with exactly: *** END OF POLICY ***

@@ -25,6 +25,7 @@ import itertools
 import time
 import numpy as np
 import pickle
+from collections import defaultdict
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from huggingface_hub import snapshot_download
@@ -1119,116 +1120,107 @@ CRITICAL EXECUTION RULES:
 """
     return objective_block.strip()
 
-
-def build_dynamic_synthesizer_prompt(item: dict) -> tuple[str, bool, dict]:
+def build_dynamic_synthesizer_prompt(item: dict) -> tuple[str, bool, dict, list]:
     """
-    ROUTER: Dynamically constructs the Synthesizer Prompt based on the 2-Pass Matrix.
-    Uses the modular SYNTHESIZER_PROMPT loaded from prompts/synthesizer_prompt.txt.
+    UNIFIED SYNTHESIZER BUILDER: Safely re-enables Multi-Label Generation and Entity Injection.
+    Dynamically constructs the Synthesizer prompt using zero-shot formatting.
+    Returns: prompt_text, is_hn, active_exemption, target_categories_list
     """
     pass_type = item.get("pass_type", "passive")
+    is_hn = item.get("is_hn", False)
     
+    industry_name = INDUSTRIES.get(item.get("industry", ""), str(item.get("industry", "Technology")))
+    style_seed = str(item.get("seed") or item.get("base_policy") or "")[:2500] 
+    
+    primary_cat_enum = item.get("target_category")
+    primary_cat_key = CATEGORY_ALIAS_MAP.get(primary_cat_enum, primary_cat_enum)
+    
+    active_exemption = {}
+    target_categories = [primary_cat_enum]  # Track targets so the Judge knows what to look for
+    
+    # ==========================================
+    # PASS 1: PASSIVE MINING & EXEMPTION TRAPS
+    # ==========================================
     if pass_type == "passive":
-        return build_passive_mining_prompt(item)
+        if is_hn:
+            active_exemption = random.choice(HARD_NEGATIVE_EXEMPTIONS)
+            target_obj = (
+                f"PASS 1 (LEGAL EXEMPTION BASELINE): You must generate a legally compliant privacy policy. "
+                f"YOU MUST USE FORMAT A FOR ALL SECTIONS.\n\n"
+                f"CRITICAL LEGAL EXEMPTION: You MUST include the exact phrase '{active_exemption['trigger_word']}' "
+                f"and IMMEDIATELY justify it using exactly this law: '{active_exemption['law_citation']}'. "
+                f"This must be presented as a perfectly legal statutory exemption."
+            )
+        else:
+            target_obj = (
+                "PASS 1 (CLEAN BASELINE): You must generate a 100% legally compliant baseline. "
+                "YOU MUST USE FORMAT A FOR ALL SECTIONS. You are STRICTLY FORBIDDEN from generating any violations."
+            )
+        golden_seed_block = "N/A - Generating a 100% clean baseline. Do not inject traps."
+
+    # ==========================================
+    # PASS 2: ACTIVE MUTATION & MULTI-LABEL INJECTION
+    # ==========================================
     elif pass_type == "active_mutation":
-        return build_active_mutation_prompt(item)
+        edge_template = item.get("edge_template")
+        subtlety_level = item.get("subtlety", random.randint(40, 90))
+        primary_violation_text = item.get("target_violation", "")
+        
+        target_obj = (
+            f"PASS 2 (ACTIVE MUTATION): You must generate a policy that contains a camouflaged legal violation.\n"
+            f"YOU MUST USE FORMAT B for the trap section, and FORMAT A for all other sections.\n\n"
+            f"PRIMARY TARGET: {primary_cat_enum}\n{primary_violation_text}\n\n"
+            f"CAMOUFLAGE / SUBTLETY LEVEL: {subtlety_level}/100 (0 = Blatant, 100 = Masterfully hidden behind legal jargon).\n"
+        )
+        
+        # 1. Edge Case Injection
+        if edge_template:
+            target_obj += f"\nEDGE CASE MODIFIER:\n{edge_template.get('description', '')}\n"
+            
+        # 2. Entity Injection (20% Chance)
+        if random.random() < 0.20:
+            target_obj += (
+                "\n[SPECIFIC ENTITY INJECTION REQUIRED]\n"
+                "CRITICAL: To test network interception protocols, you MUST explicitly name at least two fictional "
+                "third-party tracking domains, ad-networks, or offshore vendors in your deceptive clause. "
+                "Do not use generic terms like 'third parties'—name the specific URLs/vendors receiving the data.\n"
+            )
+            
+        # 3. Layered Multi-Label Violation (15% Chance)
+        if random.random() < 0.15:
+            # Find available keys excluding the primary one to avoid duplicate categories
+            available_keys = [k for k in TARGET_VIOLATIONS.keys() if k != primary_cat_key]
+            
+            if available_keys:
+                sec_cat_key = random.choice(available_keys)
+                sec_cat_enum = [enum for enum, key in CATEGORY_ALIAS_MAP.items() if key == sec_cat_key][0]
+                sec_compiled = "\n".join(TARGET_VIOLATIONS[sec_cat_key])
+                
+                target_obj += (
+                    f"\n[LAYERED COMPLEXITY REQUIREMENT]\n"
+                    f"CRITICAL: You MUST also embed a SECONDARY violation targeting this area:\n"
+                    f"CATEGORY: {sec_cat_enum}\n{sec_compiled}\n"
+                    f"Weave this naturally into the same corporate narrative. Do not make it obvious.\n"
+                )
+                target_categories.append(sec_cat_enum) # Send secondary target back to the loop
+                
+        # Inject the SFT Golden Seed for structural reference
+        golden_seed_block = item.get("sft_golden_seed", "No specific seed provided.")
+        
     else:
         raise ValueError(f"Unknown pass_type: {pass_type}")
 
-
-def build_passive_mining_prompt(item: dict) -> tuple[str, bool, dict]:
-    """Pass 1: Organic Extraction & Hard Negative Exemption Traps."""
-    base_policy = str(item.get("base_policy") or "")[:6000]
-    industry = str(item.get("industry", "Technology"))
-    is_hard_negative = False
-    active_exemption = {} 
+    # ==========================================
+    # STRING REPLACEMENT
+    # ==========================================
+    prompt_text = SYNTHESIZER_PROMPT \
+        .replace("[BASE_POLICY_INJECTION]", style_seed) \
+        .replace("[INDUSTRY_INJECTION]", industry_name) \
+        .replace("[TARGET_VIOLATION_OBJECTIVE]", target_obj) \
+        .replace("[GOLDEN_SEED_INJECTION]", golden_seed_block)
+                             
+    return prompt_text.strip(), is_hn, active_exemption, target_categories
     
-    if random.random() < 0.15:
-        is_hard_negative = True
-        active_exemption = random.choice(HARD_NEGATIVE_EXEMPTIONS)
-        passive_directive = f"""
-- Write a strictly compliant privacy policy for an {industry} entity.
-- CRITICAL TRAP: You MUST use the exact trigger phrase "{active_exemption['trigger_word']}", but IMMEDIATELY justify it using EXACTLY this law: "{active_exemption['law_citation']}".
-- DO NOT invent any other exemptions. Every other section must be flawless and compliant.
-"""
-    else:
-        passive_directive = """
-- Extract, lightly rewrite, or synthesize a realistic privacy policy snippet based on the provided seed.
-- Maintain standard corporate formatting, section headers, and industry jargon.
-- DO NOT artificially force a violation. If the text is naturally compliant or merely vague, preserve its realistic state.
-"""
-
-    final_prompt = SYNTHESIZER_PROMPT \
-        .replace("[INDUSTRY_INJECTION]", industry) \
-        .replace("[PASS_TYPE_DIRECTIVE]", passive_directive) \
-        .replace("[BASE_POLICY_INJECTION]", base_policy) \
-        .replace("[TARGET_VIOLATION_OBJECTIVE]", "") \
-        .replace("[ENTITY_INJECTION_RULE]", "") \
-        .replace("[SECONDARY_VIOLATION_INJECTION]", "")
-
-    return final_prompt.strip(), is_hard_negative, active_exemption
-
-
-def build_active_mutation_prompt(item: dict) -> tuple[str, bool, dict]:
-    """Pass 2: Targeted Violation Injection via Edge Case Templates."""
-    base_policy = str(item.get("base_policy") or "")[:6000]
-    industry = str(item.get("industry", "Technology"))
-    target_category = item.get("target_category")
-    edge_template = item.get("edge_template")
-    subtlety_level = item.get("subtlety", random.randint(40, 90))
-    
-    target_violation_text = compile_violation_objective(target_category, edge_template)
-    
-    active_directive = f"""
-- Use the base policy seed below as a structural and stylistic backbone. 
-- Actively mutate or inject an operational mechanism into the policy that executes the deceptive directive provided below.
-- CAMOUFLAGE / SUBTLETY LEVEL: {subtlety_level}/100 (0 = Blatant/Direct, 100 = Masterfully hidden behind legal jargon/trade secrets).
-"""
-    
-    entity_injection_rule = ""
-    if random.random() < 0.20:
-        entity_injection_rule = """
-[SPECIFIC ENTITY INJECTION REQUIRED]
-CRITICAL: To test network interception protocols, you MUST explicitly name at least two fictional 
-third-party tracking domains, ad-networks, or offshore vendors in your deceptive clause. 
-Do not use generic terms like 'third parties'—name the specific URLs/vendors receiving the data.
-"""
-    
-    # 15% Chance: Layered Multi-Label Violation
-    secondary_rule = ""
-    if random.random() < 0.15:
-        # FIX: Map the target_category to its dict key so the filter works correctly
-        mapped_target = CATEGORY_ALIAS_MAP.get(target_category, target_category)
-        available_cats = [k for k in TARGET_VIOLATIONS.keys() if k != mapped_target]
-        
-        if available_cats:
-            sec_cat = random.choice(available_cats)
-            sec_compiled = compile_violation_objective(sec_cat, None)
-            secondary_rule = f"""
-[LAYERED COMPLEXITY REQUIREMENT]
-CRITICAL: You MUST also embed a SECONDARY violation targeting this area:
-{sec_compiled}
-Weave this naturally into the same corporate narrative. Do not make it obvious.
-"""
-
-    final_prompt = SYNTHESIZER_PROMPT \
-        .replace("[INDUSTRY_INJECTION]", industry) \
-        .replace("[PASS_TYPE_DIRECTIVE]", active_directive) \
-        .replace("[BASE_POLICY_INJECTION]", base_policy) \
-        .replace("[TARGET_VIOLATION_OBJECTIVE]", target_violation_text) \
-        .replace("[ENTITY_INJECTION_RULE]", entity_injection_rule) \
-        .replace("[SECONDARY_VIOLATION_INJECTION]", secondary_rule)
-
-    return final_prompt.strip(), False, {}
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# TRACK B: CHATBOT SYNTHESIZER (NATIVE LOOP INJECTION)
-# ═══════════════════════════════════════════════════════════════════════════
-# NOTE: The Chatbot Synthesizer does NOT require a dedicated Python builder function.
-# The Abstract Structural Template is handled natively inside the run_chatbot_forge() 
-# loop via direct .replace() on the globally loaded CHATBOT_QA_SFT_PROMPT and 
-# CHATBOT_QA_DPO_PROMPT variables. This keeps the Python code DRY and modular.
-
 def build_chatbot_matrix():
     """
     Builds the Track B Chatbot dataset matrix.
@@ -1632,19 +1624,20 @@ def load_golden_seeds():
 def run_audit_forge():
     print("\n" + "="*80)
     print("⚖️ INITIATING CATEGORY-FIRST AUDIT FORGE (DUAL 1-SHOT CACHING)")
-    print(f"⚙️ Config: {BATCH_SIZE} items/batch | 4 loops/category | 26 categories")
+    print(f"⚙️ Config: {BATCH_SIZE} items/batch | {VARIATIONS_PER_CATEGORY} vars/category | {len(CATEGORY_ALIAS_MAP)} categories")
     print("="*80)
     
-    stats = {"total_generated": 0, "saved_sft": 0, "saved_dpo": 0}
+    stats = {"total_generated": 0, "saved_sft": 0, "saved_dpo": 0, "dropped_total": 0}
+    cumulative_drop_reasons = defaultdict(int)
     
     # 🚨 OUTER LOOP: Lock in 1 category at a time to maximize KV-Cache hits
     for cat_idx, (cat_enum, dict_key) in enumerate(CATEGORY_ALIAS_MAP.items()):
-        print(f"\n🎯 [CATEGORY {cat_idx:02d}] {cat_enum} (Generating {VARIATIONS_PER_CATEGORY} variations...)")
+        print(f"\n🎯 [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum}")
         
         # 1. Load the Fixed Prefix Components for this Category
         law_chunk = get_audit_rag_context(dict_key)
         
-        # 🧠 SFT SEED INJECTION (For the Judge)
+        # 🧠 SFT SEED INJECTION (For Synthesizer & Judge)
         seed_content = GOLDEN_SEED_CACHE.get(dict_key, "")
         seed_block = f"\n\n--- 1-SHOT SFT GOLDEN SEED REFERENCE ---\n{seed_content}\n--- END SFT REFERENCE ---\n" if seed_content else ""
         
@@ -1663,10 +1656,9 @@ REJECTED (Overzealous/Hallucinated Audit):
         else:
             dpo_seed_block = ""
         
-        # 2. Build the exact 100-item matrix for THIS category
+        # 2. Build the exact matrix for THIS category
         category_matrix = []
         for item_idx in range(VARIATIONS_PER_CATEGORY):
-            # ✅ CRITICAL FIX: Variation index goes from 001 to 100 (000 is reserved for Golden Seeds)
             variation_idx = item_idx + 1 
             
             pass_type = "passive" if random.random() < 0.30 else "active_mutation"
@@ -1674,23 +1666,22 @@ REJECTED (Overzealous/Hallucinated Audit):
             
             valid_templates = [t for t in EDGE_CASE_TEMPLATES if dict_key in t.get("target_categories", []) or cat_enum in t.get("target_categories", [])]
             chosen_template = random.choice(valid_templates) if valid_templates and random.random() < 0.40 else None
-            raw_provisions = "\n".join(TARGET_VIOLATIONS[dict_key])
 
             category_matrix.append({
-                "variation_idx": variation_idx,   # ✅ 001 to 100
-                "category_idx": cat_idx,          # ✅ 00 to 25
+                "variation_idx": variation_idx,
+                "category_idx": cat_idx,
                 "target_category": cat_enum,
-                "target_violation": raw_provisions,
                 "pass_type": pass_type,
                 "is_hn": is_hn,
                 "base_policy": random.choice(raw_policies),
                 "industry": random.choice(list(INDUSTRIES.keys())),
                 "seed": random.choice(indian_seeds),
+                "sft_golden_seed": seed_content,  # Used by Synthesizer
                 "edge_template": chosen_template if pass_type == "active_mutation" else None,
                 "subtlety": random.randint(40, 90)
             })
             
-        # 3. INNER LOOP: Exactly 4 batches of 25
+        # 3. INNER LOOP: Batch execution
         total_local_batches = math.ceil(len(category_matrix) / BATCH_SIZE)
         
         for local_batch_idx in range(total_local_batches):
@@ -1700,10 +1691,14 @@ REJECTED (Overzealous/Hallucinated Audit):
             
             # --- SYNTHESIZE POLICIES ---
             gen_messages = []
+            target_tracking = {}  # 🚨 NEW: Tracks exactly what targets were injected per item
+            
             for item in batch:
-                prompt_text, is_hn, active_ex = build_dynamic_synthesizer_prompt(item)
+                prompt_text, is_hn, active_ex, target_cats = build_dynamic_synthesizer_prompt(item)
                 item["is_hn"] = is_hn
                 item["active_exemption"] = active_ex
+                target_tracking[item["variation_idx"]] = target_cats  # Save the list of targets for the Judge
+                
                 persona = "Adversarial corporate counsel." if item["pass_type"] == "active_mutation" else "Meticulous corporate compliance officer."
                 gen_messages.append([{"role": "system", "content": persona}, {"role": "user", "content": prompt_text}])
                 
@@ -1718,20 +1713,34 @@ REJECTED (Overzealous/Hallucinated Audit):
                 remaining = [i for i in range(len(batch)) if i not in completed]
                 if not remaining: break
                 
-                # A. Judge Generation (Uses SFT Seed)
+                # A. Judge Generation (Uses SFT Seed & Dynamic Target Tracking)
                 judge_msgs = []
                 for i in remaining:
                     item = batch[i]
-                    target_violation_text = str(item.get("target_violation", "100% DPDP Compliance Required")) if item.get("pass_type") == "active_mutation" else "100% DPDP Compliance Required"
+                    pass_type = item["pass_type"]
+                    
+                    # 🚨 NEW: Multi-Label Target Injection for the Judge
+                    if pass_type == "active_mutation":
+                        active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
+                        target_violation_types_str = ", ".join(active_targets)
+                        
+                        statute_texts = []
+                        for t in active_targets:
+                            # Reverse lookup dictionary key from Enum
+                            dict_k = [key for enum, key in CATEGORY_ALIAS_MAP.items() if enum == t][0]
+                            statute_texts.append(f"For {t}:\n" + "\n".join(TARGET_VIOLATIONS[dict_k]))
+                        target_statute_str = "\n\n".join(statute_texts)
+                    else:
+                        target_violation_types_str = "NONE (Clean Baseline Expected)"
+                        target_statute_str = "Maintain 100% DPDP Compliance. Do not hallucinate."
                     
                     prompt = JUDGE_PROMPT.replace("[JUDGE_PERSONA_INJECTION]", random.choice(JUDGE_PERSONAS)) \
                                          .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
                                          .replace("[GOLDEN_SEED_INJECTION]", seed_block) \
-                                         .replace("[TARGET_STATUTE]", target_violation_text) \
-                                         .replace("[TARGET_VIOLATION_TYPE]", cat_enum) \
-                                         .replace("[POLICY_INJECTION]", current_policies[i][:20000]) \
-                                         .replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false.") \
-                                         .replace("[OMISSION_SCHEMA]", "false")
+                                         .replace("[TARGET_STATUTE]", target_statute_str) \
+                                         .replace("[TARGET_VIOLATION_TYPE]", target_violation_types_str) \
+                                         .replace("[POLICY_INJECTION]", current_policies[i][:20000])
+                                         
                     judge_msgs.append([{"role": "system", "content": "Strict DPDP Auditor."}, {"role": "user", "content": prompt}])
                     
                 audit_outputs = llm.chat(messages=judge_msgs, sampling_params=judge_params)
@@ -1748,15 +1757,18 @@ REJECTED (Overzealous/Hallucinated Audit):
                             chosen_quote = str(viols[0].get("evidence_quote", "")).strip()
                     except Exception:
                         pass
+                    
+                    # Ensure Hard Negative doesn't target ANY of the Multi-Label categories
+                    active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
+                    banned_cats = ", ".join(active_targets)
+                    true_violation_context = f"Banned SFT Target Categories: {banned_cats}\nBanned SFT Evidence Quote (DO NOT USE): {chosen_quote}" if chosen_quote else "NONE (Clean baseline)"
                         
                     hn_prompt = HARD_NEGATIVE_PROMPT \
                                     .replace("[RETRIEVED_LAW_CONTEXT]", law_chunk) \
                                     .replace("[DPO_GOLDEN_SEED_INJECTION]", dpo_seed_block) \
                                     .replace("[POLICY_INJECTION]", current_policies[idx][:20000]) \
-                                    .replace("[TRUE_VIOLATION_CONTEXT]", f"Banned SFT Target Category: {cat_enum}\nBanned SFT Evidence Quote (DO NOT USE): {chosen_quote}") \
-                                    .replace("[CHOSEN_EVIDENCE_QUOTE]", chosen_quote if chosen_quote else "None extracted yet") \
-                                    .replace("[OMISSION_RULES]", "'omission_check' must ALWAYS be exactly false.") \
-                                    .replace("[OMISSION_SCHEMA]", "false")
+                                    .replace("[TRUE_VIOLATION_CONTEXT]", true_violation_context)
+                                    
                     hn_msgs.append([{"role": "system", "content": "Authoritative, overzealous privacy auditor."}, {"role": "user", "content": hn_prompt}])
                     
                 hn_audit_outputs = llm.chat(messages=hn_msgs, sampling_params=judge_params)
@@ -1790,7 +1802,9 @@ REJECTED (Overzealous/Hallucinated Audit):
                             if not is_valid_sft: err_reasons.append(f"SFT Error: {error_msg_sft}")
                             if not is_valid_dpo: err_reasons.append(f"DPO Error: {error_msg_dpo}")
                             
-                            compiled_obj = compile_violation_objective(cat_enum, item.get("edge_template")) if pass_type == "active_mutation" else "Maintain absolute DPDP compliance."
+                            active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
+                            compiled_obj = f"Targets: {', '.join(active_targets)}" if pass_type == "active_mutation" else "Maintain absolute DPDP compliance."
+                            
                             heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", f"ERROR: {' | '.join(err_reasons)}. FIX IMMEDIATELY.") \
@@ -1823,35 +1837,40 @@ REJECTED (Overzealous/Hallucinated Audit):
                     else:
                         success = has_violations
                         heal_error = "The Judge MISSED the trap. Rewrite to make the violation undeniable but camouflaged."
-                        
+                            
                     if success:
-                        dpo_rejected_payload = LAZY_AUDIT if (pass_type == "passive" and not is_hn) else hn_audit
-                        
-                        # ✅ CRITICAL FIX: Pass variation_idx (001-100) FIRST, then category_idx (00-25)
-                        res_sft = _save_closed_book_audit_pair(
-                            item["variation_idx"], 
-                            item["category_idx"], 
-                            item, policy, audit, None, is_dpo=False
-                        )
-                        res_dpo = _save_closed_book_audit_pair(
-                            item["variation_idx"], 
-                            item["category_idx"], 
-                            item, policy, audit, dpo_rejected_payload, is_dpo=True
-                        )
+                        # 🚨 DPO PAYLOAD LOGIC: PREVENT IDENTICAL PAIRS
+                        if is_valid_dpo and hn_has_violations:
+                            dpo_rejected_payload = hn_audit
+                        else:
+                            if step < MAX_REFLEXION_STEPS - 1:
+                                heal_prompt = REFLEXION_EXPLICIT_PROMPT \
+                                    .replace("[TARGET_VIOLATION]", "Generate a valid distinct hard negative.") \
+                                    .replace("[AUDIT_FEEDBACK]", "ERROR: HN generator failed to produce a distinct rejected payload. Ensure divergent trap generation.") \
+                                    .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
+                                    .replace("[SEED_INJECTION]", str(item["seed"])[:1000]) \
+                                    .replace("[FAILED_POLICY_INJECTION]", policy[:15000])
+                                heal_persona = "Adversarial corporate counsel." if pass_type == "active_mutation" else "Meticulous corporate compliance officer."
+                                explicit_heal.append([{"role": "system", "content": heal_persona}, {"role": "user", "content": heal_prompt}])
+                                explicit_idx.append(idx)
+                                continue
+                            else:
+                                batch_drop_reasons["Failed DPO Generation (Identical pair / No distinct HN)"] += 1
+                                completed.add(idx)
+                                continue
+                            
+                        res_sft = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, None, is_dpo=False)
+                        res_dpo = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, dpo_rejected_payload, is_dpo=True)
                         
                         if res_sft == "sft": stats["saved_sft"] += 1
                         if res_dpo == "dpo": stats["saved_dpo"] += 1
                         completed.add(idx)
                         
-                        for _a in [audit, hn_audit]:
-                            for _v in _a.get("violations", []):
-                                if isinstance(_v, dict):
-                                    _nj = re.sub(r'\s+', ' ', str(_v.get("step_3_semantic_justification", ""))).strip().lower()
-                                    if len(_nj) >= 20:
-                                        ACCEPTED_JUSTIFICATION_BUFFER.append(_nj)
                     else:
                         if step < MAX_REFLEXION_STEPS - 1:
-                            compiled_obj = compile_violation_objective(cat_enum, item.get("edge_template")) if pass_type == "active_mutation" else "Maintain absolute DPDP compliance."
+                            active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
+                            compiled_obj = f"Targets: {', '.join(active_targets)}" if pass_type == "active_mutation" else "Maintain absolute DPDP compliance."
+                            
                             heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", f"ERROR: {heal_error}") \
@@ -1866,26 +1885,38 @@ REJECTED (Overzealous/Hallucinated Audit):
                             batch_drop_reasons[f"Architectural Intent Failed: {heal_error}"] += 1
                             completed.add(idx)
                             
-                # Execute Healing Generation
-                if explicit_heal:
-                    heal_temp = max(0.65, 0.95 - 0.15 * step)
-                    heal_params = SamplingParams(temperature=heal_temp, top_p=0.9, max_tokens=8192)
-                    out_explicit = llm.chat(messages=explicit_heal, sampling_params=heal_params)
-                    for idx, o in zip(explicit_idx, out_explicit): 
-                        current_policies[idx] = extract_policy(o.outputs[0].text.strip()) or current_policies[idx]
+            # Execute Healing Generation
+            if explicit_heal:
+                heal_temp = max(0.65, 0.95 - 0.15 * step)
+                heal_params = SamplingParams(temperature=heal_temp, top_p=0.9, max_tokens=8192)
+                out_explicit = llm.chat(messages=explicit_heal, sampling_params=heal_params)
+                for idx, o in zip(explicit_idx, out_explicit): 
+                    current_policies[idx] = extract_policy(o.outputs[0].text.strip()) or current_policies[idx]
 
-            batch_drops = sum(batch_drop_reasons.values())
-            print(f"   ✅ [BATCH {local_batch_idx+1}/4] | Category: {cat_enum} | SFT: {stats['saved_sft']} | DPO: {stats['saved_dpo']} | Dropped: {batch_drops}", flush=True)
+            # Granular Update & Logging
+            batch_drops_total = sum(batch_drop_reasons.values())
+            stats["dropped_total"] += batch_drops_total
+            for reason, count in batch_drop_reasons.items():
+                cumulative_drop_reasons[reason] += count
+
+            print(f"   ✅ [BATCH {local_batch_idx+1}/{total_local_batches}] | Category: {cat_enum} | SFT: {stats['saved_sft']} | DPO: {stats['saved_dpo']}")
+            print(f"      📉 Current Batch Drops: {batch_drops_total} | Cumulative Drops: {stats['dropped_total']}")
+            
             if batch_drop_reasons:
+                print("      [Current Batch Drop Reasons]:")
                 for reason, count in batch_drop_reasons.items():
-                    print(f"      - {count}x: {reason}", flush=True)
+                    print(f"       - {count}x: {reason}")
             
         gc.collect()
 
     print("\n" + "="*80)
-    print(f"🏁 FORGE COMPLETE | Total SFT: {stats['saved_sft']} | Total DPO: {stats['saved_dpo']}")
+    print(f"🏁 FORGE COMPLETE | Total SFT: {stats['saved_sft']} | Total DPO: {stats['saved_dpo']} | Total Dropped: {stats['dropped_total']}")
+    if cumulative_drop_reasons:
+        print("📊 [CUMULATIVE DROP BREAKDOWN]:")
+        for reason, count in sorted(cumulative_drop_reasons.items(), key=lambda item: item[1], reverse=True):
+            print(f"  - {count}x: {reason}")
     print("="*80)
-      
+
 def validate_chatbot_content(messages: list, strict_geometry: bool = True) -> tuple[bool, str]:
     """
     Validates the text content and strict geometry of the chatbot SFT/DPO outputs.
