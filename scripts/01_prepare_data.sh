@@ -82,10 +82,45 @@ echo -e "\n🧹 Cleaning up any orphaned vLLM API endpoints before starting..."
 pkill -f vllm.entrypoints.openai.api_server 2>/dev/null || true
 
 # ════════════════════════════════════════════════════════════════════════════════
-# [PHASE 0/4]: MODEL VERIFICATION & DOWNLOAD (LOCAL CHECK & HUGGINGFACE FALLBACK)
+# [PHASE 0.1]: PURGE CACHES & PREVIOUS GENERATIONS (CLEAN SLATE PROTOCOL)
+# ════════════════════════════════════════════════════════════════════════════════
+echo -e "\n🧹 [PHASE 0.1]: Purging Caches & Previous Generation Artifacts (Clean Slate)..."
+
+# 1. Purge Python Bytecode Cache (Kills the "Ghost in the Machine")
+find "${REPO_ROOT}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+echo "   ✅ Purged all __pycache__ directories."
+
+# 2. Purge Vector DB Cache (Forces fresh embedding generation)
+rm -f "${REPO_ROOT}/ml/data-forge/dpdp_hybrid_index.pkl" 2>/dev/null || true
+echo "   ✅ Purged Hybrid RAG Index cache."
+
+# 3. Purge Aggregated JSONL data
+rm -f "${REPO_ROOT}/ml/slm-training/data"/*.jsonl 2>/dev/null || true
+echo "   ✅ Purged aggregated JSONL training files."
+
+# 4. Purge Chatbot generations (these have no golden seeds)
+rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-sft"/*.json 2>/dev/null || true
+rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-dpo"/*.json 2>/dev/null || true
+echo "   ✅ Purged previous Chatbot QA generations."
+
+# 5. SURGICAL PURGE: SFT & DPO generations (PROTECTS GOLDEN SEEDS)
+if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/sft" ]; then
+    find "${REPO_ROOT}/ml/data-forge/training-pairs/sft" -type f -name "*.json" \
+        ! -name "sft_000_*.json" -delete
+    echo "   🛡️ Purged standard SFT generations (Preserved Golden Seeds)."
+fi
+
+if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" ]; then
+    find "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" -type f -name "*.json" \
+        ! -name "dpo_000_*.json" -delete
+    echo "   🛡️ Purged standard DPO generations (Preserved Golden Seeds)."
+fi
+
+# ════════════════════════════════════════════════════════════════════════════════
+# [PHASE 0.5/4]: MODEL VERIFICATION & DOWNLOAD (LOCAL CHECK & HUGGINGFACE FALLBACK)
 # ════════════════════════════════════════════════════════════════════════════════
 mkdir -p "${REPO_ROOT}/ml/models"
-echo -e "\n▶️  [PHASE 0/4]: Verifying Teacher ('Qwen2-72B') & Student ('Qwen 3.5 9B') Models in ml/models/..."
+echo -e "\n▶️  [PHASE 0.5/4]: Verifying Teacher ('Qwen2-72B') & Student ('Qwen 3.5 9B') Models in ml/models/..."
 
 # 1. Check Student Model: Qwen/Qwen3.5-9B
 if [ -d "${REPO_ROOT}/ml/models/Qwen3.5-9B" ] && [ -n "$(ls -A "${REPO_ROOT}/ml/models/Qwen3.5-9B" 2>/dev/null)" ]; then
@@ -143,9 +178,9 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════════════
-# [PHASE 0.5/4]: RAG DEPENDENCY RESOLUTION
+# [PHASE 0.7/4]: RAG DEPENDENCY RESOLUTION
 # ════════════════════════════════════════════════════════════════════════════════
-echo -e "\n▶️  [PHASE 0.5/4]: Verifying Data Forge & Vector DB Dependencies..."
+echo -e "\n▶️  [PHASE 0.7/4]: Verifying Data Forge & Vector DB Dependencies..."
 "${PYTHON_CMD}" -m pip install -q chromadb langchain-text-splitters rank_bm25 sentence-transformers langchain
 echo "   ✅ Dependencies synchronized."
 

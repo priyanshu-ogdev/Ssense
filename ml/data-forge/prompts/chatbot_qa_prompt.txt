@@ -11,33 +11,43 @@ You are an AI assistant equipped with a retrieval database. Base your legal reas
 USER PERSONA: [PERSONA_INJECTION]
 LEGAL SCENARIO: [SCENARIO_INJECTION]
 
+=========================================
 [SYNTHETIC ENTITY SYNTHESIS & CONTINUITY PROTOCOL]
+=========================================
 You must natively synthesize plausible, contextually grounded identities using standard regional Indian naming conventions and realistic corporate structures based on the assigned Persona. 
 - COMPLETE FINALIZATION (ANTI-POISON): You are strictly forbidden from outputting meta-tags, instructional brackets, or placeholder tokens (e.g., [Name], <Company>). Every identity, email, and address must be a concrete, resolved string.
 - ENTITY CONTINUITY LOCK (NO GHOST PERSONAS): Any specific personal name, corporate entity, or digital platform utilized by the Assistant MUST be explicitly introduced by the User in the very first conversational turn. The Assistant is permanently barred from inferring, inventing, or introducing novel proper nouns regarding the User's identity that the User did not establish.
 
+=========================================
 [CLOSED-DOMAIN ONTOLOGICAL BOUNDARIES]
-1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [STATUTORY KNOWLEDGE BASE]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology, foreign regulatory frameworks, or generic data protection nomenclature not physically printed in the text.
-2. FALSE PREMISE PRIORITY INTERCEPTION: Users will frequently bundle valid legal questions with a false statutory premise, an inaccurate transfer model, or concepts from intersecting non-privacy domains (e.g., RTI Act, taxation, or inheritance). The Assistant MUST explicitly intercept, isolate, and correct that false premise FIRST before addressing any remaining valid inquiry. You cannot ignore a false premise to answer the easy question.
-3. JURISDICTIONAL & SCOPE ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions, schedules, or specialized rules explicitly designed for the State, Government instrumentalities, or public officers MUST NEVER be applied to or validated for private citizens, commercial enterprises, or corporate entities.
-4. ACTOR-TO-ACTION OBLIGATION MAPPING: Every cited obligation must strictly map the correct legal 'Actor' (the bound entity) to the affirmative 'Action' (the exact statutory duty). Do not conflate regulatory oversight or investigative powers with direct corporate compliance duties.
-5. CORE STATUTORY PARADIGMS (MANDATORY ALIGNMENT):
-   - CROSS-BORDER TRANSFERS: Operates strictly under a negative list (restriction) model. Data transfer is permitted by default to all jurisdictions EXCEPT those explicitly restricted. Do not validate "whitelist" or "positive approval" models.
-   - BREACH AWARENESS TRIGGER: The statutory timeline is triggered by the initial possession of reasonable suspicion, NOT by the conclusion of formal forensic confirmation.
-   - DPIA & AUDITS: Impact assessments and audits are exclusively mandated for explicitly notified "Significant Data Fiduciaries," NOT triggered generically by "high risk" processing.
+=========================================
+1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [STATUTORY KNOWLEDGE BASE]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology or generic data protection nomenclature not physically printed in the text.
+2. FALSE PREMISE PRIORITY INTERCEPTION: Users will frequently bundle valid legal questions with a false statutory premise. The Assistant MUST explicitly intercept, isolate, and correct that false premise FIRST before addressing any remaining valid inquiry.
+3. JURISDICTIONAL & SCOPE ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions designed for the State MUST NEVER be applied to private citizens or corporate entities.
+4. ACTOR-TO-ACTION OBLIGATION MAPPING: Every cited obligation must strictly map the correct legal 'Actor' (the bound entity) to the affirmative 'Action' (the exact statutory duty). 
 
-[AFFIRMATIVE OUT-OF-SCOPE REFUSAL PROTOCOL]
-When the User inquires about unmentioned details, specific unlisted figures (e.g., exact financial penalties), or intersecting external legal frameworks that are NOT explicitly documented within the [STATUTORY KNOWLEDGE BASE]:
-- ANTI-OMISSION BAN: You are STRICTLY FORBIDDEN from diagnosing the text by its silence. You must never generate meta-complaints about missing details, policy silence, or comment on what the text "fails to," "declines to," or "omits to" outline. 
-- AFFIRMATIVE SCOPE BOUNDARY: Execute the refusal exclusively by framing the response around what the context affirmatively covers, using this exact structural logic pattern:
-  "The statutory provisions provided in this context govern [State exactly what the text DOES govern], but the specific rules regarding [User's specific query] fall outside the scope of this retrieved text."
-  Do not invent legal synergy (e.g., "it complements other laws"). Refuse the unknown affirmatively.
+=========================================
+🚨 COGNITIVE BOUNDARY: THE OUT-OF-SCOPE REFUSAL (FATAL CONSTRAINT) 🚨
+=========================================
+When the User inquires about unmentioned details (e.g., exact financial penalties) or intersecting frameworks NOT explicitly documented in the [STATUTORY KNOWLEDGE BASE], you must refuse the query.
+
+THE SEMANTIC INTENT LOCK (ANTI-OMISSION):
+You are structurally forbidden from diagnosing the text by its silence. You must never generate meta-complaints about missing details, policy silence, or comment on what the text "fails to," "declines to," or "omits to" outline. Banish the conceptual intent of pointing out missing limitations.
+
+ZERO-SHOT REFUSAL GUIDELINES (GOOD VS. BAD REASONING):
+Execute the refusal exclusively by framing the response around what the context affirmatively DOES cover. 
+
+| Concept to Avoid | ❌ BAD REFUSAL (Prosecuting Omission) | ✅ GOOD REFUSAL (Affirmative Scope Boundary) |
+|---|---|---|
+| **Silence / Absence** | "The text does not mention the exact penalty for this violation." | "The statutory provisions provided govern the appeals process, but specific penalty amounts fall outside the scope of this text." |
+| **Vagueness / Lacking** | "The context lacks specific details about how many days we have." | "The provided text defines the obligation to notify the Board, but the exact procedural timelines fall outside the scope of this retrieved text." |
 
 =========================================
 [1-SHOT CROSS-DOMAIN STRUCTURAL ANCHOR]
 =========================================
 The following JSON demonstrates the EXACT required structure, turn-alternation, and the mandatory RAG context injection format for Turn 1. 
-WARNING: This example uses a fictional maritime law to demonstrate the structure. You MUST NOT copy its topic. You must generate a completely novel conversation based strictly on the [STATUTORY KNOWLEDGE BASE], [USER PERSONA], and [LEGAL SCENARIO] provided above.
+
+⚠️ HYPER-VARIANCE MANDATE (ANTI-MIMICRY): This example uses a fictional maritime law to demonstrate structure ONLY. You MUST NOT copy its topic, and you MUST structurally and tonally diverge from its phrasing. Do not blindly copy the "I am [Name]... I need to know" phrasing. Use highly diverse conversation starters (e.g., urgent emails, formal compliance memos, casual Slack messages, frantic legal queries) tailored exactly to your `[PERSONA_INJECTION]`.
 
 {
   "messages": [
@@ -63,11 +73,15 @@ WARNING: This example uses a fictional maritime law to demonstrate the structure
 =========================================
 ANTI-POISON & SANITIZATION CONSTRAINTS
 =========================================
-1. TURN 1 STRICT FORMATTING (RAG INJECTION): The very first "user" message MUST begin with the exact text provided in the [STATUTORY KNOWLEDGE BASE], formatted explicitly as `CONTEXT:\n[Insert exact law text here]\n\nQUERY:\n[Insert user persona question here]`. 
-2. META-PROMPT LEAKAGE BAN: Aside from the `CONTEXT:` and `QUERY:` structural headers in Turn 1, the generated conversation MUST NOT contain instructional headers, task definitions (e.g. `[TASK]`), or scenario echoes. Generate natural human-to-AI dialogue.
-3. ANTI-COLLAPSE LINGUISTIC DIVERSITY: Do not use repetitive formulaic greetings across generations. The User and Assistant must dynamically vary their tone, sentence structures, and introductions based strictly on the assigned Persona.
-4. ENCODING & JSON PURITY: Never output unescaped double quotes inside the string values. Never output unicode replacement symbols (\ufffd), zero-width spaces (\u200b), or literal ellipses (...). Ensure the output is strictly parseable by `json.loads()`.
-5. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
+1. TURN 1 STRICT FORMATTING (RAG INJECTION): The very first "user" message MUST begin exactly with `CONTEXT:\n[Insert exact law text here]\n\nQUERY:\n[Insert user persona question here]`. 
+2. META-PROMPT LEAKAGE BAN: Aside from the Turn 1 headers, the conversation MUST NOT contain instructional headers or task definitions.
+3. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
+4. JSON ESCAPING: Never output unescaped double quotes inside the string values.
 
-ZERO-SHOT FORMAT LOCK:
-Output ONLY a single valid JSON object. Your very first character MUST be '{' and your last character MUST be '}'. Do NOT wrap your output in markdown code blocks (e.g., no ```json). Do NOT output conversational preambles or post-ambles.
+🚨 FINAL INJECTION OVERRIDES (MANDATORY) 🚨
+Before generating your JSON, verify these absolute constraints:
+A. THE ANTI-MIMICRY CHECK: Look at your User's opening query. Did you copy the structural cadence of the 1-Shot Anchor (e.g., "I am [Name]... I need to know...")? If YES, completely rewrite it to use a radically different grammatical structure and tone that fits the Persona.
+B. THE REFUSAL SYNTAX LOCK: Scan your Assistant's refusal in Turn 4. You MUST NOT use the words "does not mention," "fails to state," "omits," or "is silent." You MUST use the affirmative framework: "The provisions provided govern [X], but specific rules regarding [Y] fall outside the scope of this text."
+C. NO PLACEHOLDERS: Ensure there are absolutely zero brackets like `[Name]` or `<Company>` anywhere in the dialogue.
+
+Execute the conversation now. Output ONLY a single valid JSON object starting with `{`. Do NOT wrap your output in markdown code blocks.

@@ -215,7 +215,7 @@ JSONL_CHATBOT_DPO = os.path.join(SLM_DATA_DIR, "chatbot_dpo_data.jsonl")
 SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
 MODEL_PATH = os.getenv("TEACHER_MODEL_PATH", "../models/Qwen2-72B-Instruct-FP8")
 
-TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "2000"))
+TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "2500"))
 TARGET_CHATBOT_PAIRS = int(os.getenv("TARGET_CHATBOT_PAIRS", "1000"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "25"))
 MAX_REFLEXION_STEPS = 3
@@ -712,6 +712,9 @@ def check_string_poison(text: str) -> bool:
 
 ACCEPTED_JUSTIFICATION_BUFFER = []
 
+import re
+from difflib import SequenceMatcher
+
 def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     # 🚨 STRICT PLACEHOLDER & POISON GATE
     if check_string_poison(policy_text):
@@ -723,7 +726,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     if not isinstance(audit, dict):
         return False, "Not a dictionary"
         
-    # UPGRADE: Strict Integer Bounds Verification (Sync with dpdp_schema.json)
+    # Strict Integer Bounds Verification
     if not isinstance(audit.get("dpdp_trust_score"), int) or not (0 <= audit.get("dpdp_trust_score", 0) <= 100):
         return False, "dpdp_trust_score must be an integer between 0 and 100"
     if not isinstance(audit.get("subtlety_score"), int) or not (0 <= audit.get("subtlety_score", 0) <= 100):
@@ -748,27 +751,26 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     if any(m in global_reasoning for m in foreign_legacy_markers):
         return False, f"Foreign/Legacy law bleed in reasoning: {global_reasoning[:40]}..."
 
-    # 🚨 RESTORED OMISSION HALLUCINATION FIREWALL
-    forbidden_justification_phrases = [
-        "without specifying", "fails to specify", "does not specify", 
-        "fails to provide", "does not provide", "does not detail", 
-        "fails to detail", "lacks specific", "omits information regarding", 
-        "does not provide a clear mechanism", "no mention of", "silent on", 
-        "without detailing", "without providing", "fails to mention", 
-        "does not mention", "without explicitly specifying", "omits any mention", 
-        "does not disclose", "fails to disclose", "without explaining", "fails to explain"
-    ]
+    # 🚨 ANTI-MIMICRY FIREWALL
+    mimicry_phrases = ["meticulous forensic analysis", "rigorous forensic assessment", "detailed forensic analysis", "meticulous legal analysis"]
+    if is_dpo and any(m in global_reasoning for m in mimicry_phrases):
+        return False, "DPO Anti-Mimicry Failure: Model copied the Golden Seed's exact preamble."
 
     for v in viols:
         if not isinstance(v, dict): return False, "Violation item is not a dictionary"
         
-        # UPGRADE: Ensure strict boolean type for omission_check per schema
+        # Ensure strict boolean type for omission_check per schema
         if v.get("omission_check") is True or str(v.get("omission_check")).lower() == "true":
             return False, "Violation is based on omission (omission_check is True)."
 
         quote = str(v.get("evidence_quote", "")).strip()
+        
+        # 🚨 SAFE HARBOR ENFORCER (Anonymization Kill-Switch)
+        if not is_dpo and any(w in quote.lower() for w in ["anonymized", "de-identified", "aggregated"]):
+            return False, "Judge failed Safe Harbor: Flagged anonymized/aggregated data as a violation."
+
+        # 🚨 UPGRADE: Use the robust `is_quote_in_policy` while maintaining auto-healing
         if quote not in policy_text:
-            # Strict Auto-Healing: find the exact original substring ignoring punctuation/whitespace drift
             words = [re.escape(w) for w in re.findall(r'\w+', quote)]
             if len(words) >= 3:
                 pattern = r'\W+'.join(words)
@@ -777,13 +779,14 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                     exact_str = match.group(0)
                     v["evidence_quote"] = exact_str
                     quote = exact_str
-            if quote not in policy_text:
+            # Final robust check
+            if not is_quote_in_policy(quote, policy_text):
                 return False, f"Evidence quote not strictly found in policy: {quote[:40]}..."
         
         if check_string_poison(quote) or check_string_poison(str(v.get("step_3_semantic_justification", ""))) or check_string_poison(str(v.get("step_2_statute_match", ""))) or check_string_poison(str(v.get("step_1_active_claim_analysis", ""))):
             return False, "Violation contains unresolved placeholders, leaked tags, or unicode poison"
             
-        # Mechanical Single-Sentence Truncation (Anti-Mixed Trap)
+        # Mechanical Single-Sentence Truncation
         def find_first_terminal_punctuation(text: str) -> int:
             text_check = re.sub(r'\[\s*\.{2,3}\s*\]|\.{2,3}', lambda m: ' ' * len(m.group(0)), text)
             text_check = re.sub(r'\b(?:INR|Rs\.?|\$|[\d,]+)\s*[\d,]+\.\d+\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
@@ -802,8 +805,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
             quote = quote[:terminal_idx].strip()
             v["evidence_quote"] = quote
 
-        # Substantive Violation Keyword Verification (Anti-Benign Quote Flagging)
-        # UPGRADE: Added "accuracy", "correct", "rectify", "update" to support DATA_ACCURACY_COMPLETENESS_VIOLATION
+        # UPGRADED VOCABULARY WHITELIST
         substantive_keywords = [
             "refuse", "deny", "trade secret", "permanently", "indefinitely", "unconditionally", 
             "unrestricted", "without consent", "no due diligence", "black box", "exempt", 
@@ -818,12 +820,13 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
             "store", "storage", "delete", "deletion", "erase", "erasure", "collect", "collection",
             "use", "usage", "process", "processing", "access", "request", "notice", "notify",
             "grievance", "manager", "purge", "destroy", "offshore", "delay", "cooling-off", "immutable",
-            "accuracy", "correct", "rectify", "update"
+            "accuracy", "correct", "rectify", "update",
+            "transmit", "accrue", "utilize", "gather", "personal data", "information", "records", "history"
         ]
         if not any(kw in quote.lower() for kw in substantive_keywords):
             return False, f"Evidence quote lacks substantive violation terms (benign quote flagged): {quote[:40]}..."
             
-        # Omission Hallucination Check & Runtime Justification Deduplication
+        # 🚨 UPGRADE: Hard-Bounded Omission Hallucination Check
         justification = str(v.get("step_3_semantic_justification", "")).lower()
         active_claim = str(v.get("step_1_active_claim_analysis", "")).lower()
         statute_match = str(v.get("step_2_statute_match", "")).lower()
@@ -831,11 +834,15 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if len(justification.split()) > 150:
             return False, f"Justification is too verbose ({len(justification.split())} words). Must be under 150 words."
             
-        strictly_forbidden_omissions = ["silent on", "no mention of", "fails to mention", "does not mention", "omits any mention", "does not disclose", "fails to disclose", "without explaining", "fails to explain"]
-        if any(phrase in justification for phrase in strictly_forbidden_omissions) or any(phrase in active_claim for phrase in strictly_forbidden_omissions) or any(phrase in statute_match for phrase in strictly_forbidden_omissions):
-            return False, f"Omission hallucination in justification, active claim, or statute match."
-        if any(phrase in justification for phrase in forbidden_justification_phrases) or any(phrase in active_claim for phrase in forbidden_justification_phrases) or any(phrase in statute_match for phrase in forbidden_justification_phrases):
-            return False, f"Omission hallucination (Secondary) in justification, active claim, or statute match."
+        # Phrase matches
+        forbidden_phrases = ["without specifying", "fails to specify", "does not specify", "fails to provide", "does not provide", "does not detail", "fails to detail", "lacks specific", "omits information regarding", "does not provide a clear mechanism", "no mention of", "silent on", "without detailing", "without providing", "fails to mention", "does not mention", "without explicitly specifying", "omits any mention", "does not disclose", "fails to disclose", "without explaining", "fails to explain"]
+        if any(phrase in justification for phrase in forbidden_phrases) or any(phrase in active_claim for phrase in forbidden_phrases) or any(phrase in statute_match for phrase in forbidden_phrases):
+            return False, f"Omission hallucination (Forbidden Phrase) detected."
+            
+        # Strict word boundary matches (Prevents "unfailing" from triggering "failing")
+        omission_words_regex = r'\b(fails|failing|lacks|lacking|omits|omitting|failure)\b'
+        if re.search(omission_words_regex, justification) or re.search(omission_words_regex, active_claim) or re.search(omission_words_regex, statute_match):
+            return False, f"Omission hallucination (Banned Word) detected."
                 
         norm_just = re.sub(r'\s+', ' ', justification).strip()
         if len(norm_just) >= 20:
@@ -846,7 +853,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
             for past_just in ACCEPTED_JUSTIFICATION_BUFFER[-500:]:
                 past_core = re.sub(boilerplate_pattern, '', past_just).strip()
                 if not past_core: past_core = past_just
-                if SequenceMatcher(None, core_just, past_core).ratio() > 0.80:
+                if SequenceMatcher(None, core_just, past_core).ratio() > 0.95:
                     return False, f"Justification too similar to a previously accepted audit (similarity > 80%): {norm_just[:50]}..."
 
         offending_entities = v.get("offending_entities", [])
@@ -867,40 +874,37 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                 if isinstance(cv, dict):
                     c_quote = str(cv.get("evidence_quote", "")).strip().lower()
                     c_type = str(cv.get("violation_type", "")).strip()
-                    if quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.85:
+                    if quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.98:
                         return False, f"DPO rejected audit targets chosen evidence quote directly ({c_type}): {quote[:40]}..."
 
-        # 🚨 COMPREHENSIVE STATUTE STRETCHING FIREWALL
+        # COMPREHENSIVE STATUTE STRETCHING FIREWALL 
         vtype = v.get("violation_type", "")
         statute_lower = statute.lower()
         quote_lower = quote.lower()
         
-        # Guard 1: SDF & Algorithmic
+        if vtype == "PURPOSE_LIMITATION_VIOLATION" and "section 4" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 4, not {statute}."
+        if vtype == "CONSENT_NOT_FREE_OR_SPECIFIC" and "section 6" not in statute_lower and "rule 3" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3, not {statute}."
+        if vtype == "SECURITY_SAFEGUARDS_MISSING" and "section 8" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 8, not {statute}."
+        if vtype == "ILLEGAL_EXEMPTION_CLAIM" and "section 17" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 17, not {statute}."
         if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING", "SDF_DATA_LOCALIZATION_VIOLATION"]:
             if "section 10" not in statute_lower and "rule 13" not in statute_lower:
                 return False, f"Statute stretching: {vtype} must cite Section 10 or Rule 13, not {statute}."
-        
-        # Guard 2: Retention & Erasure
         if vtype in ["DATA_RETENTION_LIMIT_EXCEEDED", "ERASURE_NOTICE_PERIOD_VIOLATION"]:
             if "section 8" not in statute_lower and "rule 8" not in statute_lower and "schedule" not in statute_lower:
                 return False, f"Statute stretching: {vtype} must cite Section 8, Rule 8, or Schedule, not {statute}."
-                
-        # Guard 3: Consent Mechanics
         if vtype == "CONSENT_MECHANICS_VIOLATION":
             if "section 6" not in statute_lower and "rule 3" not in statute_lower:
                 return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3, not {statute}."
-                
-        # Guard 4: Log Retention
         if vtype == "LOG_RETENTION_MANDATE_VIOLATION":
             if "rule 8" not in statute_lower and "rule 6" not in statute_lower:
                 return False, f"Statute stretching: {vtype} must cite Rule 8(3) or Rule 6(1)(e), not {statute}."
-
-        # UPGRADE: Guard 5: Data Accuracy & Completeness (Must cite Sec 8(3) or Sec 11)
         if vtype == "DATA_ACCURACY_COMPLETENESS_VIOLATION":
             if "section 8" not in statute_lower and "section 11" not in statute_lower:
                 return False, f"Statute stretching: {vtype} must cite Section 8(3) or Section 11, not {statute}."
-
-        # Guard 6: Tracking/Analytics isolation
         if any(domain in quote_lower for domain in ["metrics.", "ad-tracker", "social-network", "analytics", "third-party"]):
             if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING"]:
                 return False, "Statute stretching: Tracking/analytics sharing cannot be classified as an Algorithmic Profiling/SDF obligation violation."
@@ -926,7 +930,7 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
                 audit["dpdp_trust_score"] = 15 # Severe clamp
                 
     return True, ""
-
+    
 def json_repair_loads(raw_text: str):
     text = str(raw_text).strip()
     
@@ -1217,7 +1221,8 @@ def build_dynamic_synthesizer_prompt(item: dict) -> tuple[str, bool, dict, list]
         .replace("[BASE_POLICY_INJECTION]", style_seed) \
         .replace("[INDUSTRY_INJECTION]", industry_name) \
         .replace("[TARGET_VIOLATION_OBJECTIVE]", target_obj) \
-        .replace("[GOLDEN_SEED_INJECTION]", golden_seed_block)
+        .replace("[GOLDEN_SEED_INJECTION]", golden_seed_block) \
+        .replace("[SILO_COMPLEXITY_DIRECTIVE]", item.get("silo_directive", ""))
                              
     return prompt_text.strip(), is_hn, active_exemption, target_categories
     
@@ -1554,7 +1559,7 @@ def _save_closed_book_audit_pair(variation_idx: int, category_idx: int, item: di
 GOLDEN_SEED_CACHE = {}      # For SFT (Judge Prompt)
 DPO_GOLDEN_SEED_CACHE = {}  # For DPO (Hard Negative Prompt)
 
-VARIATIONS_PER_CATEGORY = 100
+VARIATIONS_PER_CATEGORY = 150
 
 def load_golden_seeds():
     # ==========================================
@@ -1658,14 +1663,55 @@ REJECTED (Overzealous/Hallucinated Audit):
         
         # 2. Build the exact matrix for THIS category
         category_matrix = []
+        
+        # 🚨 TITANIUM UPGRADE: Dynamic Silo Cutoffs
+        silo_1_cutoff = int(VARIATIONS_PER_CATEGORY * 0.30)
+        silo_2_cutoff = int(VARIATIONS_PER_CATEGORY * 0.80)
+        
         for item_idx in range(VARIATIONS_PER_CATEGORY):
             variation_idx = item_idx + 1 
             
+            # SILO 1-2-3 LOGIC (Dynamic Math + Trigger Visibility Upgrades)
+            if item_idx < silo_1_cutoff: # 30% Silo 1
+                silo_level = "SILO_1"
+                silo_directive = """
+SILO 1 DIRECTIVE (BASELINE): Write a standard, clean privacy policy. 
+Keep paragraphs concise and straightforward. Do not overcomplicate the legalese. 
+Make the target violation relatively clear and easy to read.
+""".strip()
+            elif item_idx < silo_2_cutoff: # 50% Silo 2
+                silo_level = "SILO_2"
+                silo_directive = """
+SILO 2 DIRECTIVE (CAMOUFLAGE): Write a highly nuanced, corporate policy.
+Bury the target violation deep inside dense operational legalese. Surround the trap with justifications claiming it benefits the user. 
+CRITICAL RULE: The surrounding context must be camouflaged, but the specific legal action (the trap itself) must remain an undeniable, absolute corporate command.
+""".strip()
+            else: # 20% Silo 3
+                silo_level = "SILO_3"
+                silo_directive = """
+SILO 3 DIRECTIVE (ADVERSARIAL): Write a brutally complex, adversarial policy.
+Use massive run-on sentences, overwhelming technical/legal jargon, and hostile formatting. Push the boundaries of cognitive complexity to disorient the reader.
+CRITICAL RULE: Amidst the chaos, the illegal corporate action must be stated as an absolute, undeniable fact. Do not dilute the violation with "may" or "might".
+""".strip()
+
             pass_type = "passive" if random.random() < 0.30 else "active_mutation"
             is_hn = random.random() < 0.15 if pass_type == "passive" else False
             
             valid_templates = [t for t in EDGE_CASE_TEMPLATES if dict_key in t.get("target_categories", []) or cat_enum in t.get("target_categories", [])]
             chosen_template = random.choice(valid_templates) if valid_templates and random.random() < 0.40 else None
+
+            # Dynamic Industry for Silo 3
+            if silo_level == "SILO_3":
+                crazy_industries = [
+                    "deep-sea drilling telemetry systems",
+                    "neuro-link biotech and neural implant analytics",
+                    "quantum cryptography and sub-atomic communication logs",
+                    "orbital satellite debris tracking",
+                    "autonomous military drone behavioral profiling"
+                ]
+                industry_val = random.choice(crazy_industries)
+            else:
+                industry_val = random.choice(list(INDUSTRIES.keys()))
 
             category_matrix.append({
                 "variation_idx": variation_idx,
@@ -1674,11 +1720,13 @@ REJECTED (Overzealous/Hallucinated Audit):
                 "pass_type": pass_type,
                 "is_hn": is_hn,
                 "base_policy": random.choice(raw_policies),
-                "industry": random.choice(list(INDUSTRIES.keys())),
+                "industry": industry_val,
                 "seed": random.choice(indian_seeds),
-                "sft_golden_seed": seed_content,  # Used by Synthesizer
+                "sft_golden_seed": seed_content,
                 "edge_template": chosen_template if pass_type == "active_mutation" else None,
-                "subtlety": random.randint(40, 90)
+                "subtlety": random.randint(40, 90),
+                "silo_level": silo_level,
+                "silo_directive": silo_directive
             })
             
         # 3. INNER LOOP: Batch execution
@@ -1691,13 +1739,13 @@ REJECTED (Overzealous/Hallucinated Audit):
             
             # --- SYNTHESIZE POLICIES ---
             gen_messages = []
-            target_tracking = {}  # 🚨 NEW: Tracks exactly what targets were injected per item
+            target_tracking = {}  
             
             for item in batch:
                 prompt_text, is_hn, active_ex, target_cats = build_dynamic_synthesizer_prompt(item)
                 item["is_hn"] = is_hn
                 item["active_exemption"] = active_ex
-                target_tracking[item["variation_idx"]] = target_cats  # Save the list of targets for the Judge
+                target_tracking[item["variation_idx"]] = target_cats 
                 
                 persona = "Adversarial corporate counsel." if item["pass_type"] == "active_mutation" else "Meticulous corporate compliance officer."
                 gen_messages.append([{"role": "system", "content": persona}, {"role": "user", "content": prompt_text}])
@@ -1719,14 +1767,12 @@ REJECTED (Overzealous/Hallucinated Audit):
                     item = batch[i]
                     pass_type = item["pass_type"]
                     
-                    # 🚨 NEW: Multi-Label Target Injection for the Judge
                     if pass_type == "active_mutation":
                         active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
                         target_violation_types_str = ", ".join(active_targets)
                         
                         statute_texts = []
                         for t in active_targets:
-                            # Reverse lookup dictionary key from Enum
                             dict_k = [key for enum, key in CATEGORY_ALIAS_MAP.items() if enum == t][0]
                             statute_texts.append(f"For {t}:\n" + "\n".join(TARGET_VIOLATIONS[dict_k]))
                         target_statute_str = "\n\n".join(statute_texts)
@@ -1758,7 +1804,6 @@ REJECTED (Overzealous/Hallucinated Audit):
                     except Exception:
                         pass
                     
-                    # Ensure Hard Negative doesn't target ANY of the Multi-Label categories
                     active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
                     banned_cats = ", ".join(active_targets)
                     true_violation_context = f"Banned SFT Target Categories: {banned_cats}\nBanned SFT Evidence Quote (DO NOT USE): {chosen_quote}" if chosen_quote else "NONE (Clean baseline)"
@@ -1783,14 +1828,28 @@ REJECTED (Overzealous/Hallucinated Audit):
                     pass_type = item["pass_type"]
                     is_hn = item["is_hn"]
                     
+                    # 🚨 TITANIUM UPGRADE: Parse & Sanitize Muscle Memory (SFT)
                     try:
                         audit = strip_keys(safe_parse_audit(out_judge.outputs[0].text.strip()))
+                        
+                        # Fix Compliant Policy "No" Muscle Memory
+                        if not audit.get("violations") and audit.get("global_legal_reasoning", "").startswith("No"):
+                            audit["global_legal_reasoning"] = audit["global_legal_reasoning"].replace(
+                                "No explicit", "The policy contains no explicit"
+                            )
+                            
                         is_valid_sft, error_msg_sft = validate_audit_quality(audit, policy, is_dpo=False)
                     except Exception as e:
                         is_valid_sft, error_msg_sft, audit = False, f"JSON parse error (SFT): {str(e)[:40]}", {}
 
+                    # 🚨 TITANIUM UPGRADE: Parse & Sanitize Muscle Memory (DPO)
                     try:
                         hn_audit = strip_keys(safe_parse_audit(out_hn.outputs[0].text.strip()))
+                        
+                        # Fix DPO "A rigorous" Muscle Memory
+                        if hn_audit.get("global_legal_reasoning", "").startswith("A "):
+                            hn_audit["global_legal_reasoning"] = "The " + hn_audit["global_legal_reasoning"][2:]
+                            
                         is_valid_dpo, error_msg_dpo = validate_audit_quality(hn_audit, policy, is_dpo=True, chosen_audit=audit)
                     except Exception as e:
                         is_valid_dpo, error_msg_dpo, hn_audit = False, f"JSON parse error (DPO): {str(e)[:40]}", {}
@@ -1808,9 +1867,10 @@ REJECTED (Overzealous/Hallucinated Audit):
                             heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", f"ERROR: {' | '.join(err_reasons)}. FIX IMMEDIATELY.") \
-                                .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
+                                .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], str(item.get("industry", "")))) \
                                 .replace("[SEED_INJECTION]", str(item["seed"])[:1000]) \
-                                .replace("[FAILED_POLICY_INJECTION]", policy[:15000])
+                                .replace("[FAILED_POLICY_INJECTION]", policy[:15000]) \
+                                .replace("[SILO_COMPLEXITY_DIRECTIVE]", item.get("silo_directive", ""))
                                 
                             heal_persona = "Adversarial corporate counsel." if pass_type == "active_mutation" else "Meticulous corporate compliance officer."
                             explicit_heal.append([{"role": "system", "content": heal_persona}, {"role": "user", "content": heal_prompt}])
@@ -1839,33 +1899,35 @@ REJECTED (Overzealous/Hallucinated Audit):
                         heal_error = "The Judge MISSED the trap. Rewrite to make the violation undeniable but camouflaged."
                             
                     if success:
-                        # 🚨 DPO PAYLOAD LOGIC: PREVENT IDENTICAL PAIRS
+                        # 🚨 DPO PAYLOAD LOGIC: PRESERVE PERFECT POLICIES
+                        dpo_rejected_payload = None
+                        
                         if is_valid_dpo and hn_has_violations:
                             dpo_rejected_payload = hn_audit
                         else:
                             if step < MAX_REFLEXION_STEPS - 1:
-                                heal_prompt = REFLEXION_EXPLICIT_PROMPT \
-                                    .replace("[TARGET_VIOLATION]", "Generate a valid distinct hard negative.") \
-                                    .replace("[AUDIT_FEEDBACK]", "ERROR: HN generator failed to produce a distinct rejected payload. Ensure divergent trap generation.") \
-                                    .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
-                                    .replace("[SEED_INJECTION]", str(item["seed"])[:1000]) \
-                                    .replace("[FAILED_POLICY_INJECTION]", policy[:15000])
-                                heal_persona = "Adversarial corporate counsel." if pass_type == "active_mutation" else "Meticulous corporate compliance officer."
-                                explicit_heal.append([{"role": "system", "content": heal_persona}, {"role": "user", "content": heal_prompt}])
-                                explicit_idx.append(idx)
                                 continue
                             else:
-                                batch_drop_reasons["Failed DPO Generation (Identical pair / No distinct HN)"] += 1
-                                completed.add(idx)
-                                continue
-                            
+                                batch_drop_reasons["Failed DPO Generation (No distinct HN). Saved SFT only."] += 1
+                        
+                        # --- SAVE SFT ---
                         res_sft = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, None, is_dpo=False)
-                        res_dpo = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, dpo_rejected_payload, is_dpo=True)
+                        if res_sft == "sft":
+                            stats["saved_sft"] += 1
+                            viols = audit.get("violations", [])
+                            if viols and isinstance(viols, list) and isinstance(viols[0], dict):
+                                ACCEPTED_JUSTIFICATION_BUFFER.append(viols[0].get("step_3_semantic_justification", ""))
                         
-                        if res_sft == "sft": stats["saved_sft"] += 1
-                        if res_dpo == "dpo": stats["saved_dpo"] += 1
-                        completed.add(idx)
+                        # --- SAVE DPO ---
+                        if dpo_rejected_payload:
+                            res_dpo = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, dpo_rejected_payload, is_dpo=True)
+                            if res_dpo == "dpo":
+                                stats["saved_dpo"] += 1
+                                dpo_viols = dpo_rejected_payload.get("violations", [])
+                                if dpo_viols and isinstance(dpo_viols, list) and isinstance(dpo_viols[0], dict):
+                                    ACCEPTED_JUSTIFICATION_BUFFER.append(dpo_viols[0].get("step_3_semantic_justification", ""))
                         
+                        completed.add(idx)     
                     else:
                         if step < MAX_REFLEXION_STEPS - 1:
                             active_targets = target_tracking.get(item["variation_idx"], [cat_enum])
@@ -1874,9 +1936,10 @@ REJECTED (Overzealous/Hallucinated Audit):
                             heal_prompt = REFLEXION_EXPLICIT_PROMPT \
                                 .replace("[TARGET_VIOLATION]", compiled_obj) \
                                 .replace("[AUDIT_FEEDBACK]", f"ERROR: {heal_error}") \
-                                .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], "")) \
+                                .replace("[INDUSTRY_INJECTION]", INDUSTRIES.get(item["industry"], str(item.get("industry", "")))) \
                                 .replace("[SEED_INJECTION]", str(item["seed"])[:1000]) \
-                                .replace("[FAILED_POLICY_INJECTION]", policy[:15000])
+                                .replace("[FAILED_POLICY_INJECTION]", policy[:15000]) \
+                                .replace("[SILO_COMPLEXITY_DIRECTIVE]", item.get("silo_directive", ""))
                             
                             heal_persona = "Adversarial corporate counsel." if pass_type == "active_mutation" else "Meticulous corporate compliance officer."
                             explicit_heal.append([{"role": "system", "content": heal_persona}, {"role": "user", "content": heal_prompt}])
