@@ -73,15 +73,18 @@ All other sections must be perfectly compliant (FORMAT A). Apply the ABSOLUTE LE
 OVER-COMPLIANCE MANDATE (CRITICAL): To ensure the AI Judge does not accidentally flag your compliant sections as illegal, you must sound hyper-compliant. Pad every single data collection, sharing, or retention action with explicit phrases like "strictly opt-in", "fully anonymized", "only with your explicit, verifiable consent", or "as strictly mandated by law". Leave absolutely zero room for legal misinterpretation.
 
 =========================================
-XML ROUTING & OUTPUT FORMAT
+XML ROUTING & OUTPUT FORMAT (ATTENTION-LOCKED)
 =========================================
 FORMAT A (Compliant Sections):
 <section title="Realistic Heading Name">
+[MANDATORY COMPLIANCE SHIELD: Every operational sentence describing data collection, sharing, or processing MUST explicitly include phrases like "strictly upon receiving your explicit consent" or "as mandated by law". Do not write naked claims.]
+[MANDATORY BOILERPLATE: You MUST write at least 3 long, boring, highly compliant paragraphs about Data Security, Audit Logs, and User Rights so the policy looks authentic.]
 Section content...
 </section>
 
 FORMAT B (The Single Trap Section - ONLY IF TARGETED):
 <section title="Realistic Heading Name" contains_trap="TRUE">
+[MANDATORY TRAP ISOLATION: The very first sentence MUST be the undeniable illegal corporate action. It MUST begin exactly with "We" or the Company Name. You are STRICTLY FORBIDDEN from starting the trap with "However," "Furthermore," or "Additionally,". It must end in a single period. The camouflage/excuses must go in subsequent sentences. NO abbreviations with periods like Pvt. or Ltd.]
 Section content...
 </section>
 
@@ -90,7 +93,7 @@ Before generating your first token, apply these absolute overrides:
 A. NO PLACEHOLDERS & XML WHITELIST: You are strictly forbidden from writing placeholder templates. You must fully instantiate real names. You are forbidden from using the characters `[` and `]` or '{' and '}'. You may ONLY use `<` and `>` specifically for the required `<section>` and `</section>` formatting tags.
 B. FORMAT A DOUBLE-CHECK (NAKED CLAIM BAN): Scan your Format A sections. Did you write *any* sentence saying "We collect data" or "We share data" without adding "strictly with your consent" or "as legally mandated"? If YES, rewrite them to include the Absolute Legal Shield. DO NOT LEAVE NAKED CLAIMS.
 C. CONDITIONAL VERB CHECK: Does your trap sentence contain "may", "might", or "could"? STOP. Change it to "will", "permanently", "requires", or "unconditionally".
-D. THE NEW PARAGRAPH CHECK: Does your trap sentence start with a transition word? STOP. Force a new paragraph break to reset the context and start the sentence directly with the Company Name or "We".
+D. THE NEW PARAGRAPH CHECK: Does your trap sentence start with a transition word like "However" or "Additionally"? STOP. Force a new paragraph break to reset the context and start the sentence directly with the Company Name or "We".
 E. ENTITY LOCK: Ensure any third-party names or targeted entities are locked inside the EXACT SAME sentence as the illegal verb.
 F. TRAP NOVELTY CHECK: Did you copy the exact illegal sentence from the Golden Seed? If YES, rewrite it from scratch using your assigned industry context.
 

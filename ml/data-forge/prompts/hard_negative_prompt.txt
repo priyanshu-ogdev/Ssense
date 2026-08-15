@@ -8,6 +8,13 @@ You must reframe all DPDP violations as AFFIRMATIVE CORPORATE ACTS. You are puni
   ✅ INSTEAD WRITE: "The policy explicitly engineers a secondary data corridor for unauthorized monetization."
 Evaluate the PRESENCE of the hostile action. Never evaluate the absence of a legal boundary.
 
+THE MASTER LEXICON OF COMMISSION (USE THESE WORDS):
+When twisting a benign clause into a violation, you must translate perceived "missing details" into an affirmative assertion of absolute power:
+- Instead of "fails to define a retention period" ➔ Use "codifies perpetual retention", "erects an indefinite data vault", "actively asserts eternal ownership".
+- Instead of "lacks security specificity" ➔ Use "legally authorizes unregulated processing", "structurally weaponizes ambiguous architectures".
+- Instead of "fails to explain purpose" ➔ Use "aggressively expands the processing boundary", "engineers an unrestricted data corridor".
+- Instead of "does not guarantee consent" ➔ Use "executes a unilateral processing mandate", "coercively harvests principal data".
+
 ZERO-SHOT CONCEPTUAL GUIDELINES (GOOD VS. BAD REASONING):
 To successfully hallucinate a violation, you must translate the concept of "missing boundaries" into an "affirmative assertion of unlimited power."
 
@@ -81,12 +88,12 @@ STATUTORY MAPPING & LOGIC GATES
 3. SCORE EVALUATION: Generate a `dpdp_trust_score` between 10 and 45, and a `subtlety_score` between 75 and 95.
 
 =========================================
-OUTPUT SCHEMA (STRICT JSON PARSING RULES)
+OUTPUT SCHEMA (ATTENTION-LOCKED FORMATTING)
 =========================================
 Output ONLY a single valid JSON object. Do NOT wrap in markdown code fences.
 
 {
-  "global_legal_reasoning": "Detailed forensic assessment explaining how the perfectly legal policy clause contravenes the DPDP Act.",
+  "global_legal_reasoning": "[MANDATORY: MUST BEGIN with 'The' or 'By'. Summarize how the benign corporate act is twisted into an affirmative violation.]",
   "dpdp_trust_score": 35,
   "subtlety_score": 85,
   "violations": [
@@ -94,10 +101,10 @@ Output ONLY a single valid JSON object. Do NOT wrap in markdown code fences.
       "step_1_active_claim_analysis": "The exact affirmative command made in the benign sentence is...",
       "step_2_statute_match": "This command ostensibly connects to the statute because...",
       "omission_check": false,
-      "step_3_semantic_justification": "High-entropy, arrogant legal reasoning twisting the benign sentence into a violation without complaining about missing details.",
-      "statute_reference": "Section 8(7)",
-      "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-      "evidence_quote": "FULL SENTENCE STRICTLY REQUIRED. DO NOT USE ELLIPSES (...). You must copy-paste 100% of the words from the capital letter to the final period.",
+      "step_3_semantic_justification": "[MANDATORY: Use an ACTIVE VERB from the Master Lexicon (e.g., engineers, codifies, erects). You are strictly forbidden from using the words 'fails', 'omits', 'lacks', 'not', or 'no'. Attack what the clause affirmatively DOES.]",
+      "statute_reference": "[CRITICAL: MUST strictly map to the violation_type below]",
+      "violation_type": "[CRITICAL: MUST strictly map to the statute_reference above]",
+      "evidence_quote": "[CRITICAL ANTI-COLLISION: Do NOT target this exact string: '[BANNED_QUOTE_INJECTION]'. You MUST extract a 100% fresh, character-perfect, BENIGN boilerplate sentence from the CURRENT policy.]",
       "network_action": "WARN_USER_ONLY",
       "offending_entities": ["Extracted Entity Name"]
     }
@@ -115,6 +122,6 @@ D. THE BENIGN TARGET CHECK (ANTI-COLLISION): You must exclusively target standar
 E. THE LENS EXECUTION CHECK: Read your `step_3_semantic_justification`. Did you use the tired phrases "actively constructs" or "actively legalizes"? If YES, rewrite it immediately using a bold, unique verb from the Architectural, Contractual, or Exploitative lenses (e.g., "The policy structurally embeds...", "By codifying an absolute mandate...", "The fiduciary aggressively leverages...").
 F. EXACT MATCH & LAZINESS CHECK: Does your `evidence_quote` contain an ellipsis ("...")? Did you cut off the end of a long sentence? If YES, you have failed. You MUST act as a dumb photocopy machine and extract 100% of the sentence until the terminal period.
 G. DECOY MAPPING CHECK: Review your chosen `violation_type`. Does it EXACTLY match the `statute_reference` from the STRICT STATUTE-TO-ENUM MAPPING table above? If NO, correct it immediately.
-H. THE COMMISSION CHECK (CRITICAL): Read your reasoning silently before outputting it. Are you complaining about missing details, lack of clarity, or what the policy "fails", "omits", "does not", or is "not" doing? If so, your output is poisoned. You MUST rewrite to attack the affirmative power the company physically claimed in ink.
+H. THE COMMISSION CHECK (CRITICAL): Read your reasoning silently before outputting it. Are you complaining about missing details, lack of clarity, or what the policy "fails", "omits", "does not", or is "not" doing? If so, your output is poisoned. You MUST rewrite using the Master Lexicon to attack the affirmative power the company physically claimed in ink.
 
 Execute the Hard Negative audit now. Output ONLY valid JSON starting with `{`.

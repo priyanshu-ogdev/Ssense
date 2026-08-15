@@ -82,39 +82,39 @@ echo -e "\n🧹 Cleaning up any orphaned vLLM API endpoints before starting..."
 pkill -f vllm.entrypoints.openai.api_server 2>/dev/null || true
 
 # ════════════════════════════════════════════════════════════════════════════════
-# [PHASE 0.1]: PURGE CACHES & PREVIOUS GENERATIONS (CLEAN SLATE PROTOCOL)
+# [PHASE 0.1]: PURGE CACHES (PRESERVING GENERATED DATA)
 # ════════════════════════════════════════════════════════════════════════════════
-echo -e "\n🧹 [PHASE 0.1]: Purging Caches & Previous Generation Artifacts (Clean Slate)..."
+echo -e "\n🧹 [PHASE 0.1]: Purging Caches..."
 
 # 1. Purge Python Bytecode Cache (Kills the "Ghost in the Machine")
 find "${REPO_ROOT}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 echo "   ✅ Purged all __pycache__ directories."
 
-# 2. Purge Vector DB Cache (Forces fresh embedding generation)
+# 2. Purge Vector DB Cache (Forces fresh embedding generation if rerun)
 rm -f "${REPO_ROOT}/ml/data-forge/dpdp_hybrid_index.pkl" 2>/dev/null || true
 echo "   ✅ Purged Hybrid RAG Index cache."
 
-# 3. Purge Aggregated JSONL data
+# 3. Purge Aggregated JSONL data (so `prepare_unsloth_data.py` rebuilds them fresh from existing JSONs)
 rm -f "${REPO_ROOT}/ml/slm-training/data"/*.jsonl 2>/dev/null || true
-echo "   ✅ Purged aggregated JSONL training files."
+echo "   ✅ Purged aggregated JSONL training files (Will be rebuilt in Phase 3)."
 
-# 4. Purge Chatbot generations (these have no golden seeds)
-rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-sft"/*.json 2>/dev/null || true
-rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-dpo"/*.json 2>/dev/null || true
-echo "   ✅ Purged previous Chatbot QA generations."
+# 4. [DISABLED] Purge Chatbot generations
+# rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-sft"/*.json 2>/dev/null || true
+# rm -f "${REPO_ROOT}/ml/data-forge/training-pairs/chatbot-dpo"/*.json 2>/dev/null || true
+echo "   🛡️ [DISABLED] Chatbot QA purge skipped. Preserving existing data."
 
-# 5. SURGICAL PURGE: SFT & DPO generations (PROTECTS GOLDEN SEEDS)
-if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/sft" ]; then
-    find "${REPO_ROOT}/ml/data-forge/training-pairs/sft" -type f -name "*.json" \
-        ! -name "sft_000_*.json" -delete
-    echo "   🛡️ Purged standard SFT generations (Preserved Golden Seeds)."
-fi
+# 5. [DISABLED] SURGICAL PURGE: SFT & DPO generations
+# if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/sft" ]; then
+#     find "${REPO_ROOT}/ml/data-forge/training-pairs/sft" -type f -name "*.json" \
+#         ! -name "sft_000_*.json" -delete
+# fi
+echo "   🛡️ [DISABLED] Standard SFT generation purge skipped. Preserving existing data."
 
-if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" ]; then
-    find "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" -type f -name "*.json" \
-        ! -name "dpo_000_*.json" -delete
-    echo "   🛡️ Purged standard DPO generations (Preserved Golden Seeds)."
-fi
+# if [ -d "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" ]; then
+#     find "${REPO_ROOT}/ml/data-forge/training-pairs/dpo" -type f -name "*.json" \
+#         ! -name "dpo_000_*.json" -delete
+# fi
+echo "   🛡️ [DISABLED] Standard DPO generation purge skipped. Preserving existing data."
 
 # ════════════════════════════════════════════════════════════════════════════════
 # [PHASE 0.5/4]: MODEL VERIFICATION & DOWNLOAD (LOCAL CHECK & HUGGINGFACE FALLBACK)

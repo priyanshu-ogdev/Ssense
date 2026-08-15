@@ -12,25 +12,12 @@
 #   - Python 3.10+ / 3.12 with CUDA 12.x support
 #   - Packages installed (`pip install -r requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch
 # ==============================================================================
-# This script executes the training sequence for both our 9B fine-tuned models:
-#   1. VRAM Airlock -> Sanitizes GPU memory and terminates zombie processes
-#   2. train_audit.py -> Fine-tunes the Forensic Auditor (`r=128`, `beta=2.0`)
-#   3. train_chatbot.py -> Fine-tunes the Conversational Chatbot (`r=64`, `beta=1.0`)
-#
-# Usage:
-#   bash scripts/02_train_models.sh [--model <audit|chatbot|all>]
-#
-# Options:
-#   --model audit     Only train the Forensic Auditor model
-#   --model chatbot   Only train the Conversational Chatbot model
-#   --model all       Train both models sequentially (default)
-#   -h, --help        Show help menu and exit
-# ==============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TRAINING_DIR="${REPO_ROOT}/ml/slm-training"
 
 PYTHON_CMD="python"
 if command -v python3 &> /dev/null; then
@@ -65,6 +52,11 @@ if [[ "${MODEL_TARGET}" != "audit" && "${MODEL_TARGET}" != "chatbot" && "${MODEL
     exit 1
 fi
 
+if [[ ! -d "${TRAINING_DIR}" ]]; then
+    echo "❌ FATAL: Training directory not found at ${TRAINING_DIR}"
+    exit 1
+fi
+
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 export LOG_DIR="${REPO_ROOT}/logs"
 export PYTHONUNBUFFERED=1
@@ -75,52 +67,67 @@ MASTER_LOG="${LOG_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
 exec > >(tee -i "${MASTER_LOG}")
 exec 2>&1
 
+# ==============================================================================
+# FUNCTION: VRAM AIRLOCK SANITIZATION
+# ==============================================================================
+vram_airlock() {
+    echo -e "\n════════════════════════════════════════════════════════════════════════════════"
+    echo "🧹 VRAM AIRLOCK: PURGING RESIDUAL GPU & POSIX SHARED MEMORY"
+    echo "════════════════════════════════════════════════════════════════════════════════"
+
+    echo "   [1/5] Terminating Ray background daemons..."
+    ray stop -f 2>/dev/null || true
+
+    echo "   [2/5] Hunting zombie vLLM and orphaned inference processes..."
+    pkill -9 -f vllm 2>/dev/null || true
+    pkill -9 -f vllm.entrypoints.openai.api_server 2>/dev/null || true
+    pkill -9 -f ray:: 2>/dev/null || true
+
+    echo "   [3/5] Neutralizing orphaned PyTorch multiprocessing spawned workers..."
+    pkill -9 -f "multiprocessing.spawn" 2>/dev/null || true
+
+    echo "   [4/5] Flushing POSIX shared memory allocations..."
+    rm -rf /dev/shm/* 2>/dev/null || true
+
+    echo "   [5/5] Checking OS file cache drop permissions..."
+    if command -v sudo &> /dev/null && sudo -n true 2>/dev/null; then
+        sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null || true
+    else
+        echo "         (Skipping OS drop_caches: non-root/non-sudo context)"
+    fi
+
+    echo "⏳ Waiting 5 seconds for Nvidia GPU memory state stabilization..."
+    sleep 5
+    echo "✅ VRAM Airlock complete. Environment strictly isolated."
+}
+
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "🚀 INITIATING STAGE 2: VRAM AIRLOCK & SLM TRAINING PIPELINE"
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "   • Repository Root: ${REPO_ROOT}"
 echo "   • Python Binary:   $(command -v "${PYTHON_CMD}")"
+echo "   • Execution Dir:   ${TRAINING_DIR}"
 echo "   • Logs Directory:  ${LOG_DIR}"
 echo "   • Training Target: ${MODEL_TARGET}"
 echo "════════════════════════════════════════════════════════════════════════════════"
 
-# ------------------------------------------------------------------------------
-# VRAM AIRLOCK: SANITIZATION & ISOLATION
-# ------------------------------------------------------------------------------
-echo -e "\n════════════════════════════════════════════════════════════════════════════════"
-echo "🧹 VRAM AIRLOCK: PURGING RESIDUAL GPU & POSIX SHARED MEMORY"
-echo "════════════════════════════════════════════════════════════════════════════════"
-
-echo "   [1/4] Terminating Ray background daemons..."
-ray stop -f 2>/dev/null || true
-
-echo "   [2/4] Hunting zombie vLLM and orphaned inference processes..."
-pkill -9 -f vllm 2>/dev/null || true
-pkill -9 -f vllm.entrypoints.openai.api_server 2>/dev/null || true
-pkill -9 -f ray:: 2>/dev/null || true
-
-echo "   [3/4] Flushing POSIX shared memory allocations..."
-rm -rf /dev/shm/* 2>/dev/null || true
-
-echo "   [4/4] Checking OS file cache drop permissions..."
-if command -v sudo &> /dev/null && sudo -n true 2>/dev/null; then
-    sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null || true
-else
-    echo "         (Skipping OS drop_caches: non-root/non-sudo context)"
-fi
-
-echo "⏳ Waiting 10 seconds for Nvidia GPU memory state stabilization..."
-sleep 10
-echo "✅ VRAM Airlock complete. Environment isolated and ready for Unsloth."
+# Execute Initial Pre-Training Airlock
+vram_airlock
 
 # ------------------------------------------------------------------------------
 # SLM FINE-TUNING EXECUTION
 # ------------------------------------------------------------------------------
-cd "${REPO_ROOT}/ml/slm-training"
+cd "${TRAINING_DIR}"
 
 if [[ "${MODEL_TARGET}" == "audit" || "${MODEL_TARGET}" == "all" ]]; then
     echo -e "\n▶️  [TRAINING 1/2]: Executing Forensic Auditor Fine-Tuning (train_audit.py)..."
     "${PYTHON_CMD}" -u train_audit.py
+fi
+
+if [[ "${MODEL_TARGET}" == "all" ]]; then
+    # 🚨 CRITICAL: Re-engage the VRAM Airlock between models to guarantee the 
+    # Chatbot starts with 100% clean memory and zero PyTorch fragmentation.
+    vram_airlock
 fi
 
 if [[ "${MODEL_TARGET}" == "chatbot" || "${MODEL_TARGET}" == "all" ]]; then

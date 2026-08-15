@@ -215,9 +215,9 @@ JSONL_CHATBOT_DPO = os.path.join(SLM_DATA_DIR, "chatbot_dpo_data.jsonl")
 SCHEMA_PATH = "../../libs/contracts/schemas/dpdp_schema.json"
 MODEL_PATH = os.getenv("TEACHER_MODEL_PATH", "../models/Qwen2-72B-Instruct-FP8")
 
-TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "2500"))
-TARGET_CHATBOT_PAIRS = int(os.getenv("TARGET_CHATBOT_PAIRS", "1000"))
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "25"))
+TARGET_AUDIT_POLICIES = int(os.getenv("TARGET_AUDIT_POLICIES", "3000"))
+TARGET_CHATBOT_PAIRS = int(os.getenv("TARGET_CHATBOT_PAIRS", "3000"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "16"))
 MAX_REFLEXION_STEPS = 3
 
 for d in [SFT_OUTPUT_DIR, DPO_OUTPUT_DIR, CHATBOT_SFT_DIR, CHATBOT_DPO_DIR, SLM_DATA_DIR]:
@@ -715,6 +715,9 @@ ACCEPTED_JUSTIFICATION_BUFFER = []
 import re
 from difflib import SequenceMatcher
 
+import re
+from difflib import SequenceMatcher
+
 def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     # 🚨 STRICT PLACEHOLDER & POISON GATE
     if check_string_poison(policy_text):
@@ -726,10 +729,12 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
     if not isinstance(audit, dict):
         return False, "Not a dictionary"
         
-    # Strict Integer Bounds Verification
-    if not isinstance(audit.get("dpdp_trust_score"), int) or not (0 <= audit.get("dpdp_trust_score", 0) <= 100):
+    # Strict Integer Bounds Verification (Type-Safe)
+    trust_score = audit.get("dpdp_trust_score")
+    subtlety_score = audit.get("subtlety_score")
+    if not isinstance(trust_score, int) or not (0 <= trust_score <= 100):
         return False, "dpdp_trust_score must be an integer between 0 and 100"
-    if not isinstance(audit.get("subtlety_score"), int) or not (0 <= audit.get("subtlety_score", 0) <= 100):
+    if not isinstance(subtlety_score, int) or not (0 <= subtlety_score <= 100):
         return False, "subtlety_score must be an integer between 0 and 100"
 
     if check_string_poison(str(audit.get("global_legal_reasoning", ""))):
@@ -747,7 +752,12 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         return True, ""
 
     global_reasoning = str(audit.get("global_legal_reasoning", "")).lower()
-    foreign_legacy_markers = ["gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", "article 17", "right to portability", "legitimate interest", "it act 2000", "information technology act", "section 43a", "spdi rules 2011"]
+    # Expanded Foreign Law Markers
+    foreign_legacy_markers = [
+        "gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", "article 17", 
+        "right to portability", "legitimate interest", "it act 2000", 
+        "information technology act", "section 43a", "spdi rules 2011", "eu data"
+    ]
     if any(m in global_reasoning for m in foreign_legacy_markers):
         return False, f"Foreign/Legacy law bleed in reasoning: {global_reasoning[:40]}..."
 
@@ -764,46 +774,63 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
             return False, "Violation is based on omission (omission_check is True)."
 
         quote = str(v.get("evidence_quote", "")).strip()
-        
+        if not quote:
+            return False, "Violation is missing an evidence quote."
+            
+        # Context Bleed Check
+        if any(tag in quote.upper() for tag in ["CONTEXT:", "QUERY:", "SCENARIO:"]):
+            return False, "Evidence quote leaked RAG injection headers."
+
         # 🚨 SAFE HARBOR ENFORCER (Anonymization Kill-Switch)
         if not is_dpo and any(w in quote.lower() for w in ["anonymized", "de-identified", "aggregated"]):
             return False, "Judge failed Safe Harbor: Flagged anonymized/aggregated data as a violation."
 
-        # 🚨 UPGRADE: Use the robust `is_quote_in_policy` while maintaining auto-healing
+        # 🚨 UPGRADE: Safe Whitespace Normalization (Prevents Regex Backtracking Crashes)
         if quote not in policy_text:
-            words = [re.escape(w) for w in re.findall(r'\w+', quote)]
-            if len(words) >= 3:
-                pattern = r'\W+'.join(words)
-                match = re.search(pattern, policy_text, re.IGNORECASE)
-                if match:
-                    exact_str = match.group(0)
-                    v["evidence_quote"] = exact_str
-                    quote = exact_str
-            # Final robust check
-            if not is_quote_in_policy(quote, policy_text):
-                return False, f"Evidence quote not strictly found in policy: {quote[:40]}..."
+            norm_quote = re.sub(r'\s+', ' ', quote).strip()
+            norm_policy = re.sub(r'\s+', ' ', policy_text).strip()
+            if norm_quote in norm_policy:
+                v["evidence_quote"] = norm_quote
+                quote = norm_quote
+            else:
+                # Absolute final fallback for punctuation discrepancies
+                words = [re.escape(w) for w in re.findall(r'\w+', norm_quote)[:20]] # Limit to 20 words to prevent regex crash
+                if len(words) >= 3:
+                    pattern = r'\W+'.join(words)
+                    match = re.search(pattern, policy_text, re.IGNORECASE)
+                    if match:
+                        exact_str = match.group(0)
+                        v["evidence_quote"] = exact_str
+                        quote = exact_str
+                    else:
+                        return False, f"Evidence quote not strictly found in policy: {quote[:40]}..."
+                else:
+                    return False, f"Evidence quote not strictly found in policy: {quote[:40]}..."
         
         if check_string_poison(quote) or check_string_poison(str(v.get("step_3_semantic_justification", ""))) or check_string_poison(str(v.get("step_2_statute_match", ""))) or check_string_poison(str(v.get("step_1_active_claim_analysis", ""))):
             return False, "Violation contains unresolved placeholders, leaked tags, or unicode poison"
             
         # Mechanical Single-Sentence Truncation
-        def find_first_terminal_punctuation(text: str) -> int:
-            text_check = re.sub(r'\[\s*\.{2,3}\s*\]|\.{2,3}', lambda m: ' ' * len(m.group(0)), text)
-            text_check = re.sub(r'\b(?:INR|Rs\.?|\$|[\d,]+)\s*[\d,]+\.\d+\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
-            text_check = re.sub(r'\b\d+\.\d+(?:\.\d+)*\b', lambda m: ' ' * len(m.group(0)), text_check)
-            text_check = re.sub(r'\S+@\S+|\S+\.\S+/(?:\S+)?|\b(?:www\.)?[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|co|io|ai|info|biz)\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
-            text_check = re.sub(r'(?:\b[A-Za-z]\.\s*)+', lambda m: ' ' * len(m.group(0)), text_check)
-            text_check = re.sub(r'(?i)\b(?:Pvt|Private\s+Ltd|Ltd|Co|Inc|Corp|Dr|Mr|Mrs|Ms|Smt|Shri|Prof|Capt|Col|Gen|Hon|Rev|Sr|Jr|No|S\.No|Reg|Sec|Rule|Section|Cl|Clause|Dept|Est|Approx|Max|Min|Rs|INR|Fig|Ref|App|Ph\.D|B\.Tech|M\.Tech|e\.g|i\.e|vs|v|etc|viz|cf|et\s+al|St|Ave|Blvd|Rd|Sq|Gov|Org|Edu|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*(?:Ltd\.?)?', lambda m: ' ' * len(m.group(0)), text_check)
-            
-            match = re.search(r'([\.\!\?])\s+(?=[A-Z0-9])', text_check)
-            if match:
-                return match.start(1) + 1 
-            return -1
+        try:
+            def find_first_terminal_punctuation(text: str) -> int:
+                text_check = re.sub(r'\[\s*\.{2,3}\s*\]|\.{2,3}', lambda m: ' ' * len(m.group(0)), text)
+                text_check = re.sub(r'\b(?:INR|Rs\.?|\$|[\d,]+)\s*[\d,]+\.\d+\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
+                text_check = re.sub(r'\b\d+\.\d+(?:\.\d+)*\b', lambda m: ' ' * len(m.group(0)), text_check)
+                text_check = re.sub(r'\S+@\S+|\S+\.\S+/(?:\S+)?|\b(?:www\.)?[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|co|io|ai|info|biz)\b', lambda m: ' ' * len(m.group(0)), text_check, flags=re.IGNORECASE)
+                text_check = re.sub(r'(?:\b[A-Za-z]\.\s*)+', lambda m: ' ' * len(m.group(0)), text_check)
+                text_check = re.sub(r'(?i)\b(?:Pvt|Private\s+Ltd|Ltd|Co|Inc|Corp|Dr|Mr|Mrs|Ms|Smt|Shri|Prof|Capt|Col|Gen|Hon|Rev|Sr|Jr|No|S\.No|Reg|Sec|Rule|Section|Cl|Clause|Dept|Est|Approx|Max|Min|Rs|INR|Fig|Ref|App|Ph\.D|B\.Tech|M\.Tech|e\.g|i\.e|vs|v|etc|viz|cf|et\s+al|St|Ave|Blvd|Rd|Sq|Gov|Org|Edu|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*(?:Ltd\.?)?', lambda m: ' ' * len(m.group(0)), text_check)
+                
+                match = re.search(r'([\.\!\?])\s+(?=[A-Z0-9])', text_check)
+                if match:
+                    return match.start(1) + 1 
+                return -1
 
-        terminal_idx = find_first_terminal_punctuation(quote)
-        if terminal_idx != -1:
-            quote = quote[:terminal_idx].strip()
-            v["evidence_quote"] = quote
+            terminal_idx = find_first_terminal_punctuation(quote)
+            if terminal_idx != -1:
+                quote = quote[:terminal_idx].strip()
+                v["evidence_quote"] = quote
+        except Exception:
+            pass # Failsafe against weird strings
 
         # UPGRADED VOCABULARY WHITELIST
         substantive_keywords = [
@@ -839,26 +866,27 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if any(phrase in justification for phrase in forbidden_phrases) or any(phrase in active_claim for phrase in forbidden_phrases) or any(phrase in statute_match for phrase in forbidden_phrases):
             return False, f"Omission hallucination (Forbidden Phrase) detected."
             
-        # Strict word boundary matches (Prevents "unfailing" from triggering "failing")
+        # Strict word boundary matches
         omission_words_regex = r'\b(fails|failing|lacks|lacking|omits|omitting|failure)\b'
         if re.search(omission_words_regex, justification) or re.search(omission_words_regex, active_claim) or re.search(omission_words_regex, statute_match):
             return False, f"Omission hallucination (Banned Word) detected."
                 
+        # Similarity Buffer Check
         norm_just = re.sub(r'\s+', ' ', justification).strip()
-        if len(norm_just) >= 20:
+        if len(norm_just) >= 20 and 'ACCEPTED_JUSTIFICATION_BUFFER' in globals():
             boilerplate_pattern = r'(?i)violates\s+(?:section|rule)\s+\d+(?:\(\d+\))?\s+of\s+the\s+(?:digital\s+personal\s+data\s+protection|dpdp)\s+(?:act,?\s*2023|rules,?\s*2025).*'
             core_just = re.sub(boilerplate_pattern, '', norm_just).strip()
             if not core_just: core_just = norm_just
             
-            for past_just in ACCEPTED_JUSTIFICATION_BUFFER[-500:]:
+            for past_just in globals()['ACCEPTED_JUSTIFICATION_BUFFER'][-500:]:
                 past_core = re.sub(boilerplate_pattern, '', past_just).strip()
                 if not past_core: past_core = past_just
                 if SequenceMatcher(None, core_just, past_core).ratio() > 0.95:
-                    return False, f"Justification too similar to a previously accepted audit (similarity > 80%): {norm_just[:50]}..."
+                    return False, f"Justification too similar to a previously accepted audit (similarity > 95%): {norm_just[:50]}..."
 
         offending_entities = v.get("offending_entities", [])
         if not isinstance(offending_entities, list): v["offending_entities"] = []
-        if is_administrative_element(quote, v["offending_entities"]):
+        if 'is_administrative_element' in globals() and globals()['is_administrative_element'](quote, v["offending_entities"]):
             return False, f"Administrative/contact info flagged as violation: {quote[:40]}..."
 
         statute = str(v.get("statute_reference", ""))
@@ -868,69 +896,91 @@ def validate_audit_quality(audit, policy_text, is_dpo=False, chosen_audit=None):
         if any(marker in quote.lower() for marker in ["the policy does not", "no mention of", "does not explicitly"]):
             return False, f"Commentary trap in evidence: {quote[:40]}..."
 
-        # DPO Differentiation Check
+        # DPO Differentiation Check (Fixed Empty Match Bug)
         if is_dpo and chosen_audit and isinstance(chosen_audit, dict):
             for cv in chosen_audit.get("violations", []):
                 if isinstance(cv, dict):
                     c_quote = str(cv.get("evidence_quote", "")).strip().lower()
                     c_type = str(cv.get("violation_type", "")).strip()
-                    if quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.98:
+                    if quote and c_quote and (quote.lower() == c_quote or SequenceMatcher(None, quote.lower(), c_quote).ratio() > 0.98):
                         return False, f"DPO rejected audit targets chosen evidence quote directly ({c_type}): {quote[:40]}..."
 
-        # COMPREHENSIVE STATUTE STRETCHING FIREWALL 
+        # 🚨 UPGRADE: COMPREHENSIVE 16-CATEGORY STATUTE STRETCHING FIREWALL
         vtype = v.get("violation_type", "")
         statute_lower = statute.lower()
         quote_lower = quote.lower()
         
         if vtype == "PURPOSE_LIMITATION_VIOLATION" and "section 4" not in statute_lower:
-            return False, f"Statute stretching: {vtype} must cite Section 4, not {statute}."
+            return False, f"Statute stretching: {vtype} must cite Section 4."
         if vtype == "CONSENT_NOT_FREE_OR_SPECIFIC" and "section 6" not in statute_lower and "rule 3" not in statute_lower:
-            return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3, not {statute}."
+            return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3."
+        if vtype == "LEGITIMATE_USES_ABUSE" and "section 7" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 7."
+        if vtype == "NOTICE_INADEQUATE" and "section 5" not in statute_lower and "rule 4" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 5 or Rule 4."
+        if vtype in ["DATA_RETENTION_LIMIT_EXCEEDED", "ERASURE_NOTICE_PERIOD_VIOLATION"] and "section 8" not in statute_lower and "rule 8" not in statute_lower and "schedule" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 8, Rule 8, or Schedule."
+        if vtype == "CHILD_CONSENT_VIOLATION" and "section 9" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 9."
         if vtype == "SECURITY_SAFEGUARDS_MISSING" and "section 8" not in statute_lower:
-            return False, f"Statute stretching: {vtype} must cite Section 8, not {statute}."
+            return False, f"Statute stretching: {vtype} must cite Section 8."
+        if vtype == "BREACH_NOTIFICATION_FAILURE" and "section 8" not in statute_lower and "rule 7" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 8(6) or Rule 7(2)."
+        if vtype == "PROCESSOR_ACCOUNTABILITY_VIOLATION" and "section 8" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 8."
+        if vtype == "GRIEVANCE_REDRESSAL_INADEQUATE" and "section 13" not in statute_lower and "rule 9" not in statute_lower and "rule 14" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 13, Rule 9, or Rule 14."
+        if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING", "SDF_DATA_LOCALIZATION_VIOLATION"] and "section 10" not in statute_lower and "rule 13" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 10 or Rule 13."
+        if vtype == "CROSS_BORDER_TRANSFER_VIOLATION" and "section 16" not in statute_lower and "rule 15" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 16 or Rule 15."
+        if vtype == "CONSENT_MANAGER_OBSTRUCTION" and "section 6" not in statute_lower and "rule 5" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 5."
+        if vtype == "LANGUAGE_ACCESSIBILITY" and "section 5" not in statute_lower and "rule 4" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 5(3) or Rule 4(1)."
+        if vtype == "RIGHTS_IMPLEMENTATION_VIOLATION" and not any(s in statute_lower for s in ["section 11", "section 12", "section 13", "section 14", "rule 10", "rule 11"]):
+            return False, f"Statute stretching: {vtype} must cite Sections 11-14 or Rules 10-11."
+        if vtype == "CONSENT_MECHANICS_VIOLATION" and "section 6" not in statute_lower and "rule 3" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3."
+        if vtype == "LOG_RETENTION_MANDATE_VIOLATION" and "rule 8" not in statute_lower and "rule 6" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Rule 8(3) or Rule 6(1)(e)."
+        if vtype == "DATA_ACCURACY_COMPLETENESS_VIOLATION" and "section 8" not in statute_lower and "section 11" not in statute_lower:
+            return False, f"Statute stretching: {vtype} must cite Section 8(3) or Section 11."
+
+        # 🚨 UPGRADE: RESTORE THE SEC 17 FALSE-POSITIVE GUARDRAIL
         if vtype == "ILLEGAL_EXEMPTION_CLAIM" and "section 17" not in statute_lower:
-            return False, f"Statute stretching: {vtype} must cite Section 17, not {statute}."
-        if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING", "SDF_DATA_LOCALIZATION_VIOLATION"]:
-            if "section 10" not in statute_lower and "rule 13" not in statute_lower:
-                return False, f"Statute stretching: {vtype} must cite Section 10 or Rule 13, not {statute}."
-        if vtype in ["DATA_RETENTION_LIMIT_EXCEEDED", "ERASURE_NOTICE_PERIOD_VIOLATION"]:
-            if "section 8" not in statute_lower and "rule 8" not in statute_lower and "schedule" not in statute_lower:
-                return False, f"Statute stretching: {vtype} must cite Section 8, Rule 8, or Schedule, not {statute}."
-        if vtype == "CONSENT_MECHANICS_VIOLATION":
-            if "section 6" not in statute_lower and "rule 3" not in statute_lower:
-                return False, f"Statute stretching: {vtype} must cite Section 6 or Rule 3, not {statute}."
-        if vtype == "LOG_RETENTION_MANDATE_VIOLATION":
-            if "rule 8" not in statute_lower and "rule 6" not in statute_lower:
-                return False, f"Statute stretching: {vtype} must cite Rule 8(3) or Rule 6(1)(e), not {statute}."
-        if vtype == "DATA_ACCURACY_COMPLETENESS_VIOLATION":
-            if "section 8" not in statute_lower and "section 11" not in statute_lower:
-                return False, f"Statute stretching: {vtype} must cite Section 8(3) or Section 11, not {statute}."
+            return False, f"Statute stretching: {vtype} must cite Section 17."
+        elif vtype == "ILLEGAL_EXEMPTION_CLAIM" and "17" in statute_lower:
+            if any(w in quote_lower or w in justification for w in ["anonymiz", "de-identif", "aggregat"]) and any(w in quote_lower or w in justification for w in ["research", "statistic"]):
+                return False, "Statute stretching: Sec 17 allows research if de-identified. Model falsely prosecuted a valid exemption."
+
         if any(domain in quote_lower for domain in ["metrics.", "ad-tracker", "social-network", "analytics", "third-party"]):
             if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING"]:
                 return False, "Statute stretching: Tracking/analytics sharing cannot be classified as an Algorithmic Profiling/SDF obligation violation."
 
         statute_pattern = r'(?i)\b(?:(?:section|sec\.?|s\.?|clause|act)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:rule|r\.?)\s*\d+(?:\s*\(\s*\w+\s*\))*|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|the)\s+schedule|dpdp)\b'
         if not re.search(statute_pattern, statute):
-            v["statute_reference"] = "DPDP Act 2023, Section 8"
+            v["statute_reference"] = "DPDP Act 2023"
             
         net_act = v.get("network_action", "")
-        if net_act in ENUM_MAPPINGS: v["network_action"] = ENUM_MAPPINGS[net_act]
+        if 'ENUM_MAPPINGS' in globals() and net_act in globals()['ENUM_MAPPINGS']: v["network_action"] = globals()['ENUM_MAPPINGS'][net_act]
         if v["network_action"] not in ["BLOCK_THIRD_PARTY", "STRIP_TELEMETRY_HEADER", "SPOOF_HARDWARE_API", "INJECT_GPC_SIGNAL", "WARN_USER_ONLY"]:
             v["network_action"] = "WARN_USER_ONLY"
             
     # Post-validation Trust Score Clamping
+    sev_violations = [
+        "ALGORITHMIC_PROFILING_SDF", "CHILD_CONSENT_VIOLATION", "CONSENT_NOT_FREE_OR_SPECIFIC", 
+        "ILLEGAL_EXEMPTION_CLAIM", "DATA_RETENTION_LIMIT_EXCEEDED", 
+        "SDF_DATA_LOCALIZATION_VIOLATION", "LOG_RETENTION_MANDATE_VIOLATION"
+    ]
     for v in viols:
-        sev_violations = [
-            "ALGORITHMIC_PROFILING_SDF", "CHILD_CONSENT_VIOLATION", "CONSENT_NOT_FREE_OR_SPECIFIC", 
-            "ILLEGAL_EXEMPTION_CLAIM", "DATA_RETENTION_LIMIT_EXCEEDED", 
-            "SDF_DATA_LOCALIZATION_VIOLATION", "LOG_RETENTION_MANDATE_VIOLATION"
-        ]
         if v.get("violation_type") in sev_violations:
             if audit.get("dpdp_trust_score", 100) > 20:
                 audit["dpdp_trust_score"] = 15 # Severe clamp
+            break # Break early to avoid redundant clamping
                 
     return True, ""
-    
+
 def json_repair_loads(raw_text: str):
     text = str(raw_text).strip()
     
@@ -1225,16 +1275,19 @@ def build_dynamic_synthesizer_prompt(item: dict) -> tuple[str, bool, dict, list]
         .replace("[SILO_COMPLEXITY_DIRECTIVE]", item.get("silo_directive", ""))
                              
     return prompt_text.strip(), is_hn, active_exemption, target_categories
-    
+  
+import random
+
 def build_chatbot_matrix():
     """
     Builds the Track B Chatbot dataset matrix.
-    Grounds queries in the 26 DPDP categories using the Hybrid RAG engine 
+    Grounds queries in the DPDP categories using the Hybrid RAG engine 
     and high-entropy personas/scenarios to prevent Teacher mode-collapse.
+    Injects deterministic Turn 3 logic to force 'Out-of-Domain' examples.
     """
     matrix = []
     
-    # 🧠 HIGH-ENTROPY PERSONAS & SCENARIOS (Prevents generic Q&A drift)
+    # 🧠 HIGH-ENTROPY PERSONAS (Prevents generic Q&A drift)
     CHATBOT_PERSONAS = [
         "An angry citizen whose data was leaked in a recent breach.",
         "A Data Protection Officer (DPO) at a mid-sized Indian fintech.",
@@ -1245,6 +1298,7 @@ def build_chatbot_matrix():
         "A small business owner trying to understand DPDP compliance."
     ]
     
+    # 🧠 EXHAUSTIVE SCENARIOS
     CHATBOT_SCENARIOS = [
         "A user asking how to obtain valid consent for an app, specifically questioning if pre-checked boxes are legally sufficient.",
         "A product manager asking if they can bundle consent for marketing with consent for a core service.",
@@ -1298,6 +1352,32 @@ def build_chatbot_matrix():
         "A security team asking what exactly must be included in the breach notification to the Board."
     ]
     
+    # 🚨 THE CHAOTIC USER ROUTER (Deterministic distribution)
+    TURN_3_OPTIONS = [
+        # --- PATH A: THE OUT-OF-SCOPE LEGAL TRAP (Framework 2) ---
+        "Ask a valid legal follow-up question that requests a specific penalty amount (in Rupees) missing from the provided context.",
+        "Ask about the historical context or parliamentary debates regarding this specific rule, which is NOT in the text.",
+        "Ask how this specific rule compares to the European GDPR or California CCPA.",
+        "Ask for a specific procedural deadline (e.g., 'exactly how many days do I have?') that is omitted from the context.",
+        
+        # --- PATH B: THE UNRELATED DOMAIN TRAP (Framework 1) ---
+        "Completely change the subject. Ask the assistant to write a Python script to automate the scenario.",
+        "Completely change the subject. Ask the assistant to write a complex SQL query to extract database information.",
+        "Completely change the subject. Ask for a generic business strategy to increase next quarter's revenue.",
+        "Completely change the subject. Ask for advice on digital marketing, SEO optimization, or social media growth.",
+        "Completely change the subject. Ask about the weather forecast for Mumbai or Bangalore.",
+        "Completely change the subject. Ask for a recipe for chicken tikka masala or paneer butter masala.",
+        "Completely change the subject. Ask for instructions on how to change a flat tire or fix a car engine.",
+        "Completely change the subject. Ask for financial investment advice regarding buying tech stocks or cryptocurrency.",
+        "Completely change the subject. Ask the assistant to write a poem, a haiku, or a creative story about the scenario.",
+        "Completely change the subject. Ask for medical advice regarding a headache or a cold.",
+        
+        # --- PATH C: THE MULTI-TURN DEEP DIVE (The "Happy Accident") ---
+        "Ask a highly specific follow-up question about a detail that IS explicitly mentioned in the provided context, forcing the assistant to elaborate on it correctly.",
+        "Ask the assistant to summarize their previous answer into a 2-sentence TL;DR.",
+        "Ask a valid follow-up question asking the assistant to clarify a specific legal term used in the provided context."
+    ]
+
     schema_enums = list(CATEGORY_ALIAS_MAP.keys())
     
     for i in range(TARGET_CHATBOT_PAIRS):
@@ -1307,6 +1387,7 @@ def build_chatbot_matrix():
         
         persona = random.choice(CHATBOT_PERSONAS)
         scenario = random.choice(CHATBOT_SCENARIOS)
+        turn_3_directive = random.choice(TURN_3_OPTIONS)
         
         # ✅ FIX: Use the actual Hybrid RAG engine with the semantic scenario text
         # n_results=3 ensures we get enough context for the Teacher to cite accurately
@@ -1321,7 +1402,8 @@ def build_chatbot_matrix():
             "target_category_enum": category_enum,
             "law_context": law_context,
             "persona": persona,
-            "scenario": scenario
+            "scenario": scenario,
+            "turn_3_directive": turn_3_directive
         })
         
     # Shuffle at the very end to break sequential patterns for the Chatbot loop
@@ -1559,7 +1641,7 @@ def _save_closed_book_audit_pair(variation_idx: int, category_idx: int, item: di
 GOLDEN_SEED_CACHE = {}      # For SFT (Judge Prompt)
 DPO_GOLDEN_SEED_CACHE = {}  # For DPO (Hard Negative Prompt)
 
-VARIATIONS_PER_CATEGORY = 150
+VARIATIONS_PER_CATEGORY = 250
 
 def load_golden_seeds():
     # ==========================================
@@ -1626,19 +1708,50 @@ def load_golden_seeds():
     if len(GOLDEN_SEED_CACHE) < 26 or len(DPO_GOLDEN_SEED_CACHE) < 26:
         print("⚠️ Warning: Incomplete Golden Seed cache. Missing categories will fallback to 0-Shot generation.")
 
+import glob  # Ensure this is imported at the top of your file
+
 def run_audit_forge():
     print("\n" + "="*80)
     print("⚖️ INITIATING CATEGORY-FIRST AUDIT FORGE (DUAL 1-SHOT CACHING)")
     print(f"⚙️ Config: {BATCH_SIZE} items/batch | {VARIATIONS_PER_CATEGORY} vars/category | {len(CATEGORY_ALIAS_MAP)} categories")
     print("="*80)
     
+    TARGET_QUOTA = 100  # 🚨 NEW: Maximum flawless policies to save per category
+    
     stats = {"total_generated": 0, "saved_sft": 0, "saved_dpo": 0, "dropped_total": 0}
     cumulative_drop_reasons = defaultdict(int)
     
     # 🚨 OUTER LOOP: Lock in 1 category at a time to maximize KV-Cache hits
     for cat_idx, (cat_enum, dict_key) in enumerate(CATEGORY_ALIAS_MAP.items()):
-        print(f"\n🎯 [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum}")
+
+        # --- 🚨 FOOLPROOF DISK SCANNER & RESUME LOGIC ---
+        all_sft_files = glob.glob("training-pairs/sft/sft_*.json")
         
+        existing_files = []
+        max_existing_idx = 0
+        
+        for f in all_sft_files:
+            try:
+                # Example: "sft_149_00.json" -> parts = ['sft', '149', '00.json']
+                parts = os.path.basename(f).split('_')
+                file_var_idx = int(parts[1])                 # The middle one (variation count)
+                file_cat_idx = int(parts[2].split('.')[0])   # The last one (category idx)
+                
+                if file_cat_idx == cat_idx:
+                    existing_files.append(f)
+                    max_existing_idx = max(max_existing_idx, file_var_idx)
+            except Exception:
+                pass
+
+        local_success_count = len(existing_files)
+        
+        if local_success_count >= TARGET_QUOTA:
+            print(f"\n⏭️ [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum} - CAP REACHED ({local_success_count}/{TARGET_QUOTA}). SKIPPING.")
+            continue
+            
+        print(f"\n🎯 [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum} | Current Yield: {local_success_count}/{TARGET_QUOTA} | Starting offset: {max_existing_idx}")
+        # ------------------------------------------
+
         # 1. Load the Fixed Prefix Components for this Category
         law_chunk = get_audit_rag_context(dict_key)
         
@@ -1669,7 +1782,8 @@ REJECTED (Overzealous/Hallucinated Audit):
         silo_2_cutoff = int(VARIATIONS_PER_CATEGORY * 0.80)
         
         for item_idx in range(VARIATIONS_PER_CATEGORY):
-            variation_idx = item_idx + 1 
+            # 🚨 FIX: Offset the ID by the max existing file number so it never overwrites!
+            variation_idx = max_existing_idx + item_idx + 1 
             
             # SILO 1-2-3 LOGIC (Dynamic Math + Trigger Visibility Upgrades)
             if item_idx < silo_1_cutoff: # 30% Silo 1
@@ -1899,6 +2013,12 @@ CRITICAL RULE: Amidst the chaos, the illegal corporate action must be stated as 
                         heal_error = "The Judge MISSED the trap. Rewrite to make the violation undeniable but camouflaged."
                             
                     if success:
+                        # --- 🚨 REAL-TIME OVERFLOW PREVENTER ---
+                        # If we hit 100 mid-batch, stop saving and throw the rest away
+                        if local_success_count >= TARGET_QUOTA:
+                            completed.add(idx)
+                            continue
+                        # ---------------------------------------
                         # 🚨 DPO PAYLOAD LOGIC: PRESERVE PERFECT POLICIES
                         dpo_rejected_payload = None
                         
@@ -1914,6 +2034,7 @@ CRITICAL RULE: Amidst the chaos, the illegal corporate action must be stated as 
                         res_sft = _save_closed_book_audit_pair(item["variation_idx"], item["category_idx"], item, policy, audit, None, is_dpo=False)
                         if res_sft == "sft":
                             stats["saved_sft"] += 1
+                            local_success_count += 1  # 🚨 NEW: Track live yield
                             viols = audit.get("violations", [])
                             if viols and isinstance(viols, list) and isinstance(viols[0], dict):
                                 ACCEPTED_JUSTIFICATION_BUFFER.append(viols[0].get("step_3_semantic_justification", ""))
@@ -1969,8 +2090,15 @@ CRITICAL RULE: Amidst the chaos, the illegal corporate action must be stated as 
                 print("      [Current Batch Drop Reasons]:")
                 for reason, count in batch_drop_reasons.items():
                     print(f"       - {count}x: {reason}")
+                
+            # --- 🚨 NEW: EARLY EXIT LOGIC ---
+            if local_success_count >= TARGET_QUOTA:
+                print(f"  ✅ SUCCESS: Reached {TARGET_QUOTA} perfect policies for {cat_enum}. Moving to next category.")
+                break
+            # --------------------------------
             
         gc.collect()
+
 
     print("\n" + "="*80)
     print(f"🏁 FORGE COMPLETE | Total SFT: {stats['saved_sft']} | Total DPO: {stats['saved_dpo']} | Total Dropped: {stats['dropped_total']}")
@@ -1980,14 +2108,16 @@ CRITICAL RULE: Amidst the chaos, the illegal corporate action must be stated as 
             print(f"  - {count}x: {reason}")
     print("="*80)
 
+import re
+
 def validate_chatbot_content(messages: list, strict_geometry: bool = True) -> tuple[bool, str]:
     """
     Validates the text content and strict geometry of the chatbot SFT/DPO outputs.
-    strict_geometry=True enforces the 4-turn SFT matrix.
+    strict_geometry=True enforces the 4-turn SFT matrix and RAG injection headers.
     strict_geometry=False bypasses the turn count for isolated DPO chosen/rejected turns.
     """
     
-    # 🚨 GATE 1: STRICT GEOMETRY ENFORCEMENT (Bypassed for individual DPO turns)
+    # 🚨 GATE 1: STRICT GEOMETRY & RAG ENFORCEMENT
     if strict_geometry:
         if len(messages) != 4:
             return False, f"Invalid turn count: {len(messages)} (Expected exactly 4)"
@@ -1997,32 +2127,47 @@ def validate_chatbot_content(messages: list, strict_geometry: bool = True) -> tu
             actual_role = messages[i].get("role")
             if actual_role != expected_role:
                 return False, f"Role mismatch at turn {i+1}: Expected '{expected_role}', got '{actual_role}'"
+                
+        # Turn 1 RAG Format Enforcer
+        turn_1_content = str(messages[0].get("content", ""))
+        if "CONTEXT:" not in turn_1_content or "QUERY:" not in turn_1_content:
+            return False, "Turn 1 is missing the mandatory CONTEXT: and QUERY: RAG formatting."
 
-    # 🚨 GATE 2: CONTENT POISON & HALLUCINATION CHECK
+    # 🚨 GATE 2: CONTENT POISON, HEDGING & HALLUCINATION CHECK
     forbidden_laws = [
         "gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", 
         "article 17", "right to portability", "legitimate interest", 
-        "it act 2000", "information technology act", "section 43a", "spdi rules 2011"
+        "it act 2000", "information technology act", "section 43a", "spdi rules 2011", "eu data"
     ]
     
     omission_phrases = [
         "without specifying", "fails to specify", "does not specify", 
         "fails to provide", "does not provide", "fails to detail", 
-        "does not detail", "silent on", "no mention of"
+        "does not detail", "silent on", "no mention of", "fails to mention", "does not mention"
     ]
     
+    # Expanded AI Identity Hedging
     ai_disclaimers = [
-        "as an ai", "i am not a lawyer", "not legal advice", 
-        "consult a professional", "i cannot provide legal advice", 
-        "for informational purposes only"
+        "as an ai", "as an artificial intelligence", "i am an ai", "i am a language model",
+        "i am not a lawyer", "not legal advice", "consult a professional", "seek legal counsel",
+        "i cannot provide legal advice", "for informational purposes only"
+    ]
+    
+    # Catches the LLM being lazy and printing the schema instructions instead of generating text
+    lazy_brackets = [
+        "[insert exact law", "[insert a highly contextual", "[answer the user", 
+        "[ask a follow-up", "[mandatory refusal", "[poisoned response"
     ]
     
     for m in messages:
         content = str(m.get("content", "")).lower()
         
         # Universal Poison Checks
-        if check_string_poison(content): 
+        if 'check_string_poison' in globals() and globals()['check_string_poison'](content): 
             return False, "Placeholder or structural tag leak detected."
+            
+        if any(lazy in content for lazy in lazy_brackets):
+            return False, "Model outputted literal schema instructions/brackets instead of generating text."
             
         if any(law in content for law in forbidden_laws): 
             return False, "Foreign/legacy law bleed detected in dialogue."
@@ -2032,222 +2177,378 @@ def validate_chatbot_content(messages: list, strict_geometry: bool = True) -> tu
             
         # Assistant-Specific Checks
         if m.get("role") == "assistant":
+            # Phrase-based omission check
             if any(phrase in content for phrase in omission_phrases):
-                return False, "Omission hallucination detected in assistant response."
+                return False, "Omission hallucination (phrase) detected in assistant response."
+                
+            # Regex Word-Boundary omission check (catches 'omits', 'lacks', 'fails')
+            omission_words_regex = r'\b(fails|failing|lacks|lacking|omits|omitting|failure)\b'
+            if re.search(omission_words_regex, content):
+                return False, "Omission hallucination (banned word) detected in assistant response."
             
             # Ensure the RAG context tags don't leak into the model's actual speech
-            if "[context: the law]" in content or "[task]" in content or "[retrieved_law_context]" in content:
+            if "[context: the law]" in content or "[task]" in content or "[retrieved_law_context]" in content or "context:" in content:
                 return False, "RAG Context tag leaked into assistant dialogue."
                 
     return True, ""
+    
+import os
+import glob
+import math
+import random
+import json
+import gc
+from collections import defaultdict
 
 def run_chatbot_forge():
     print("\n" + "="*80)
-    print("💬 INITIATING BATCHED CHATBOT QA FORGE (OPEN-BOOK ARCHITECTURE)")
+    print("💬 INITIATING CATEGORY-FIRST CHATBOT QA FORGE (OPEN-BOOK ARCHITECTURE)")
+    print(f"⚙️ Config: {BATCH_SIZE} items/batch | {VARIATIONS_PER_CATEGORY} vars/category | {len(CATEGORY_ALIAS_MAP)} categories")
     print("="*80)
     
-    matrix = build_chatbot_matrix()
-    total_batches = math.ceil(len(matrix) / BATCH_SIZE)
+    TARGET_QUOTA = 100
     stats = {"saved_chatbot_sft": 0, "saved_chatbot_dpo": 0, "dropped": 0}
     
-    for batch_idx in range(total_batches):
-        batch_start = batch_idx * BATCH_SIZE
-        batch_end = min(batch_start + BATCH_SIZE, len(matrix))
-        batch = matrix[batch_start:batch_end]
+    # 🧠 HIGH-ENTROPY ARRAYS
+    CHATBOT_PERSONAS = [
+        "An angry citizen whose data was leaked in a recent breach.",
+        "A Data Protection Officer (DPO) at a mid-sized Indian fintech.",
+        "A startup CTO trying to understand SDF thresholds.",
+        "A corporate compliance lawyer advising a multinational client.",
+        "A journalist trying to file an RTI request for a politician's data.",
+        "A parent concerned about their child's data being tracked by an EdTech app.",
+        "A small business owner trying to understand DPDP compliance."
+    ]
+    
+    CHATBOT_SCENARIOS = [
+        "A user asking how to obtain valid consent for an app, specifically questioning if pre-checked boxes are legally sufficient.",
+        "A product manager asking if they can bundle consent for marketing with consent for a core service.",
+        "A user wanting to withdraw consent, asking about the processing timeline and what happens if withdrawal breaks an active subscription.",
+        "A security team discovering a data breach, asking exactly who to notify and the specific format for notifying the Board.",
+        "A corporate lawyer asking how a company becomes a Significant Data Fiduciary (SDF) and if it's purely based on data volume.",
+        "A multinational company asking if they can transfer Indian users' data to servers in the USA."
+    ] # Add the rest of your comprehensive scenarios here
+    
+    # 🚨 DETERMINISTIC OUT-OF-DOMAIN ROUTER
+    TURN_3_OPTIONS = [
+        "Ask a valid legal follow-up question that requests a specific detail missing from the provided context.",
+        "Ask a valid legal follow-up question that requests a specific detail missing from the provided context.",
+        "Ask a valid legal follow-up question that requests a specific detail missing from the provided context.",
+        "Completely change the subject. Ask the assistant to write a Python script, a SQL query, or fix a server issue related to the scenario.",
+        "Completely change the subject. Ask the assistant for generic business strategy, financial forecasting, or marketing advice.",
+        "Completely change the subject. Ask the assistant about cooking, car repair, or weather."
+    ]
+
+    # 🚨 OUTER LOOP: Lock in 1 category at a time
+    for cat_idx, (cat_enum, dict_key) in enumerate(CATEGORY_ALIAS_MAP.items()):
         
-        batch_drop_reasons = defaultdict(int)
+        # --- 🚨 FOOLPROOF DISK SCANNER & RESUME LOGIC ---
+        all_chatbot_files = glob.glob(os.path.join(CHATBOT_SFT_DIR, "chat_sft_*.json"))
         
-        # 1. Prepare Base Prompts (Stored separately to prevent infinite Reflexion growth)
-        base_sft_prompts = []
-        base_dpo_prompts = []
+        existing_files = []
+        max_existing_idx = 0
         
-        for item in batch:
-            prompt_sft = CHATBOT_QA_SFT_PROMPT \
-                .replace("[RETRIEVED_LAW_CONTEXT]", item["law_context"]) \
-                .replace("[PERSONA_INJECTION]", item["persona"]) \
-                .replace("[SCENARIO_INJECTION]", item["scenario"])
-            base_sft_prompts.append(prompt_sft)
-            
-            prompt_dpo = CHATBOT_QA_DPO_PROMPT \
-                .replace("[RETRIEVED_LAW_CONTEXT]", item["law_context"]) \
-                .replace("[PERSONA_INJECTION]", item["persona"]) \
-                .replace("[SCENARIO_INJECTION]", item["scenario"])
-            base_dpo_prompts.append(prompt_dpo)
-            
-        max_retries = 2
-        active_indices = list(range(len(batch)))
-        final_sft_results = [None] * len(batch)
-        final_dpo_results = [None] * len(batch)
-        
-        # Store feedback for reflexion
-        retry_feedback_sft = {}
-        retry_feedback_dpo = {}
-        
-        # 🚨 REFLEXION RETRY LOOP
-        for attempt in range(max_retries):
-            if not active_indices: 
-                break
+        for f in all_chatbot_files:
+            try:
+                # Expecting format: chat_sft_{variation_idx}_{cat_idx}.json
+                parts = os.path.basename(f).split('_')
+                file_cat_idx = int(parts[3].split('.')[0])
+                file_var_idx = int(parts[2])
                 
-            # Build dynamic message arrays for the active indices
-            curr_sft_msgs = []
-            curr_dpo_msgs = []
+                if file_cat_idx == cat_idx:
+                    existing_files.append(f)
+                    max_existing_idx = max(max_existing_idx, file_var_idx)
+            except Exception:
+                pass
+
+        local_success_count = len(existing_files)
+        
+        if local_success_count >= TARGET_QUOTA:
+            print(f"\n⏭️ [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum} - CAP REACHED ({local_success_count}/{TARGET_QUOTA}). SKIPPING.")
+            continue
             
-            for orig_idx in active_indices:
-                sft_content = base_sft_prompts[orig_idx]
-                dpo_content = base_dpo_prompts[orig_idx]
-                        
-                if attempt > 0:
-                    if orig_idx in retry_feedback_sft:
-                        sft_content += f"\n\n[REFLEXION FEEDBACK]: {retry_feedback_sft[orig_idx]}"
-                    if orig_idx in retry_feedback_dpo:
-                        dpo_content += f"\n\n[REFLEXION FEEDBACK]: {retry_feedback_dpo[orig_idx]}"
-                        
-                # ✅ TWEAK: Added the System Role for Tokenizer compatibility
-                sys_msg = {"role": "system", "content": "You are an expert AI dataset synthesizer."}
-                curr_sft_msgs.append([sys_msg, {"role": "user", "content": sft_content}])
-                curr_dpo_msgs.append([sys_msg, {"role": "user", "content": dpo_content}])                
+        print(f"\n🎯 [CATEGORY {cat_idx+1:02d}/{len(CATEGORY_ALIAS_MAP)}] {cat_enum} | Current Yield: {local_success_count}/{TARGET_QUOTA} | Starting offset: {max_existing_idx}")
+
+        # 1. Build the specific matrix for THIS category
+        category_matrix = []
+        for item_idx in range(VARIATIONS_PER_CATEGORY):
+            variation_idx = max_existing_idx + item_idx + 1
             
-            sft_out = llm.chat(messages=curr_sft_msgs, sampling_params=chatbot_sft_params)
-            dpo_out = llm.chat(messages=curr_dpo_msgs, sampling_params=chatbot_dpo_params)
+            scenario = random.choice(CHATBOT_SCENARIOS)
+            law_context = semantic_rag_query(
+                query=f"{scenario} {dict_key.replace('_', ' ')}", 
+                n_results=3, 
+                is_private_audit=False
+            )
             
-            next_active = []
-            # Clear feedback dictionaries for the next potential retry
+            category_matrix.append({
+                "variation_idx": variation_idx,
+                "category_idx": cat_idx,
+                "target_category": cat_enum,
+                "persona": random.choice(CHATBOT_PERSONAS),
+                "scenario": scenario,
+                "turn_3_directive": random.choice(TURN_3_OPTIONS),
+                "law_context": law_context
+            })
+            
+        # 2. INNER LOOP: Batch execution
+        total_local_batches = math.ceil(len(category_matrix) / BATCH_SIZE)
+        
+        for local_batch_idx in range(total_local_batches):
+            batch_start = local_batch_idx * BATCH_SIZE
+            batch_end = min(batch_start + BATCH_SIZE, len(category_matrix))
+            batch = category_matrix[batch_start:batch_end]
+            
+            batch_drop_reasons = defaultdict(int)
+            base_sft_prompts = []
+            base_dpo_prompts = []
+            
+            # 🚨 INJECT PROMPTS WITH TURN_3_DIRECTIVE 🚨
+            for item in batch:
+                prompt_sft = CHATBOT_QA_SFT_PROMPT \
+                    .replace("[RETRIEVED_LAW_CONTEXT]", item["law_context"]) \
+                    .replace("[PERSONA_INJECTION]", item["persona"]) \
+                    .replace("[SCENARIO_INJECTION]", item["scenario"]) \
+                    .replace("[TURN_3_DIRECTIVE]", item["turn_3_directive"])
+                base_sft_prompts.append(prompt_sft)
+                
+                prompt_dpo = CHATBOT_QA_DPO_PROMPT \
+                    .replace("[RETRIEVED_LAW_CONTEXT]", item["law_context"]) \
+                    .replace("[PERSONA_INJECTION]", item["persona"]) \
+                    .replace("[SCENARIO_INJECTION]", item["scenario"]) \
+                    .replace("[TURN_3_DIRECTIVE]", item["turn_3_directive"])
+                base_dpo_prompts.append(prompt_dpo)
+                
+            max_retries = 2
+            active_indices = list(range(len(batch)))
+            final_sft_results = [None] * len(batch)
+            final_dpo_results = [None] * len(batch)
+            
             retry_feedback_sft = {}
             retry_feedback_dpo = {}
             
-            for batch_pos, orig_idx in enumerate(active_indices):
-                s_o = sft_out[batch_pos]
-                d_o = dpo_out[batch_pos]
-                
-                try:
-                    s_text = s_o.outputs[0].text.strip()
-                    d_text = d_o.outputs[0].text.strip()
+            # 🚨 REFLEXION RETRY LOOP
+            for attempt in range(max_retries):
+                if not active_indices: break
                     
-                    # Gate 0: String Poison Check
-                    if check_string_poison(s_text) or check_string_poison(d_text):
+                curr_sft_msgs = []
+                curr_dpo_msgs = []
+                
+                for orig_idx in active_indices:
+                    sft_content = base_sft_prompts[orig_idx]
+                    dpo_content = base_dpo_prompts[orig_idx]
+                            
+                    if attempt > 0:
+                        if orig_idx in retry_feedback_sft:
+                            sft_content += f"\n\n[REFLEXION FEEDBACK]: {retry_feedback_sft[orig_idx]}"
+                        if orig_idx in retry_feedback_dpo:
+                            dpo_content += f"\n\n[REFLEXION FEEDBACK]: {retry_feedback_dpo[orig_idx]}"
+                            
+                    sys_msg = {"role": "system", "content": "You are an expert AI dataset synthesizer."}
+                    curr_sft_msgs.append([sys_msg, {"role": "user", "content": sft_content}])
+                    curr_dpo_msgs.append([sys_msg, {"role": "user", "content": dpo_content}])                
+                
+                sft_out = llm.chat(messages=curr_sft_msgs, sampling_params=chatbot_sft_params)
+                dpo_out = llm.chat(messages=curr_dpo_msgs, sampling_params=chatbot_dpo_params)
+                
+                next_active = []
+                retry_feedback_sft = {}
+                retry_feedback_dpo = {}
+                
+                for batch_pos, orig_idx in enumerate(active_indices):
+                    s_o = sft_out[batch_pos]
+                    d_o = dpo_out[batch_pos]
+                    
+                    try:
+                        s_text = s_o.outputs[0].text.strip()
+                        d_text = d_o.outputs[0].text.strip()
+                        
+                        # Gate 0: String Poison Check
+                        if check_string_poison(s_text) or check_string_poison(d_text):
+                            if attempt == max_retries - 1:
+                                stats["dropped"] += 1
+                                batch_drop_reasons["String poison/leak detected"] += 1
+                            else:
+                                retry_feedback_sft[orig_idx] = "Your output contained leaked structural tags or placeholders."
+                                retry_feedback_dpo[orig_idx] = "Your output contained leaked structural tags or placeholders."
+                                next_active.append(orig_idx)
+                            continue
+
+                        # Gate 1: JSON Parsing
+                        parsed_sft = safe_parse_audit(s_text)
+                        parsed_dpo = safe_parse_audit(d_text)
+                        
+                        if not isinstance(parsed_sft, dict) or "messages" not in parsed_sft:
+                            raise ValueError("SFT missing 'messages' key")
+                        if not isinstance(parsed_dpo, dict) or not all(k in parsed_dpo for k in ["prompt", "chosen", "rejected"]):
+                            raise ValueError("DPO missing required keys")
+
+                        # Gate 2: Deep Content Validation
+                        sft_valid, sft_reason = validate_chatbot_content(parsed_sft["messages"])
+                        
+                        chosen_text = parsed_dpo["chosen"][0].get("content", "") if parsed_dpo["chosen"] else ""
+                        rejected_text = parsed_dpo["rejected"][0].get("content", "") if parsed_dpo["rejected"] else ""
+                        
+                        dpo_valid = True
+                        dpo_reason = ""
+                        for role_text in [chosen_text, rejected_text]:
+                            dummy_msg = [{"role": "assistant", "content": role_text}]
+                            v, r = validate_chatbot_content(dummy_msg, strict_geometry=False) 
+                            if not v:
+                                dpo_valid = False
+                                dpo_reason = r
+                                break
+
+                        if not sft_valid or not dpo_valid:
+                            if attempt == max_retries - 1:
+                                stats["dropped"] += 1
+                                if not sft_valid: batch_drop_reasons[f"SFT Validation: {sft_reason}"] += 1
+                                if not dpo_valid: batch_drop_reasons[f"DPO Validation: {dpo_reason}"] += 1
+                            else:
+                                retry_feedback_sft[orig_idx] = sft_reason if not sft_valid else "DPO structure failed validation."
+                                retry_feedback_dpo[orig_idx] = dpo_reason if not dpo_valid else "SFT structure failed validation."
+                                next_active.append(orig_idx)
+                            continue
+                        
+                        # SUCCESS: Mark as completed
+                        final_sft_results[orig_idx] = parsed_sft
+                        final_dpo_results[orig_idx] = parsed_dpo
+                        
+                    except Exception as e:
                         if attempt == max_retries - 1:
                             stats["dropped"] += 1
-                            batch_drop_reasons["String poison/leak detected"] += 1
+                            batch_drop_reasons[f"Parse/Execution Error: {str(e)[:50]}"] += 1
                         else:
-                            retry_feedback_sft[orig_idx] = "Your output contained leaked structural tags or placeholders."
-                            retry_feedback_dpo[orig_idx] = "Your output contained leaked structural tags or placeholders."
+                            retry_feedback_sft[orig_idx] = f"JSON parsing failed: {str(e)[:40]}. Output ONLY valid JSON."
+                            retry_feedback_dpo[orig_idx] = f"JSON parsing failed: {str(e)[:40]}. Output ONLY valid JSON."
                             next_active.append(orig_idx)
+                
+                active_indices = next_active
+                
+            # 3. SAVE SUCCESSFUL PAIRS & ENFORCE HARD QUOTA
+            for i in range(len(batch)):
+                if final_sft_results[i] and final_dpo_results[i]:
+                    
+                    # 🚨 REAL-TIME OVERFLOW PREVENTER 🚨
+                    if local_success_count >= TARGET_QUOTA:
                         continue
-
-                    # Gate 1: JSON Parsing
-                    parsed_sft = safe_parse_audit(s_text)
-                    parsed_dpo = safe_parse_audit(d_text)
+                        
+                    parsed_sft = final_sft_results[i]
+                    parsed_dpo = final_dpo_results[i]
                     
-                    if not isinstance(parsed_sft, dict) or "messages" not in parsed_sft:
-                        raise ValueError("SFT missing 'messages' key")
-                    if not isinstance(parsed_dpo, dict) or not all(k in parsed_dpo for k in ["prompt", "chosen", "rejected"]):
-                        raise ValueError("DPO missing required keys")
-
-                    # Gate 2: Deep Content & Geometry Validation
-                    # SFT must have exactly 4 turns (strict_geometry=True by default)
-                    sft_valid, sft_reason = validate_chatbot_content(parsed_sft["messages"])
+                    var_idx = batch[i]["variation_idx"]
+                    cat_index = batch[i]["category_idx"]
                     
-                    # For DPO, validate the chosen and rejected assistant turns (Bypass 4-turn rule)
-                    chosen_text = parsed_dpo["chosen"][0].get("content", "") if parsed_dpo["chosen"] else ""
-                    rejected_text = parsed_dpo["rejected"][0].get("content", "") if parsed_dpo["rejected"] else ""
+                    # --- SAVE TRACK B SFT ---
+                    sft_filepath = os.path.join(CHATBOT_SFT_DIR, f"chat_sft_{var_idx:03d}_{cat_index:02d}.json")
+                    with open(sft_filepath, "w", encoding="utf-8") as f:
+                        json.dump(parsed_sft, f, ensure_ascii=False, indent=2)
+                    with open(JSONL_CHATBOT_SFT, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(parsed_sft, ensure_ascii=False) + "\n")
+                    stats["saved_chatbot_sft"] += 1
                     
-                    dpo_valid = True
-                    dpo_reason = ""
-                    for role_text in [chosen_text, rejected_text]:
-                        dummy_msg = [{"role": "assistant", "content": role_text}]
-                        # ✅ FIX: Bypass the 4-turn geometry check for isolated DPO turns
-                        v, r = validate_chatbot_content(dummy_msg, strict_geometry=False) 
-                        if not v:
-                            dpo_valid = False
-                            dpo_reason = r
-                            break
-
-                    if not sft_valid or not dpo_valid:
-                        if attempt == max_retries - 1:
-                            stats["dropped"] += 1
-                            if not sft_valid: batch_drop_reasons[f"SFT Validation: {sft_reason}"] += 1
-                            if not dpo_valid: batch_drop_reasons[f"DPO Validation: {dpo_reason}"] += 1
-                        else:
-                            # Inject Reflexion Feedback for the next attempt
-                            retry_feedback_sft[orig_idx] = sft_reason if not sft_valid else "DPO structure failed validation."
-                            retry_feedback_dpo[orig_idx] = dpo_reason if not dpo_valid else "SFT structure failed validation."
-                            next_active.append(orig_idx)
-                        continue
+                    # --- SAVE TRACK B DPO ---
+                    dpo_filepath = os.path.join(CHATBOT_DPO_DIR, f"chat_dpo_{var_idx:03d}_{cat_index:02d}.json")
+                    with open(dpo_filepath, "w", encoding="utf-8") as f:
+                        json.dump(parsed_dpo, f, ensure_ascii=False, indent=2)
+                    with open(JSONL_CHATBOT_DPO, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(parsed_dpo, ensure_ascii=False) + "\n")
+                    stats["saved_chatbot_dpo"] += 1
                     
-                    # SUCCESS: Mark as completed and store results
-                    final_sft_results[orig_idx] = parsed_sft
-                    final_dpo_results[orig_idx] = parsed_dpo
-                    
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        stats["dropped"] += 1
-                        batch_drop_reasons[f"Parse/Execution Error: {str(e)[:50]}"] += 1
-                    else:
-                        retry_feedback_sft[orig_idx] = f"JSON parsing failed: {str(e)[:40]}. Output ONLY valid JSON."
-                        retry_feedback_dpo[orig_idx] = f"JSON parsing failed: {str(e)[:40]}. Output ONLY valid JSON."
-                        next_active.append(orig_idx)
+                    local_success_count += 1 # Live increment!
             
-            active_indices = next_active
+            print(f"   ✅ [BATCH {local_batch_idx+1}/{total_local_batches}] | Category: {cat_enum} | Chat SFT: {stats['saved_chatbot_sft']} | Chat DPO: {stats['saved_chatbot_dpo']}")
+            if batch_drop_reasons:
+                for reason, count in batch_drop_reasons.items():
+                    print(f"      - {count}x: {reason}")
+                    
+            if local_success_count >= TARGET_QUOTA:
+                print(f"  ✅ SUCCESS: Reached {TARGET_QUOTA} perfect chatbot pairs for {cat_enum}. Moving to next category.")
+                break
+                
+            gc.collect()
             
-        # 3. SAVE SUCCESSFUL PAIRS (OPEN-BOOK PROTOCOL)
-        for i in range(len(batch)):
-            if final_sft_results[i] and final_dpo_results[i]:
-                parsed_sft = final_sft_results[i]
-                parsed_dpo = final_dpo_results[i]
-                
-                local_idx = i
-                
-                # --- SAVE TRACK B SFT ---
-                sft_filepath = os.path.join(CHATBOT_SFT_DIR, f"chat_sft_{batch_idx:03d}_{local_idx:02d}.json")
-                with open(sft_filepath, "w", encoding="utf-8") as f:
-                    json.dump(parsed_sft, f, ensure_ascii=False, indent=2)
-                with open(JSONL_CHATBOT_SFT, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(parsed_sft, ensure_ascii=False) + "\n")
-                stats["saved_chatbot_sft"] += 1
-                
-                # --- SAVE TRACK B DPO ---
-                dpo_filepath = os.path.join(CHATBOT_DPO_DIR, f"chat_dpo_{batch_idx:03d}_{local_idx:02d}.json")
-                with open(dpo_filepath, "w", encoding="utf-8") as f:
-                    json.dump(parsed_dpo, f, ensure_ascii=False, indent=2)
-                with open(JSONL_CHATBOT_DPO, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(parsed_dpo, ensure_ascii=False) + "\n")
-                stats["saved_chatbot_dpo"] += 1
+    print("\n" + "="*80)
+    print("🏁 CHATBOT FORGE COMPLETE")
+    print("="*80)
 
-        print(f"   ✅ Chatbot Batch {batch_idx + 1}/{total_batches} complete | SFT: {stats['saved_chatbot_sft']} | DPO: {stats['saved_chatbot_dpo']} | Dropped: {stats['dropped']}", flush=True)
-        if batch_drop_reasons:
-            for reason, count in batch_drop_reasons.items():
-                print(f"      - {count}x: {reason}", flush=True)
-        gc.collect()
+import os
+import glob
+import json
+from collections import defaultdict
+
+def resolve_data_dir(folder_name, alt_folder_name=None):
+    """
+    Auto-discovers training data directories across root, ml/, and training-pairs/ structures.
+    """
+    base = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+    cwd = os.getcwd()
+    
+    candidates = []
+    folders = [folder_name]
+    if alt_folder_name and alt_folder_name != folder_name:
+        folders.append(alt_folder_name)
+        
+    for f in folders:
+        candidates.extend([
+            os.path.join(cwd, "ml", "training-pairs", f),
+            os.path.join(cwd, "training-pairs", f),
+            os.path.join(cwd, f),
+            os.path.join(base, "ml", "training-pairs", f),
+            os.path.join(base, "training-pairs", f),
+            os.path.join(base, f),
+            os.path.join(base, "..", "ml", "training-pairs", f),
+            os.path.join(base, "..", "training-pairs", f),
+        ])
+        
+    for candidate in candidates:
+        if os.path.exists(candidate) and os.path.isdir(candidate):
+            return os.path.abspath(candidate)
+            
+    # Fallback to absolute join with cwd
+    return os.path.abspath(os.path.join(cwd, "ml", "training-pairs", folder_name))
+
 
 def run_post_generation_analysis():
-    print("\n" + "="*70)
+    print("\n" + "="*80)
     print("📊 RUNNING POST-GENERATION DATA QUALITY FORENSIC SCAN")
-    print("="*70)
+    print("="*80)
     
-    sft_files = glob.glob(os.path.join(SFT_OUTPUT_DIR, "*.json"))
-    dpo_files = glob.glob(os.path.join(DPO_OUTPUT_DIR, "*.json"))
+    # 🚨 AUTOMATED DIRECTORY DISCOVERY
+    SFT_OUTPUT_DIR = resolve_data_dir("sft")
+    DPO_OUTPUT_DIR = resolve_data_dir("dpo")
+    CHATBOT_SFT_DIR = resolve_data_dir("chatbot-sft", "chatbot_sft")
+    CHATBOT_DPO_DIR = resolve_data_dir("chatbot-dpo", "chatbot_dpo")
+    
+    print(f"📂 Resolved Audit SFT Dir:   {SFT_OUTPUT_DIR}")
+    print(f"📂 Resolved Audit DPO Dir:   {DPO_OUTPUT_DIR}")
+    print(f"📂 Resolved Chatbot SFT Dir: {CHATBOT_SFT_DIR}")
+    print(f"📂 Resolved Chatbot DPO Dir: {CHATBOT_DPO_DIR}\n")
+    
+    # Locate all files (accepting both chat_sft_* and sft_*)
+    audit_sft_files = glob.glob(os.path.join(SFT_OUTPUT_DIR, "*.json"))
+    audit_dpo_files = glob.glob(os.path.join(DPO_OUTPUT_DIR, "*.json"))
+    chat_sft_files = glob.glob(os.path.join(CHATBOT_SFT_DIR, "*.json"))
+    chat_dpo_files = glob.glob(os.path.join(CHATBOT_DPO_DIR, "*.json"))
 
-    print(f"Scanning Track A SFT dataset: {len(sft_files)} files...")
-    print(f"Scanning Track A DPO dataset: {len(dpo_files)} files...")
+    print(f"Scanning Track A (Audit) SFT: {len(audit_sft_files)} files")
+    print(f"Scanning Track A (Audit) DPO: {len(audit_dpo_files)} files")
+    print(f"Scanning Track B (Chatbot) SFT: {len(chat_sft_files)} files")
+    print(f"Scanning Track B (Chatbot) DPO: {len(chat_dpo_files)} files\n")
 
-    poison_counts = {
-        "placeholders_in_policy": 0,
-        "placeholders_in_audit": 0,
-        "foreign_law_bleed": 0,
-        "omission_hallucination": 0,
-        "ellipsis_in_quote": 0,
-        "administrative_element_flagged": 0,
-        "quote_not_in_policy": 0,
-        "invalid_violation_enum": 0,
-        "score_out_of_bounds": 0,
-        "statute_stretching": 0,
-        "canned_global_reasoning_dpo_rejected": 0,
-        "canned_semantic_justification_dpo_rejected": 0
+    stats = {
+        "audit_sft_passed": 0, "audit_sft_failed": 0,
+        "audit_dpo_passed": 0, "audit_dpo_failed": 0,
+        "chat_sft_passed": 0, "chat_sft_failed": 0,
+        "chat_dpo_passed": 0, "chat_dpo_failed": 0,
     }
-
-    foreign_laws = ["gdpr", "ccpa", "hipaa", "lgpd", "pdpa", "privacy rights act", "article 17", "right to portability", "legitimate interest", "it act 2000", "information technology act", "section 43a", "spdi rules 2011"]
-    omission_phrases = ["without specifying", "fails to specify", "does not specify", "fails to provide", "does not provide", "fails to detail", "does not detail", "silent on", "no mention of"]
-    valid_enums = list(CATEGORY_ALIAS_MAP.keys())
+    
+    failure_reasons = defaultdict(int)
+    failed_filenames = defaultdict(list)
+    
+    # Pair ID trackers for symmetric auto-nuke
+    bad_audit_pair_ids = set()
+    bad_chat_pair_ids = set()
 
     def extract_policy_text(user_content: str) -> str:
         """Safely extracts policy text from both new Closed-Book and legacy prompts."""
@@ -2257,145 +2558,216 @@ def run_post_generation_analysis():
             return user_content.split("Analyze:\n")[1]
         return user_content
 
-    def check_omissions(text: str) -> bool:
-        text_lower = text.lower()
-        return any(phrase in text_lower for phrase in omission_phrases)
-
-    def check_statute_stretching(vtype: str, statute: str) -> bool:
-        statute_lower = statute.lower()
-        if vtype == "LOG_RETENTION_MANDATE_VIOLATION":
-            return "rule 8" not in statute_lower and "rule 6" not in statute_lower
-        if vtype in ["ALGORITHMIC_PROFILING_SDF", "SDF_OBLIGATIONS_MISSING", "SDF_DATA_LOCALIZATION_VIOLATION"]:
-            return "section 10" not in statute_lower and "rule 13" not in statute_lower
-        return False
+    def extract_pair_id(filename: str, prefix: str) -> str:
+        """Extracts identifier like '001_02.json' from 'sft_001_02.json' or 'chat_sft_001_02.json'."""
+        return filename.replace(prefix, "")
 
     # ==========================================
-    # SFT FORENSIC SCAN
+    # TRACK A: AUDIT SFT SCAN
     # ==========================================
-    for fp in sft_files:
+    for fp in audit_sft_files:
+        filename = os.path.basename(fp)
+        pair_id = extract_pair_id(filename, "sft_")
         try:
             with open(fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
             messages = data.get("messages", [])
-            if len(messages) < 3: continue
+            if len(messages) < 3: 
+                stats["audit_sft_failed"] += 1
+                failure_reasons["Audit SFT: Invalid message count"] += 1
+                failed_filenames["Audit SFT: Invalid message count"].append(filename)
+                bad_audit_pair_ids.add(pair_id)
+                continue
             
-            user_content = messages[1]["content"]
-            assistant_content = messages[2]["content"]
+            policy_text = extract_policy_text(messages[1]["content"])
+            audit_dict = json.loads(messages[2]["content"])
             
-            policy_text = extract_policy_text(user_content)
-            
-            if check_string_poison(policy_text):
-                poison_counts["placeholders_in_policy"] += 1
-                
-            audit = json.loads(assistant_content)
-            if check_string_poison(str(audit)):
-                poison_counts["placeholders_in_audit"] += 1
-                
-            global_reasoning = audit.get("global_legal_reasoning", "")
-            if any(law in global_reasoning.lower() for law in foreign_laws):
-                poison_counts["foreign_law_bleed"] += 1
-            if check_omissions(global_reasoning):
-                poison_counts["omission_hallucination"] += 1
-                
-            # Score Bounds Check
-            if not (0 <= audit.get("dpdp_trust_score", -1) <= 100) or not (0 <= audit.get("subtlety_score", -1) <= 100):
-                poison_counts["score_out_of_bounds"] += 1
-
-            for v in audit.get("violations", []):
-                # Enum Check
-                if v.get("violation_type") not in valid_enums:
-                    poison_counts["invalid_violation_enum"] += 1
-                    
-                # Statute Stretching Check
-                if check_statute_stretching(v.get("violation_type", ""), v.get("statute_reference", "")):
-                    poison_counts["statute_stretching"] += 1
-
-                quote = v.get("evidence_quote", "")
-                if not quote: continue
-                if "..." in quote or "\u2026" in quote:
-                    poison_counts["ellipsis_in_quote"] += 1
-                if is_administrative_element(quote):
-                    poison_counts["administrative_element_flagged"] += 1
-                if not is_quote_in_policy(quote, policy_text):
-                    poison_counts["quote_not_in_policy"] += 1
-                    
-                if check_omissions(v.get("step_3_semantic_justification", "")):
-                    poison_counts["omission_hallucination"] += 1
-                    
-        except Exception:
-            pass
+            is_valid, reason = validate_audit_quality(audit_dict, policy_text, is_dpo=False)
+            if is_valid:
+                stats["audit_sft_passed"] += 1
+            else:
+                stats["audit_sft_failed"] += 1
+                full_reason = f"Audit SFT: {reason}"
+                failure_reasons[full_reason] += 1
+                failed_filenames[full_reason].append(filename)
+                bad_audit_pair_ids.add(pair_id)
+        except Exception as e:
+            stats["audit_sft_failed"] += 1
+            full_reason = f"Audit SFT Exception: {str(e)[:50]}"
+            failure_reasons[full_reason] += 1
+            failed_filenames[full_reason].append(filename)
+            bad_audit_pair_ids.add(pair_id)
 
     # ==========================================
-    # DPO FORENSIC SCAN
+    # TRACK A: AUDIT DPO SCAN
     # ==========================================
-    global_reasoning_dpo_rejected = []
-    semantic_justification_dpo_rejected = []
-
-    for fp in dpo_files:
+    for fp in audit_dpo_files:
+        filename = os.path.basename(fp)
+        pair_id = extract_pair_id(filename, "dpo_")
         try:
             with open(fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
             prompt = data.get("prompt", [])
-            if len(prompt) < 2: continue
+            if len(prompt) < 2: 
+                stats["audit_dpo_failed"] += 1
+                failure_reasons["Audit DPO: Invalid prompt count"] += 1
+                failed_filenames["Audit DPO: Invalid prompt count"].append(filename)
+                bad_audit_pair_ids.add(pair_id)
+                continue
             
-            user_content = prompt[1]["content"]
-            policy_text = extract_policy_text(user_content)
-                
-            if check_string_poison(policy_text):
-                poison_counts["placeholders_in_policy"] += 1
-                
-            rejected_content = data.get("rejected", [{}])[0].get("content", "")
-            rejected_audit = json.loads(rejected_content)
+            policy_text = extract_policy_text(prompt[1]["content"])
             
-            rejection_reasoning = rejected_audit.get("global_legal_reasoning", "")
-            global_reasoning_dpo_rejected.append(rejection_reasoning)
+            chosen_text = data.get("chosen", [{}])[0].get("content", "{}")
+            rejected_text = data.get("rejected", [{}])[0].get("content", "{}")
             
-            if check_omissions(rejection_reasoning):
-                poison_counts["omission_hallucination"] += 1
+            chosen_audit = json.loads(chosen_text)
+            rejected_audit = json.loads(rejected_text)
+            
+            c_valid, c_reason = validate_audit_quality(chosen_audit, policy_text, is_dpo=False)
+            r_valid, r_reason = validate_audit_quality(rejected_audit, policy_text, is_dpo=True, chosen_audit=chosen_audit)
+            
+            if c_valid and r_valid:
+                stats["audit_dpo_passed"] += 1
+            else:
+                stats["audit_dpo_failed"] += 1
+                if not c_valid: 
+                    full_reason = f"Audit DPO (Chosen): {c_reason}"
+                    failure_reasons[full_reason] += 1
+                    failed_filenames[full_reason].append(filename)
+                if not r_valid: 
+                    full_reason = f"Audit DPO (Rejected): {r_reason}"
+                    failure_reasons[full_reason] += 1
+                    failed_filenames[full_reason].append(filename)
+                bad_audit_pair_ids.add(pair_id)
+        except Exception as e:
+            stats["audit_dpo_failed"] += 1
+            full_reason = f"Audit DPO Exception: {str(e)[:50]}"
+            failure_reasons[full_reason] += 1
+            failed_filenames[full_reason].append(filename)
+            bad_audit_pair_ids.add(pair_id)
 
-            for v in rejected_audit.get("violations", []):
-                just = v.get("step_3_semantic_justification", "")
-                semantic_justification_dpo_rejected.append(just)
-                
-                if check_omissions(just):
-                    poison_counts["omission_hallucination"] += 1
+    # ==========================================
+    # TRACK B: CHATBOT SFT SCAN
+    # ==========================================
+    for fp in chat_sft_files:
+        filename = os.path.basename(fp)
+        pair_id = extract_pair_id(filename, "chat_sft_")
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            messages = data.get("messages", [])
+            is_valid, reason = validate_chatbot_content(messages, strict_geometry=True)
+            
+            if is_valid:
+                stats["chat_sft_passed"] += 1
+            else:
+                stats["chat_sft_failed"] += 1
+                full_reason = f"Chatbot SFT: {reason}"
+                failure_reasons[full_reason] += 1
+                failed_filenames[full_reason].append(filename)
+                bad_chat_pair_ids.add(pair_id)
+        except Exception as e:
+            stats["chat_sft_failed"] += 1
+            full_reason = f"Chatbot SFT Exception: {str(e)[:50]}"
+            failure_reasons[full_reason] += 1
+            failed_filenames[full_reason].append(filename)
+            bad_chat_pair_ids.add(pair_id)
 
-                quote = v.get("evidence_quote", "")
-                if "..." in quote or "\u2026" in quote:
-                    poison_counts["ellipsis_in_quote"] += 1
-                if is_administrative_element(quote):
-                    poison_counts["administrative_element_flagged"] += 1
-                if not is_quote_in_policy(quote, policy_text):
-                    poison_counts["quote_not_in_policy"] += 1
-                    
-                statute = v.get("statute_reference", "")
-                if any(law in statute.lower() or law in just.lower() for law in foreign_laws):
-                    poison_counts["foreign_law_bleed"] += 1
-                    
-                if check_statute_stretching(v.get("violation_type", ""), statute):
-                    poison_counts["statute_stretching"] += 1
-                    
-        except Exception:
-            pass
+    # ==========================================
+    # TRACK B: CHATBOT DPO SCAN
+    # ==========================================
+    for fp in chat_dpo_files:
+        filename = os.path.basename(fp)
+        pair_id = extract_pair_id(filename, "chat_dpo_")
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            chosen_text = data.get("chosen", [{}])[0].get("content", "")
+            dummy_chosen = [{"role": "assistant", "content": chosen_text}]
+            c_valid, c_reason = validate_chatbot_content(dummy_chosen, strict_geometry=False)
+            
+            rejected_text = data.get("rejected", [{}])[0].get("content", "")
+            dummy_rejected = [{"role": "assistant", "content": rejected_text}]
+            r_valid, r_reason = validate_chatbot_content(dummy_rejected, strict_geometry=False)
+            
+            if c_valid and r_valid:
+                stats["chat_dpo_passed"] += 1
+            else:
+                stats["chat_dpo_failed"] += 1
+                if not c_valid: 
+                    full_reason = f"Chatbot DPO (Chosen): {c_reason}"
+                    failure_reasons[full_reason] += 1
+                    failed_filenames[full_reason].append(filename)
+                if not r_valid: 
+                    full_reason = f"Chatbot DPO (Rejected): {r_reason}"
+                    failure_reasons[full_reason] += 1
+                    failed_filenames[full_reason].append(filename)
+                bad_chat_pair_ids.add(pair_id)
+        except Exception as e:
+            stats["chat_dpo_failed"] += 1
+            full_reason = f"Chatbot DPO Exception: {str(e)[:50]}"
+            failure_reasons[full_reason] += 1
+            failed_filenames[full_reason].append(filename)
+            bad_chat_pair_ids.add(pair_id)
 
-    # Canned Text Detection
-    if global_reasoning_dpo_rejected:
-        canned_reasoning = "Authoritative forensic evaluation arguing that the company's invoked statutory exemptions and retention caveats under Section 17 and Section 8 exceed statutory bounds under the Digital Personal Data Protection Act 2023."
-        poison_counts["canned_global_reasoning_dpo_rejected"] = global_reasoning_dpo_rejected.count(canned_reasoning)
-
-    if semantic_justification_dpo_rejected:
-        canned_just_pattern = r"By stating the exact quoted text, the company actively asserts an overbroad rule which directly contravenes Section \d+ because it bypasses explicit statutory requirements without satisfying the narrow prerequisites for legitimate or exempt processing\."
-        for just in semantic_justification_dpo_rejected:
-            if re.search(canned_just_pattern, just): # Changed from re.match to re.search for robustness
-                poison_counts["canned_semantic_justification_dpo_rejected"] += 1
-
+    # ==========================================
+    # PRINT RESULTS
+    # ==========================================
     print("\n[Forensic Quality Scan Results]")
-    for k, v in poison_counts.items():
-        status = "✅" if v == 0 else "🚨"
-        print(f" {status} {k}: {v}")
+    print("-" * 65)
+    print(f"Track A - Audit SFT   | Passed: {stats['audit_sft_passed']:<5} | Failed: {stats['audit_sft_failed']:<5}")
+    print(f"Track A - Audit DPO   | Passed: {stats['audit_dpo_passed']:<5} | Failed: {stats['audit_dpo_failed']:<5}")
+    print(f"Track B - Chatbot SFT | Passed: {stats['chat_sft_passed']:<5} | Failed: {stats['chat_sft_failed']:<5}")
+    print(f"Track B - Chatbot DPO | Passed: {stats['chat_dpo_passed']:<5} | Failed: {stats['chat_dpo_failed']:<5}")
+    print("-" * 65)
+    
+    total_failed = stats["audit_sft_failed"] + stats["audit_dpo_failed"] + stats["chat_sft_failed"] + stats["chat_dpo_failed"]
+    
+    if total_failed == 0:
+        print("\n✅ PERFECT DATASET: Zero critical violations found across all tracks.")
+    else:
+        print(f"\n🚨 FOUND {total_failed} TOTAL FAILURES. Breakdown by Reason and Filename:")
+        for reason, count in sorted(failure_reasons.items(), key=lambda x: x[1], reverse=True):
+            print(f"\n❌ {count}x: {reason}")
+            print(f"   Files: {', '.join(failed_filenames[reason][:10])}" + ("..." if count > 10 else ""))
+            
+    # ==========================================
+    # ☢️ SYMMETRIC AUTO-NUKE OF CORRUPTED PAIRS
+    # ==========================================
+    if total_failed > 0:
+        print("\n☢️ INITIATING SYMMETRIC AUTO-NUKE OF CORRUPTED PAIRS...")
+        deleted_count = 0
+        
+        # 1. Nuke Track A (Audit Pairs)
+        for pair_id in bad_audit_pair_ids:
+            sft_path = os.path.join(SFT_OUTPUT_DIR, f"sft_{pair_id}")
+            dpo_path = os.path.join(DPO_OUTPUT_DIR, f"dpo_{pair_id}")
+            
+            if os.path.exists(sft_path):
+                os.remove(sft_path)
+                deleted_count += 1
+            if os.path.exists(dpo_path):
+                os.remove(dpo_path)
+                deleted_count += 1
+
+        # 2. Nuke Track B (Chatbot Pairs)
+        for pair_id in bad_chat_pair_ids:
+            chat_sft_path = os.path.join(CHATBOT_SFT_DIR, f"chat_sft_{pair_id}")
+            chat_dpo_path = os.path.join(CHATBOT_DPO_DIR, f"chat_dpo_{pair_id}")
+            
+            if os.path.exists(chat_sft_path):
+                os.remove(chat_sft_path)
+                deleted_count += 1
+            if os.path.exists(chat_dpo_path):
+                os.remove(chat_dpo_path)
+                deleted_count += 1
+                
+        print(f"✅ SUCCESSFULLY PURGED {deleted_count} CONTAMINATED FILES ACROSS ALL TRACKS.")
     
     print("\nData scan completed successfully.", flush=True)
-    
+
 if __name__ == "__main__":
     try:
         print("🚀 Booting Ssense GAN Forge...")
@@ -2411,6 +2783,9 @@ if __name__ == "__main__":
         
         # 4. Launch Track B (Chatbot)
         run_chatbot_forge()
+
+        # 5. Post-Generation Forensic Scan
+        run_post_generation_analysis()
         
         print("\n🏆 COMPLETE DUAL-TRACK FORGE FINISHED SUCCESSFULLY")
         

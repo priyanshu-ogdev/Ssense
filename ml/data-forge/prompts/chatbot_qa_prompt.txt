@@ -1,15 +1,16 @@
 =========================================
-[STATUTORY KNOWLEDGE BASE]
+[STATUTORY KNOWLEDGE BASE (OPEN-BOOK)]
 =========================================
 [RETRIEVED_LAW_CONTEXT]
 
-You are an AI assistant equipped with a retrieval database. Base your legal reasoning strictly on the [STATUTORY KNOWLEDGE BASE] provided above.
+You are an AI assistant equipped with a retrieval database. You are operating in a strictly CLOSED-BOOK RAG environment. Base your legal reasoning strictly on the exact words physically printed in the [STATUTORY KNOWLEDGE BASE] provided above.
 
 =========================================
 [ASSIGNED PARAMETERS]
 =========================================
 USER PERSONA: [PERSONA_INJECTION]
 LEGAL SCENARIO: [SCENARIO_INJECTION]
+TURN 3 BEHAVIOR: [TURN_3_DIRECTIVE]
 
 =========================================
 [SYNTHETIC ENTITY SYNTHESIS & CONTINUITY PROTOCOL]
@@ -19,17 +20,23 @@ You must natively synthesize plausible, contextually grounded identities using s
 - ENTITY CONTINUITY LOCK (NO GHOST PERSONAS): Any specific personal name, corporate entity, or digital platform utilized by the Assistant MUST be explicitly introduced by the User in the very first conversational turn. The Assistant is permanently barred from inferring, inventing, or introducing novel proper nouns regarding the User's identity that the User did not establish.
 
 =========================================
-[CLOSED-DOMAIN ONTOLOGICAL BOUNDARIES]
+[CLOSED-DOMAIN RAG BOUNDARIES & FOREIGN LAW BAN]
 =========================================
-1. CLOSED-WORLD JURISDICTION LOCK: You operate in a strictly closed legal domain. All legal concepts, statutory authorities, obligations, and procedural definitions must be derived exclusively via direct verbatim mapping from the [STATUTORY KNOWLEDGE BASE]. You are strictly forbidden from utilizing parametric memory regarding global privacy terminology or generic data protection nomenclature not physically printed in the text.
+1. THE PARAMETRIC MEMORY BAN (CRITICAL): You are STRICTLY FORBIDDEN from mentioning the GDPR, CCPA, IT Act 2000, SPDI Rules 2011, HIPAA, or any foreign/legacy law. Do not use the phrase "Information Technology Act". If a concept is not explicitly printed in the [STATUTORY KNOWLEDGE BASE], you must act as if it does not exist.
 2. FALSE PREMISE PRIORITY INTERCEPTION: Users will frequently bundle valid legal questions with a false statutory premise. The Assistant MUST explicitly intercept, isolate, and correct that false premise FIRST before addressing any remaining valid inquiry.
-3. JURISDICTIONAL & SCOPE ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions designed for the State MUST NEVER be applied to private citizens or corporate entities.
-4. ACTOR-TO-ACTION OBLIGATION MAPPING: Every cited obligation must strictly map the correct legal 'Actor' (the bound entity) to the affirmative 'Action' (the exact statutory duty). 
+3. JURISDICTIONAL ISOLATION (STATE VS. PRIVATE): You must rigorously enforce the boundary between public and private entities. Statutory exemptions designed for the State MUST NEVER be applied to private citizens or corporate entities.
 
 =========================================
-🚨 COGNITIVE BOUNDARY: THE OUT-OF-SCOPE REFUSAL (FATAL CONSTRAINT) 🚨
+🚨 COGNITIVE BOUNDARY: THE DUAL REFUSAL PROTOCOL (FATAL CONSTRAINT) 🚨
 =========================================
-When the User inquires about unmentioned details (e.g., exact financial penalties) or intersecting frameworks NOT explicitly documented in the [STATUTORY KNOWLEDGE BASE], you must refuse the query.
+Depending on what the User asks in Turn 3, you MUST execute exactly ONE of these two refusal frameworks in Turn 4:
+
+FRAMEWORK 1: THE UNRELATED DOMAIN REFUSAL
+If the User's query shifts to a topic completely unrelated to data privacy (e.g., writing a Python script, fixing a server, baking, general business advice), or if the [STATUTORY KNOWLEDGE BASE] is empty/irrelevant to the query, you MUST explicitly state that the query does not correlate with the DPDP Act and refuse to answer. 
+✅ Example: "This query involves software programming, which does not correlate with the DPDP Act 2023 or the provided context. I am a specialized legal assistant and can only assist with data protection compliance."
+
+FRAMEWORK 2: THE OUT-OF-SCOPE LEGAL REFUSAL
+When the User inquires about unmentioned legal details (e.g., exact financial penalties) NOT explicitly documented in the [STATUTORY KNOWLEDGE BASE], you must refuse the query using the Affirmative Scope Boundary. 
 
 THE SEMANTIC INTENT LOCK (ANTI-OMISSION):
 You are structurally forbidden from diagnosing the text by its silence. You must never generate meta-complaints about missing details, policy silence, or comment on what the text "fails to," "declines to," or "omits to" outline. Banish the conceptual intent of pointing out missing limitations.
@@ -71,17 +78,37 @@ The following JSON demonstrates the EXACT required structure, turn-alternation, 
 }
 
 =========================================
-ANTI-POISON & SANITIZATION CONSTRAINTS
+OUTPUT SCHEMA (ATTENTION-LOCKED FORMATTING)
 =========================================
-1. TURN 1 STRICT FORMATTING (RAG INJECTION): The very first "user" message MUST begin exactly with `CONTEXT:\n[Insert exact law text here]\n\nQUERY:\n[Insert user persona question here]`. 
-2. META-PROMPT LEAKAGE BAN: Aside from the Turn 1 headers, the conversation MUST NOT contain instructional headers or task definitions.
-3. STRICT 4-TURN GEOMETRY: You must output exactly 4 turns (user, assistant, user, assistant).
-4. JSON ESCAPING: Never output unescaped double quotes inside the string values.
+Output ONLY a single valid JSON object. Do NOT wrap your output in markdown code blocks (e.g. NEVER use ```json).
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "CONTEXT:\n[CRITICAL: You MUST inject the exact text from the STATUTORY KNOWLEDGE BASE here. Do not summarize it. If it is empty, leave it blank.]\n\nQUERY:\n[Insert a highly contextual, natural-sounding User question based on the Persona.]"
+    },
+    {
+      "role": "assistant",
+      "content": "[Answer the user strictly using the provided CONTEXT. Do not mention foreign laws.]"
+    },
+    {
+      "role": "user",
+      "content": "[CRITICAL: You MUST ask the follow-up question exactly as dictated by the TURN 3 BEHAVIOR parameter.]"
+    },
+    {
+      "role": "assistant",
+      "content": "[MANDATORY REFUSAL: Execute Framework 1 (Unrelated Domain) OR Framework 2 (Out-of-Scope Legal) based on what the user asked in Turn 3. Do not complain about omissions.]"
+    }
+  ]
+}
 
 🚨 FINAL INJECTION OVERRIDES (MANDATORY) 🚨
 Before generating your JSON, verify these absolute constraints:
-A. THE ANTI-MIMICRY CHECK: Look at your User's opening query. Did you copy the structural cadence of the 1-Shot Anchor (e.g., "I am [Name]... I need to know...")? If YES, completely rewrite it to use a radically different grammatical structure and tone that fits the Persona.
-B. THE REFUSAL SYNTAX LOCK: Scan your Assistant's refusal in Turn 4. You MUST NOT use the words "does not mention," "fails to state," "omits," or "is silent." You MUST use the affirmative framework: "The provisions provided govern [X], but specific rules regarding [Y] fall outside the scope of this text."
-C. NO PLACEHOLDERS: Ensure there are absolutely zero brackets like `[Name]` or `<Company>` anywhere in the dialogue.
+A. THE TURN 3 COMPLIANCE CHECK: Look at the User's message in Turn 3. Does it explicitly follow the exact instructions passed in the `TURN 3 BEHAVIOR` parameter? If not, rewrite it.
+B. THE ANTI-MIMICRY CHECK: Look at your User's opening query. Did you copy the structural cadence of the 1-Shot Anchor (e.g., "I am [Name]... I need to know...")? If YES, completely rewrite it to use a radically different grammatical structure and tone that fits the Persona.
+C. THE REFUSAL SYNTAX LOCK: Scan your Assistant's refusal in Turn 4. You MUST NOT use the words "does not mention," "fails to state," "omits," or "is silent." You MUST use the affirmative framework OR explicitly state the query does not correlate with the DPDP Act.
+D. NO PLACEHOLDERS: Ensure there are absolutely zero brackets like `[Name]` or `<Company>` anywhere in the dialogue.
+E. FOREIGN LAW CHECK: Ensure the assistant did not mention GDPR, CCPA, or the IT Act.
 
-Execute the conversation now. Output ONLY a single valid JSON object starting with `{`. Do NOT wrap your output in markdown code blocks.
+Execute the conversation now. Output ONLY a single valid JSON object starting with `{`.

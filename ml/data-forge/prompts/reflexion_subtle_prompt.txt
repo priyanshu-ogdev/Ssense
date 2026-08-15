@@ -64,8 +64,8 @@ RULE 1. THE AFFIRMATIVE ACT: The trap must declare a positive, irreversible corp
 RULE 2. UNCONDITIONAL ILLEGALITY: The trap must contain an absolute term (e.g., permanently, unconditionally, mandatory).
 RULE 3. THE ENTITY LOCK (ANTI-SPLIT): The illegal action AND the names of any associated third-party entities MUST be physically locked inside ONE single, continuous sentence.
 RULE 4. MANDATORY VOCABULARY: The trap MUST explicitly contain: "personal data", "information", "records", or "history".
-RULE 5. THE "NEW PARAGRAPH" BOUNDARY (CRITICAL): To organically prevent the accidental use of transition words like "However," or "Furthermore,", the trap sentence MUST be the very first sentence of a new paragraph, immediately followed by the camouflage sentences dictated by your Silo. It MUST start directly with the subject (the Company Name or "We").
-RULE 6. PUNCTUATION & ABBREVIATION BAN: The trap sentence MUST end with exactly ONE terminal period. ZERO internal periods are allowed (you MUST spell out Pvt as Private, Ltd as Limited, and never use e.g., or i.e.,). NO internal quotes (`"`), NO bullet points.
+RULE 5. THE "NEW PARAGRAPH" BOUNDARY (CRITICAL): To organically prevent the accidental use of transition words like "However," the trap sentence MUST be the very first sentence of a new paragraph, immediately followed by the camouflage sentences dictated by your Silo. It MUST start directly with the subject (the Company Name or "We").
+RULE 6. PUNCTUATION & ABBREVIATION BAN: The trap sentence MUST end with exactly ONE terminal period. ZERO internal periods are allowed (you MUST spell out Pvt as Private, Ltd as Limited). NO internal quotes (`"`), NO bullet points.
 RULE 7. THE ANONYMIZATION BAN: NEVER use "anonymized", "de-identified", or "aggregated" inside or near the trap.
 RULE 8. THE SMOKE AND THE BULLET (QUARANTINE): The trap sentence is the "bullet"—it must contain the pure, illegal corporate action. All corporate excuses, legal jargon, or justifications dictated by your Silo MUST go in COMPLETELY SEPARATE sentences immediately after the trap, NEVER inside it.
 
@@ -73,18 +73,20 @@ RULE 8. THE SMOKE AND THE BULLET (QUARANTINE): The trap sentence is the "bullet"
 GENERATION MECHANICS: FORMAT A (COMPLIANT)
 =========================================
 All other sections must be perfectly compliant (FORMAT A). Apply the ABSOLUTE LEGAL SHIELD defined at the top of this prompt to every operational sentence. Keep the trap strictly quarantined to FORMAT B.
-OVER-COMPLIANCE MANDATE: To ensure the AI Judge does not accidentally flag your compliant sections as illegal, you must sound hyper-compliant. Pad every single data action with explicit phrases like "strictly opt-in", "only with explicit, verifiable consent", or "as strictly mandated by law". Leave absolutely zero room for misinterpretation.
 
 =========================================
-XML ROUTING & OUTPUT FORMAT
+XML ROUTING & OUTPUT FORMAT (ATTENTION-LOCKED)
 =========================================
 FORMAT A (Compliant Sections):
 <section title="Realistic Heading Name">
+[MANDATORY COMPLIANCE SHIELD: Every operational sentence describing data collection, sharing, or processing MUST explicitly include phrases like "strictly upon receiving your explicit consent" or "as mandated by law". Do not write naked claims.]
+[MANDATORY BOILERPLATE: You MUST write at least 3 long, boring, highly compliant paragraphs about Data Security, Audit Logs, and User Rights so the policy looks authentic.]
 Section content...
 </section>
 
 FORMAT B (The Single Trap Section):
 <section title="Realistic Heading Name" contains_trap="TRUE">
+[MANDATORY TRAP ISOLATION: The very first sentence MUST be the undeniable illegal corporate action. It MUST begin exactly with "We" or the Company Name. You are STRICTLY FORBIDDEN from starting the trap with "However," "Furthermore," or "Additionally,". It must end in a single period. The camouflage/excuses must go in subsequent sentences. NO abbreviations with periods like Pvt. or Ltd.]
 Section content...
 </section>
 
@@ -94,7 +96,7 @@ A. NO PLACEHOLDERS & XML WHITELIST: You are strictly forbidden from writing plac
 B. FORMAT A DOUBLE-CHECK (NAKED CLAIM BAN): Scan your Format A sections. Did you write *any* sentence saying "We collect data" or "We share data" without adding "strictly with your consent" or "as legally mandated"? If YES, rewrite them to include the Absolute Legal Shield. DO NOT LEAVE NAKED CLAIMS.
 C. PROUD CORPORATE TONE: Ensure you have not explicitly written that the policy violates or bypasses the law.
 D. CONDITIONAL VERB CHECK: Does your trap sentence contain "may", "might", or "could"? STOP. Change it to "will", "permanently", "requires", or "unconditionally".
-E. THE NEW PARAGRAPH CHECK: Does your trap sentence start with a transition word? STOP. Force a paragraph break (`\n\n`) to reset the context and start the sentence directly with the Company Name or "We".
+E. THE NEW PARAGRAPH CHECK: Does your trap sentence start with a transition word like "However" or "Additionally"? STOP. Force a paragraph break (`\n\n`) to reset the context and start the sentence directly with the Company Name or "We".
 F. ENTITY LOCK: Ensure third-party names are in the EXACT SAME sentence as the illegal verb.
 
 Execute the rewrite. Your very first output token MUST be the opening `<section>` tag. End your response with exactly: *** END OF POLICY ***

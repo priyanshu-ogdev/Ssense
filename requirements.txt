@@ -1,40 +1,67 @@
---extra-index-url https://download.pytorch.org/whl/cu130
---extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu126
+# ══════════════════════════════════════════════════════════════════════════
+# requirements-gb10.txt — DGX Spark (GB10, aarch64, CUDA 13.0, sm_121)
+#
+# READ THIS FIRST:
+# This file alone is NOT sufficient. xformers, flash-attn, unsloth, and
+# llama-cpp-python need special install handling (source builds / --no-deps /
+# non-default indexes) that a plain `pip install -r requirements.txt` cannot
+# express correctly on this platform. Run install_gb10.sh, which installs
+# this file's contents in the right order and handles the special cases.
+# Do NOT just `pip install -r requirements-gb10.txt` on its own.
+#
+# Platform notes:
+# - GB10 is aarch64, NOT x86_64. Any wheel without an aarch64/manylinux_2_xx_aarch64
+#   variant will either fail to install or (worse) silently pull a CPU-only fallback.
+# - GB10 is sm_121, which is not yet an officially "supported" target for most
+#   CUDA-compiled packages. Working builds target sm_120 (TORCH_CUDA_ARCH_LIST=12.0)
+#   and rely on binary/forward compatibility onto sm_121 hardware.
+# - Stay on driver 580.x. 590.x has a known CUDAGraph deadlock on GB10.
+# ══════════════════════════════════════════════════════════════════════════
 
-# ── Foundation Hardware & CUDA Support (CUDA 13.0 / PyTorch 2.11) ──
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# ── Foundation: PyTorch (CUDA 13.0 / sm_121 via sm_120 forward-compat) ──────
 torch==2.11.0
 torchvision==0.26.0
 torchaudio==2.11.0
-# xformers==0.0.30
 
-# ── High-Throughput Inference Engine & Cluster Management ──
-vllm==0.24.0
+# ── High-Throughput Inference Engine & Cluster Management ──────────────────
 ray>=2.30.0
 
-# ── Modern Training & Alignment Stack (Unsloth + Transformers v5 + TRL) ──
-transformers==5.5.3
-accelerate==1.6.0
-trl==0.17.0
+# ── Modern Training & Alignment Stack (STRICT PINS FOR UNSLOTH COMPATIBILITY)
+# Unsloth 2026.8.x hard-caps transformers <= 5.5.0 and trl <= 0.24.0. 
+# Do NOT bump these versions or Unsloth will throw a dependency conflict and crash.
+transformers==5.5.0
+accelerate==1.10.0
+trl==0.24.0
 datasets==4.3.0
-peft>=0.18.2             # Upgraded to fix HybridCache crash in Transformers 5.x
-bitsandbytes==0.46.0
-unsloth==2024.8
+peft==0.18.1
 
-# ── Universal GGUF Evaluation & Schema Validation ──
-llama-cpp-python==0.3.32
+# ── Unsloth & Unsloth-Zoo Internal Utilities ────────────────────────────────
+# Because install_gb10.sh installs Unsloth with --no-deps (to protect PyTorch),
+# we MUST manually satisfy its background utilities here in Phase 1.
+diffusers
+hf_transfer
+nest-asyncio
+structlog>=24.1.0
+tyro
+cut_cross_entropy
+torchao>=0.13.0
+
+# ── Universal GGUF Evaluation & Schema Validation ───────────────────────────
 jsonschema>=4.21.0
 
-# ── Synthetic Data Forge & Extraction Pipeline ──
-curl_cffi==0.15.0
-playwright==1.61.0
-playwright-stealth==2.0.3
-readability-lxml==0.8.4.1
-beautifulsoup4==4.15.0
+# ── Synthetic Data Forge & Extraction Pipeline ──────────────────────────────
+curl_cffi>=0.15.0
+playwright>=1.61.0
+playwright-stealth>=2.0.3
+readability-lxml>=0.8.4.1
+beautifulsoup4>=4.15.0
 tqdm>=4.66.0
 aiohttp>=3.9.0
-PyMuPDF==1.28.0
+PyMuPDF>=1.28.0
 
-# ── Numerical Utilities, RAG & Vector Store Stack ──
+# ── Numerical Utilities, RAG & Vector Store Stack ───────────────────────────
 numpy>=1.26.0
 requests>=2.31.0
 urllib3>=2.0.0
