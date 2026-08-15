@@ -4,24 +4,24 @@
 # ==============================================================================
 # ⚠️ SPECIALIZED PIPELINE NOTICE:
 # This script is exclusively engineered for certifying the Indian Digital Personal Data Protection (DPDP) Act 2023 &
-# Rules 2025 specialized legal models (`Qwen/Qwen3.5-9B`) on NVIDIA DGX Spark infrastructure. It verifies all 13
-# certification thresholds across accuracy, grammar, TTR fluidity, and adversarial security. Not a generic wrapper.
+# Rules 2025 specialized legal models (`Qwen2.5-7B-Instruct`) on NVIDIA DGX Spark infrastructure. It verifies all 18
+# certification thresholds across accuracy, grammar, TTR/MTLD fluidity, and adversarial security. Not a generic wrapper.
 #
 # Prerequisites for DGX Spark Execution:
 #   - NVIDIA DGX / GPU environment (`TOKENIZERS_PARALLELISM=false`)
-#   - Python 3.10+ / 3.12 with CUDA 12.x support
-#   - Packages installed (`pip install -r requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch, jsonschema
+#   - Python 3.10+ / 3.12 with CUDA 12.x/13.x support
+#   - Packages installed (`pip install -r ml/requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch, jsonschema
 # ==============================================================================
 # This script executes the master evaluation suite across all 5 evaluation modules:
 #   1. Pillar 1 & 5: Schema Compliance & Inference Efficiency (run_grammar_evals.py)
 #   2. Pillar 2-4: Violation F1, Trust MAE, & Zero Hallucination (run_accuracy_evals.py)
-#   3. Chatbot Evals: Statutory Accuracy, TTR Vocabulary Fluidity, & Schema Bleed (run_chatbot_evals.py)
+#   3. Chatbot Evals: Statutory Accuracy, TTR/MTLD Vocabulary Fluidity, & Schema Bleed (run_chatbot_evals.py)
 #   4. Red-Team Hallucination Benchmark: Statutory Trap Resistance (run_hallucination_benchmark.py)
 #   5. Adversarial Vulnerability Suite: NIAH 20k context recall, Prompt Injection refusal,
 #      Anti-Sycophancy false premise correction, and JSON Fuzzing resilience (run_security_evals.py)
 #
 # Usage:
-#   bash scripts/03_evaluate_models.sh [options]
+#   bash ml/scripts/03_evaluate_models.sh [options]
 #
 # Options:
 #   --backend <unsloth|vllm|llamacpp>    Backend inference engine (default: unsloth)
@@ -34,15 +34,16 @@
 #   -h, --help                           Show help menu and exit
 # ==============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ML_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${ML_DIR}/.." && pwd)"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help)
-            echo "Usage: bash scripts/03_evaluate_models.sh [options]"
+            echo "Usage: bash ml/scripts/03_evaluate_models.sh [options]"
             echo "Options:"
             echo "  --backend <unsloth|vllm|llamacpp>    Backend inference engine (default: unsloth)"
             echo "  --audit-model <path>                 Path to Forensic Auditor model (default: ../models/audit-model-final)"
@@ -75,15 +76,16 @@ echo "════════════════════════�
 echo "🏆 INITIATING STAGE 3: FUNCTIONAL & ADVERSARIAL MODEL CERTIFICATION"
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "   • Repository Root: ${REPO_ROOT}"
+echo "   • ML Root:         ${ML_DIR}"
 echo "   • Logs Directory:  ${LOG_DIR}"
 echo "   • Forwarded Args:  $*"
 echo "════════════════════════════════════════════════════════════════════════════════"
 
-cd "${REPO_ROOT}/ml/evals"
+cd "${ML_DIR}/evals"
 
 # Execute verify.sh inside ml/evals with forwarded arguments
-bash verify.sh "$@"
-EXIT_CODE=${PIPESTATUS[0]}
+EXIT_CODE=0
+bash verify.sh "$@" || EXIT_CODE=$?
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"
 if [ ${EXIT_CODE} -eq 0 ]; then
@@ -93,6 +95,6 @@ else
 fi
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "📁 Execution logs saved to: ${LOG_DIR}"
-echo "📄 Scorecard summary saved to: ${REPO_ROOT}/ml/evals/reports/final_model_certification_report.md"
+echo "📄 Scorecard summary saved to: ${ML_DIR}/evals/reports/final_model_certification_report.md"
 
 exit ${EXIT_CODE}

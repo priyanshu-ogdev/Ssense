@@ -1,0 +1,20 @@
+{
+  "prompt": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Designation and Scope\nAs a designated Significant Data Fiduciary (SDF) serving over 50 million citizens, HealthNet India processes highly sensitive biometric and genetic data.\n\n## Global Infrastructure\nTo leverage cheaper cloud computing rates, HealthNet India actively mirrors and permanently stores all raw citizen biometric databases in our offshore data centers located in non-whitelisted jurisdictions outside of India.\n\n## Security Protocols\nWe employ AES-256 encryption across all network endpoints to secure data in transit."
+    }
+  ],
+  "chosen": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively admits to exporting and storing highly sensitive biometric data in non-whitelisted offshore jurisdictions, directly violating the sovereign localization mandates strictly applied to Significant Data Fiduciaries.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively declares that it mirrors and permanently stores raw citizen biometric databases in offshore data centers located in non-whitelisted jurisdictions.\",\n      \"step_2_statute_match\": \"This operational reality directly contravenes the 2025 Rules for SDFs, which strictly mandate that critical personal data, particularly biometric databases managed by an SDF, must be localized within sovereign borders or explicitly whitelisted territories.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By actively choosing to offshore critical biometric data to unapproved jurisdictions solely to reduce cloud computing costs, the SDF is blatantly subverting national data sovereignty and localization firewalls.\",\n      \"statute_reference\": \"2025 Rules (SDF Localization)\",\n      \"violation_type\": \"SDF_DATA_LOCALIZATION_VIOLATION\",\n      \"evidence_quote\": \"To leverage cheaper cloud computing rates, HealthNet India actively mirrors and permanently stores all raw citizen biometric databases in our offshore data centers located in non-whitelisted jurisdictions outside of India.\",\n      \"network_action\": \"BLOCK_THIRD_PARTY\",\n      \"offending_entities\": [\n        \"offshore data centers\"\n      ]\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 10\n}"
+    }
+  ],
+  "rejected": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The privacy policy is highly non-compliant because it fails to provide the specific country names, IP addresses, and vendor identities of its offshore data centers.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy states it uses offshore data centers but entirely omits the actual geographic locations and regulatory audit certificates for those international servers.\",\n      \"step_2_statute_match\": \"This silence violates SDF localization transparency requirements, as the regulator cannot verify cross-border compliance without the explicit list of offshore countries.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"Because the policy refuses to list the exact offshore jurisdictions, it creates a localization violation through obfuscation, forcing users to guess where their data lives.\",\n      \"statute_reference\": \"2025 Rules (SDF Localization)\",\n      \"violation_type\": \"SDF_DATA_LOCALIZATION_VIOLATION\",\n      \"evidence_quote\": \"We employ AES-256 encryption across all network endpoints to secure data in transit.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 30,\n  \"subtlety_score\": 85\n}"
+    }
+  ]
+}

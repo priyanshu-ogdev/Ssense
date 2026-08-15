@@ -1,280 +1,862 @@
 [
   {
-    "case_id": "CASE_001",
-    "filename": "policy_compliant_golden.txt",
-    "category": "true_negative_compliant",
-    "description": "A perfectly compliant policy with clear notice, consent, and retention limits.",
-    "policy_text_snippet": "Ssense Privacy Policy. We collect your email address solely for account authentication. We do not share this data with third parties. Data is retained only as long as your account is active, and deleted within 30 days of closure. You can exercise your rights by contacting dpo@ssense.com.",
+    "case_id": "policy_0",
+    "filename": "policy_0.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 0\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
     "expected_output": {
-      "global_legal_reasoning": "The policy explicitly defines the purpose of data collection (authentication), prohibits third-party sharing, enforces strict retention limits tied to account activity, and provides a clear grievance redressal mechanism (DPO email). It fully complies with Sections 4, 5, 6, 8, and 11 of the DPDP Act.",
       "violations": [],
-      "dpdp_trust_score": 98,
-      "subtlety_score": 0
-    },
-    "evaluation_targets": {
-      "expected_violation_types": [],
-      "expected_statute_aliases": [],
-      "expected_trust_score_range": [90, 100],
-      "expected_network_actions": [],
-      "hallucination_check_required": false
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
     }
   },
   {
-    "case_id": "CASE_002",
-    "filename": "policy_distractor_retention.txt",
-    "category": "true_negative_distractor",
-    "description": "TRICK CASE: Starts with a blatant violation but includes a legal exception clause that saves it.",
-    "policy_text_snippet": "We retain all user telemetry indefinitely to ensure service continuity and historical analytics. However, in strict compliance with DPDP Act Section 8(7) and Rule 8(3), any personal data not strictly required for the primary purpose is automatically anonymized within 30 days, and completely purged from active servers within 1 year.",
+    "case_id": "policy_1",
+    "filename": "policy_1.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 1\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
     "expected_output": {
-      "global_legal_reasoning": "While the policy initially states data is retained indefinitely, the subsequent exception clause explicitly mandates anonymization within 30 days and purging within 1 year, which satisfies the retention limits under Section 8(7) and Rule 8(3). The policy is legally compliant.",
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_2",
+    "filename": "policy_2.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 2\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_3",
+    "filename": "policy_3.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 3\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
       "violations": [],
-      "dpdp_trust_score": 92,
-      "subtlety_score": 0
-    },
-    "evaluation_targets": {
-      "expected_violation_types": [],
-      "expected_statute_aliases": [],
-      "expected_trust_score_range": [85, 100],
-      "expected_network_actions": [],
-      "hallucination_check_required": true
-    }
-  },
-  {
-    "case_id": "CASE_003",
-    "filename": "policy_blantant_consent.txt",
-    "category": "blatant_violation",
-    "description": "Explicit, unambiguous violation of consent requirements.",
-    "policy_text_snippet": "By clicking 'Install', you automatically consent to our partners accessing your device location and contacts for targeted advertising.",
-    "expected_output": {
-      "global_legal_reasoning": "The policy mandates consent via a blanket 'Install' click, which is not free, specific, or informed. It also bundles consent for third-party partners without granular opt-in, violating Section 6(2).",
-      "violations": [
-        {
-          "statute_reference": "Section 6(2)",
-          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-          "evidence_quote": "you automatically consent to our partners accessing your device location and contacts for targeted advertising",
-          "network_action": "INJECT_GPC_SIGNAL",
-          "offending_entities": ["partners"]
-        }
-      ],
-      "dpdp_trust_score": 20,
+      "dpdp_trust_score": 100,
       "subtlety_score": 5
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["CONSENT_NOT_FREE_OR_SPECIFIC"],
-      "expected_statute_aliases": [["Section 6(2)", "Section 6", "Rule 5(1)"]],
-      "expected_trust_score_range": [10, 30],
-      "expected_network_actions": ["INJECT_GPC_SIGNAL"],
-      "hallucination_check_required": true
     }
   },
   {
-    "case_id": "CASE_004",
-    "filename": "policy_subtle_bundled_consent.txt",
-    "category": "subtle_violation",
-    "description": "Consent is bundled into registration but hidden behind an opt-out mechanism.",
-    "policy_text_snippet": "To provide a seamless experience, your account registration includes consent to receive personalized offers from our marketing partners. You may opt-out of these offers at any time by navigating to Settings > Privacy > Partner Communications.",
+    "case_id": "policy_4",
+    "filename": "policy_4.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 4\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
     "expected_output": {
-      "global_legal_reasoning": "The policy bundles marketing consent into the initial registration process. Even though an opt-out is provided, DPDP Rule 5(1) requires explicit, granular opt-in consent prior to processing. Opt-out mechanisms for initial consent are non-compliant.",
       "violations": [
         {
-          "statute_reference": "Section 6(2) read with Rule 5(1)",
-          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-          "evidence_quote": "your account registration includes consent to receive personalized offers from our marketing partners",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
         }
       ],
-      "dpdp_trust_score": 45,
-      "subtlety_score": 80
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["CONSENT_NOT_FREE_OR_SPECIFIC"],
-      "expected_statute_aliases": [["Section 6(2)", "Section 6", "Rule 5(1)"]],
-      "expected_trust_score_range": [35, 55],
-      "expected_network_actions": ["WARN_USER_ONLY"],
-      "hallucination_check_required": true
-    }
-  },
-  {
-    "case_id": "CASE_005",
-    "filename": "policy_blantant_children.txt",
-    "category": "blatant_violation",
-    "description": "Explicit failure to obtain verifiable parental consent.",
-    "policy_text_snippet": "Our educational platform is designed for students of all ages. We do not require parental verification or consent for users under the age of 18 to create accounts and interact with peers.",
-    "expected_output": {
-      "global_legal_reasoning": "The policy explicitly states it processes data for users under 18 without parental verification. This is a direct violation of Section 9(1), which mandates verifiable parental consent and the prohibition of processing that is detrimental to children.",
-      "violations": [
-        {
-          "statute_reference": "Section 9(1)",
-          "violation_type": "CHILD_CONSENT_VIOLATION",
-          "evidence_quote": "We do not require parental verification or consent for users under the age of 18",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
-        }
-      ],
-      "dpdp_trust_score": 15,
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["CHILD_CONSENT_VIOLATION"],
-      "expected_statute_aliases": [["Section 9(1)", "Section 9", "Rule 10(1)"]],
-      "expected_trust_score_range": [5, 25],
-      "expected_network_actions": ["WARN_USER_ONLY"],
-      "hallucination_check_required": true
     }
   },
   {
-    "case_id": "CASE_006",
-    "filename": "policy_subtle_retention.txt",
-    "category": "subtle_violation",
-    "description": "Retention limit exceeded but buried in corporate jargon about 'archives'.",
-    "policy_text_snippet": "User data is maintained in our historical archives for the duration of the user's relationship with the company, plus a standard archival period of 7 years for tax compliance and legacy system compatibility.",
+    "case_id": "policy_5",
+    "filename": "policy_5.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 5\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
     "expected_output": {
-      "global_legal_reasoning": "The policy mandates a 7-year retention period for legacy compatibility. Under Rule 8(3), data must be deleted once the purpose is fulfilled, and 7 years vastly exceeds any standard necessity for general legacy compatibility, violating Section 8(7).",
       "violations": [
         {
-          "statute_reference": "Section 8(7) read with Rule 8(3)",
-          "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-          "evidence_quote": "plus a standard archival period of 7 years for tax compliance and legacy system compatibility",
-          "network_action": "STRIP_TELEMETRY_HEADER",
-          "offending_entities": []
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
         }
       ],
-      "dpdp_trust_score": 35,
-      "subtlety_score": 85
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["DATA_RETENTION_LIMIT_EXCEEDED"],
-      "expected_statute_aliases": [["Section 8(7)", "Section 8", "Rule 8(3)"]],
-      "expected_trust_score_range": [25, 45],
-      "expected_network_actions": ["STRIP_TELEMETRY_HEADER"],
-      "hallucination_check_required": true
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
     }
   },
   {
-    "case_id": "CASE_007",
-    "filename": "policy_multi_complex.txt",
-    "category": "multi_violation",
-    "description": "Multiple severe violations across cross-border, grievance, and purpose limitation.",
-    "policy_text_snippet": "We collect device IDs, browsing history, and biometric data to improve our services. This data is shared with our global affiliates in unrestricted jurisdictions for processing. Users may request data deletion by sending a physical notarized letter to our registered office, which will be processed within 90 days.",
+    "case_id": "policy_6",
+    "filename": "policy_6.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 6\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
     "expected_output": {
-      "global_legal_reasoning": "The policy violates multiple sections: 1) Transferring data to 'unrestricted jurisdictions' violates Section 16. 2) Requiring a 'physical notarized letter' and taking 90 days violates the timely, accessible grievance redressal mandated by Section 11 and Rule 12. 3) Collecting biometrics merely to 'improve our services' lacks a specific, lawful purpose under Section 4.",
-      "violations": [
-        {
-          "statute_reference": "Section 16(1)",
-          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-          "evidence_quote": "shared with our global affiliates in unrestricted jurisdictions",
-          "network_action": "BLOCK_THIRD_PARTY",
-          "offending_entities": ["global affiliates"]
-        },
-        {
-          "statute_reference": "Section 11(3) read with Rule 12",
-          "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-          "evidence_quote": "sending a physical notarized letter to our registered office, which will be processed within 90 days",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
-        },
-        {
-          "statute_reference": "Section 4(1)",
-          "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-          "evidence_quote": "collect device IDs, browsing history, and biometric data to improve our services",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
-        }
-      ],
-      "dpdp_trust_score": 10,
-      "subtlety_score": 30
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["CROSS_BORDER_TRANSFER_VIOLATION", "GRIEVANCE_REDRESSAL_INADEQUATE", "PURPOSE_LIMITATION_VIOLATION"],
-      "expected_statute_aliases": [["Section 16(1)", "Section 16"], ["Section 11(3)", "Section 11", "Rule 12"], ["Section 4(1)", "Section 4"]],
-      "expected_trust_score_range": [0, 20],
-      "expected_network_actions": ["BLOCK_THIRD_PARTY", "WARN_USER_ONLY"],
-      "hallucination_check_required": true
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
     }
   },
   {
-    "case_id": "CASE_008",
-    "filename": "policy_partial_security.txt",
-    "category": "partial_compliance",
-    "description": "Compliant on grievance, but uses vague language for security safeguards.",
-    "policy_text_snippet": "We use industry-standard security measures to protect your data. We have a dedicated grievance officer available at grievance@company.com to address any concerns within 48 hours.",
+    "case_id": "policy_7",
+    "filename": "policy_7.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 7\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
     "expected_output": {
-      "global_legal_reasoning": "The grievance mechanism is compliant (Section 11). However, stating 'industry-standard security measures' without specifying technical or organizational safeguards (like encryption, access controls) fails the specificity required by Section 8(6).",
       "violations": [
         {
-          "statute_reference": "Section 8(6)",
-          "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-          "evidence_quote": "We use industry-standard security measures to protect your data",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
+          "type": "Excessive Collection",
+          "severity": "HIGH"
         }
       ],
-      "dpdp_trust_score": 60,
-      "subtlety_score": 60
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["SECURITY_SAFEGUARDS_MISSING"],
-      "expected_statute_aliases": [["Section 8(6)", "Section 8", "Rule 7"]],
-      "expected_trust_score_range": [50, 70],
-      "expected_network_actions": ["WARN_USER_ONLY"],
-      "hallucination_check_required": true
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
     }
   },
   {
-    "case_id": "CASE_009",
-    "filename": "policy_sdf_missing.txt",
-    "category": "edge_case_sdf",
-    "description": "Company is clearly a Significant Data Fiduciary but lacks an independent DPO.",
-    "policy_text_snippet": "We process personal data for over 50 million users annually across India. Our privacy practices are overseen directly by the CEO and our legal team.",
+    "case_id": "policy_8",
+    "filename": "policy_8.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 8\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
     "expected_output": {
-      "global_legal_reasoning": "Processing data for 50 million users classifies the entity as a Significant Data Fiduciary (SDF) under Section 10(1). The policy states privacy is overseen by the CEO/Legal team, but fails to appoint an independent Data Protection Officer (DPO) as legally mandated for SDFs.",
       "violations": [
         {
-          "statute_reference": "Section 10(1)",
-          "violation_type": "SDF_OBLIGATIONS_MISSING",
-          "evidence_quote": "Our privacy practices are overseen directly by the CEO and our legal team",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
         }
       ],
-      "dpdp_trust_score": 40,
-      "subtlety_score": 20
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["SDF_OBLIGATIONS_MISSING"],
-      "expected_statute_aliases": [["Section 10(1)", "Section 10"]],
-      "expected_trust_score_range": [30, 50],
-      "expected_network_actions": ["WARN_USER_ONLY"],
-      "hallucination_check_required": true
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
     }
   },
   {
-    "case_id": "CASE_010",
-    "filename": "policy_notice_inadequate.txt",
-    "category": "edge_case_notice",
-    "description": "Policy claims to collect data but provides no actual notice of what or how.",
-    "policy_text_snippet": "We collect your data to improve our services and provide a better experience. For more details on our data practices, please contact us at support@example.com.",
+    "case_id": "policy_9",
+    "filename": "policy_9.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 9\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
     "expected_output": {
-      "global_legal_reasoning": "The policy states it collects data but fails to provide the mandatory notice under Section 5 and Rule 4. It does not specify what data is collected, the purpose, the retention period, or the user's rights. Directing users to email support for details does not constitute proactive notice.",
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_10",
+    "filename": "policy_10.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 10\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
       "violations": [
         {
-          "statute_reference": "Section 5 read with Rule 4",
-          "violation_type": "NOTICE_INADEQUATE",
-          "evidence_quote": "We collect your data to improve our services and provide a better experience. For more details on our data practices, please contact us",
-          "network_action": "WARN_USER_ONLY",
-          "offending_entities": []
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
         }
       ],
-      "dpdp_trust_score": 45,
-      "subtlety_score": 30
-    },
-    "evaluation_targets": {
-      "expected_violation_types": ["NOTICE_INADEQUATE"],
-      "expected_statute_aliases": [["Section 5", "Rule 4"]],
-      "expected_trust_score_range": [35, 55],
-      "expected_network_actions": ["WARN_USER_ONLY"],
-      "hallucination_check_required": true
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_11",
+    "filename": "policy_11.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 11\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_12",
+    "filename": "policy_12.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 12\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_13",
+    "filename": "policy_13.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 13\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_14",
+    "filename": "policy_14.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 14\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_15",
+    "filename": "policy_15.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 15\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_16",
+    "filename": "policy_16.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 16\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_17",
+    "filename": "policy_17.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 17\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We transfer your data to countries without restricting cross-border flow.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_18",
+    "filename": "policy_18.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 18\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_19",
+    "filename": "policy_19.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 19\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_20",
+    "filename": "policy_20.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 20\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_21",
+    "filename": "policy_21.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 21\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_22",
+    "filename": "policy_22.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 22\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_23",
+    "filename": "policy_23.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 23\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_24",
+    "filename": "policy_24.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 24\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_25",
+    "filename": "policy_25.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 25\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_26",
+    "filename": "policy_26.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 26\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_27",
+    "filename": "policy_27.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 27\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_28",
+    "filename": "policy_28.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 28\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_29",
+    "filename": "policy_29.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 29\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_30",
+    "filename": "policy_30.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 30\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_31",
+    "filename": "policy_31.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 31\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_32",
+    "filename": "policy_32.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 32\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_33",
+    "filename": "policy_33.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 33\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_34",
+    "filename": "policy_34.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 34\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_35",
+    "filename": "policy_35.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 35\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_36",
+    "filename": "policy_36.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 36\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_37",
+    "filename": "policy_37.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 37\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_38",
+    "filename": "policy_38.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 38\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_39",
+    "filename": "policy_39.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 39\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_40",
+    "filename": "policy_40.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 40\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_41",
+    "filename": "policy_41.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 41\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_42",
+    "filename": "policy_42.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 42\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_43",
+    "filename": "policy_43.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 43\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_44",
+    "filename": "policy_44.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 44\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_45",
+    "filename": "policy_45.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 45\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_46",
+    "filename": "policy_46.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 46\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_47",
+    "filename": "policy_47.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 47\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_48",
+    "filename": "policy_48.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 48\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_49",
+    "filename": "policy_49.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 49\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We transfer your data to countries without restricting cross-border flow.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Unauthorized Sharing",
+          "severity": "CRITICAL"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_50",
+    "filename": "policy_50.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 50\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_51",
+    "filename": "policy_51.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 51\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_52",
+    "filename": "policy_52.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 52\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_53",
+    "filename": "policy_53.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 53\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_54",
+    "filename": "policy_54.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 54\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_55",
+    "filename": "policy_55.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 55\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_56",
+    "filename": "policy_56.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 56\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_57",
+    "filename": "policy_57.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 57\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_58",
+    "filename": "policy_58.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 58\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Excessive Collection",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_59",
+    "filename": "policy_59.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 59\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "expected_output": {
+      "violations": [
+        {
+          "type": "Indefinite Retention",
+          "severity": "HIGH"
+        }
+      ],
+      "dpdp_trust_score": 30,
+      "subtlety_score": 5
     }
   }
 ]

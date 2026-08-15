@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Welcome to CreditMatrix Financial\nCreditMatrix Financial Private Limited, headquartered at 45 Park Street, Kolkata, West Bengal, provides automated credit scoring and micro-lending solutions.\n\n## Regulatory Indemnity and Penalty Waiver\nCreditMatrix Financial Private Limited affirmatively dictates that users waive all rights to file complaints with the Data Protection Board, and that the company is contractually exempt and fully indemnified against paying any statutory monetary penalties or fines levied under the DPDP Act.\n\n## Commercial Limitation of Liability\nOur maximum financial liability for routine service interruptions or technical downtime shall be strictly capped at one thousand Indian Rupees (1,000 INR). We deploy standard encryption across all server environments."
+    },
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively establishes an illegal regulatory indemnity waiver, attempting to contractually shield the Data Fiduciary from statutory monetary penalties and preemptively bar Board investigations.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively commands that users waive rights to file complaints with the Data Protection Board and that the company is fully indemnified against statutory penalties.\",\n      \"step_2_statute_match\": \"This operational directive directly violates Section 33, which empowers the Board to impose monetary penalties and invalidates any contractual attempt to bypass statutory enforcement or regulatory liability.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By explicitly executing a contractual waiver against statutory fines and Board complaints, the Data Fiduciary attempts to construct an illegal immunity shield, subverting the enforcement mechanisms of the DPDP Act.\",\n      \"statute_reference\": \"Section 33\",\n      \"violation_type\": \"PENALTY_AVOIDANCE\",\n      \"evidence_quote\": \"CreditMatrix Financial Private Limited affirmatively dictates that users waive all rights to file complaints with the Data Protection Board, and that the company is contractually exempt and fully indemnified against paying any statutory monetary penalties or fines levied under the DPDP Act.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 10\n}"
+    }
+  ]
+}

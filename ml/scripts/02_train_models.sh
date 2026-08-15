@@ -5,19 +5,20 @@
 # ⚠️ SPECIALIZED PIPELINE NOTICE:
 # This script is exclusively engineered for training the specialized Indian Digital Personal Data Protection (DPDP) Act
 # 2023 & Rules 2025 legal models (Forensic Auditor & Conversational Chatbot) on NVIDIA DGX Spark infrastructure (128 GB VRAM).
-# It executes our 32-bit FP32 `adamw_torch` + `rsLoRA` + `SimPO` pipeline on `Qwen/Qwen3.5-9B`. Not a generic wrapper.
+# It executes our 32-bit FP32 `adamw_torch` + `rsLoRA` + `SimPO` pipeline on `Qwen2.5-7B-Instruct`. Not a generic wrapper.
 #
 # Prerequisites for DGX Spark Execution:
 #   - NVIDIA DGX / GPU environment (`multiprocessing.set_start_method("spawn")` enabled)
-#   - Python 3.10+ / 3.12 with CUDA 12.x support
-#   - Packages installed (`pip install -r requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch
+#   - Python 3.10+ / 3.12 with CUDA 12.x/13.x support
+#   - Packages installed (`pip install -r ml/requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch
 # ==============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TRAINING_DIR="${REPO_ROOT}/ml/slm-training"
+ML_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${ML_DIR}/.." && pwd)"
+TRAINING_DIR="${ML_DIR}/slm-training"
 
 PYTHON_CMD="python"
 if command -v python3 &> /dev/null; then
@@ -33,7 +34,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: bash scripts/02_train_models.sh [options]"
+            echo "Usage: bash ml/scripts/02_train_models.sh [options]"
             echo "Options:"
             echo "  --model <audit|chatbot|all>   Specify which model(s) to train (default: all)"
             echo "  -h, --help                    Show this help message and exit"
@@ -105,6 +106,7 @@ echo "════════════════════════�
 echo "🚀 INITIATING STAGE 2: VRAM AIRLOCK & SLM TRAINING PIPELINE"
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "   • Repository Root: ${REPO_ROOT}"
+echo "   • ML Root:         ${ML_DIR}"
 echo "   • Python Binary:   $(command -v "${PYTHON_CMD}")"
 echo "   • Execution Dir:   ${TRAINING_DIR}"
 echo "   • Logs Directory:  ${LOG_DIR}"
@@ -139,4 +141,4 @@ echo -e "\n═══════════════════════
 echo "✅ STAGE 2 COMPLETE: Selected SLM models successfully fine-tuned and exported."
 echo "════════════════════════════════════════════════════════════════════════════════"
 echo "📁 Execution logs saved to: ${LOG_DIR}"
-echo "👉 Next step: Run 'bash scripts/03_evaluate_models.sh' to execute functional & adversarial certification."
+echo "👉 Next step: Run 'bash ml/scripts/03_evaluate_models.sh' to execute functional & adversarial certification."

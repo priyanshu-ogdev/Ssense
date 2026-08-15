@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Data Minimization and Storage\nTo provide blazing fast response times, ApexFintech implements a strictly ephemeral architecture. We aggressively purge and permanently destroy all consent lifecycle audit logs and automated processing records every 12 hours to minimize server overhead.\n\n## Financial Telemetry\nUser transaction histories are maintained for a period of five years in accordance with federal banking regulations."
+    },
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively mandates the rapid destruction of consent audit artifacts, directly contravening the 2025 Rules which require the preservation of such logs to ensure verifiable compliance and regulatory accountability.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy explicitly commands the aggressive purging and permanent destruction of all consent lifecycle audit logs every 12 hours.\",\n      \"step_2_statute_match\": \"This active destruction protocol directly violates the 2025 Rules regarding log retention, which mandate that Data Fiduciaries must maintain an immutable audit trail of consent grants and processing activities for regulatory inspection.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By programmatically annihilating compliance records under the guise of server optimization, the Data Fiduciary actively evades mandatory accountability frameworks and destroys the legal evidence required for a DPDP audit.\",\n      \"statute_reference\": \"2025 Rules (Log Retention)\",\n      \"violation_type\": \"LOG_RETENTION_MANDATE_VIOLATION\",\n      \"evidence_quote\": \"We aggressively purge and permanently destroy all consent lifecycle audit logs and automated processing records every 12 hours to minimize server overhead.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 15\n}"
+    }
+  ]
+}

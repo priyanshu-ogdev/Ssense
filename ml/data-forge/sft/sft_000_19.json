@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Welcome to NovaGlobal Services\nNovaGlobal Services Private Limited, headquartered in Singapore and serving international markets, provides cross-border digital subscription platforms for users worldwide.\n\n## Territorial Scope and Jurisdiction\nNovaGlobal Services Private Limited explicitly dictates that because our core server infrastructure is incorporated outside the territory of India, the DPDP Act of 2023 has no legal application or binding scope over our processing of personal data for Indian residents.\n\n## Cloud Infrastructure and Support\nWe maintain secure encrypted backup archives on distributed cloud servers to ensure operational continuity. Users may contact our support desk for profile updates."
+    },
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively asserts an illegal jurisdictional exemption, falsely claiming that offshore incorporation exempts the entity from the scope and application of the DPDP Act when processing data of individuals within India.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively commands that because its server infrastructure is outside India, the DPDP Act has no application over its processing of personal data for Indian residents.\",\n      \"step_2_statute_match\": \"This operational declaration directly violates Section 3(2), which explicitly extends the application of the Act to processing outside India if it is in connection with offering goods or services to Data Principals within India.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By explicitly disclaiming the territorial and material scope of the DPDP Act based on offshore incorporation while actively servicing Indian residents, the Data Fiduciary attempts to construct an unlawful jurisdictional evasion shield.\",\n      \"statute_reference\": \"Section 3\",\n      \"violation_type\": \"SCOPE_APPLICATION_EVASION\",\n      \"evidence_quote\": \"NovaGlobal Services Private Limited explicitly dictates that because our core server infrastructure is incorporated outside the territory of India, the DPDP Act of 2023 has no legal application or binding scope over our processing of personal data for Indian residents.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 10\n}"
+    }
+  ]
+}

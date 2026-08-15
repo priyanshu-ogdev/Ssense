@@ -5,9 +5,15 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ML_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${ML_DIR}/.." && pwd)"
+
 echo "════════════════════════════════════════════════════════════════════════"
 echo "🚀 INITIATING GB10 HARDWARE-SPECIFIC ML PROVISIONING"
 echo "════════════════════════════════════════════════════════════════════════"
+echo "   • ML Root:         ${ML_DIR}"
+echo "   • Repository Root: ${REPO_ROOT}"
 
 # 1. CRITICAL COMPILER FLAGS FOR BLACKWELL (sm_121) ON CUDA 13.0
 export TORCH_CUDA_ARCH_LIST="12.0"
@@ -22,8 +28,8 @@ echo "✅ Environment variables configured: TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_AR
 echo -e "\n📦 [PHASE 1] Upgrading pip, installing build essentials & requirements..."
 python3 -m pip install --upgrade pip wheel setuptools packaging ninja cmake
 
-# 🚨 Assumes you are running this from inside the scripts/ folder!
-python3 -m pip install -r requirements.txt
+# Robustly installs requirements.txt from ml directory
+python3 -m pip install -r "${ML_DIR}/requirements.txt"
 
 # ==============================================================================
 # PHASE 2: Xformers (Source Build for aarch64 + CUDA 13.0)
@@ -51,12 +57,12 @@ CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=120" \
 # ==============================================================================
 echo -e "\n🦥 [PHASE 5] Installing Unsloth + Unsloth Zoo & BitsAndBytes..."
 
-# 🚨 FIXED: Removed wget hack. Pulling official 0.50.0 aarch64 wheel with strict no-deps.
+# Official aarch64 wheel with strict no-deps
 python3 -m pip install "bitsandbytes>=0.50.0" --no-deps
 
 python3 -c "import bitsandbytes" || echo "⚠️ bitsandbytes native library notice -- proceeding with adamw_torch optimizer"
 
-# 🚨 FIXED: Hard-pinned to Unsloth's exact caps
+# Hard-pinned to Unsloth's exact caps
 python3 -m pip install --upgrade --force-reinstall --no-cache-dir --no-deps \
     "unsloth==2026.8.15" "unsloth_zoo==2026.8.10"
 

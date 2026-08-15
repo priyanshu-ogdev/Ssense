@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Welcome to VaniLegal Tech Solutions\nVaniLegal Tech Solutions Private Limited, located at 99 Legal Heights, New Delhi, provides enterprise compliance and dispute resolution tracking software.\n\n## Dispute Finality and Appellate Restrictions\nTo streamline administrative finality, VaniLegal Tech Solutions Private Limited affirmatively dictates that all internal grievance determinations are final, unappealable, and legally barred from being escalated to the Telecom Disputes Settlement and Appellate Tribunal.\n\n## Operational Workflows\nOur compliance team reviews all inquiries within a standard forty-eight-hour internal escalation window. We deploy robust TLS encryption across all client-facing data portals."
+    },
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively constructs an illegal appellate waiver, attempting to contractually bar Data Principals from escalating disputes to the Telecom Disputes Settlement and Appellate Tribunal.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively commands that all internal grievance determinations are final, unappealable, and legally barred from being escalated to the Appellate Tribunal.\",\n      \"step_2_statute_match\": \"This operational directive directly violates Section 29, which establishes the statutory right of aggrieved parties to appeal Board orders to the Telecom Disputes Settlement and Appellate Tribunal and voids any contractual bar.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By explicitly declaring internal decisions unappealable and prohibiting recourse to the appellate tribunal, the Data Fiduciary attempts to construct an illegal immunity shield, subverting statutory judicial review.\",\n      \"statute_reference\": \"Section 29\",\n      \"violation_type\": \"APPEAL_PROCESS_VIOLATION\",\n      \"evidence_quote\": \"To streamline administrative finality, VaniLegal Tech Solutions Private Limited affirmatively dictates that all internal grievance determinations are final, unappealable, and legally barred from being escalated to the Telecom Disputes Settlement and Appellate Tribunal.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 10\n}"
+    }
+  ]
+}

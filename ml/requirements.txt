@@ -1,13 +1,13 @@
 # ══════════════════════════════════════════════════════════════════════════
-# requirements-gb10.txt — DGX Spark (GB10, aarch64, CUDA 13.0, sm_121)
+# requirements.txt — DGX Spark (GB10, aarch64, CUDA 13.0, sm_121)
 #
 # READ THIS FIRST:
 # This file alone is NOT sufficient. xformers, flash-attn, unsloth, and
 # llama-cpp-python need special install handling (source builds / --no-deps /
 # non-default indexes) that a plain `pip install -r requirements.txt` cannot
-# express correctly on this platform. Run install_gb10.sh, which installs
+# express correctly on this platform. Run install.sh, which installs
 # this file's contents in the right order and handles the special cases.
-# Do NOT just `pip install -r requirements-gb10.txt` on its own.
+# Do NOT just `pip install -r requirements.txt` on its own.
 #
 # Platform notes:
 # - GB10 is aarch64, NOT x86_64. Any wheel without an aarch64/manylinux_2_xx_aarch64
@@ -38,7 +38,7 @@ datasets==4.3.0
 peft==0.18.1
 
 # ── Unsloth & Unsloth-Zoo Internal Utilities ────────────────────────────────
-# Because install_gb10.sh installs Unsloth with --no-deps (to protect PyTorch),
+# Because install.sh installs Unsloth with --no-deps (to protect PyTorch),
 # we MUST manually satisfy its background utilities here in Phase 1.
 diffusers
 hf_transfer

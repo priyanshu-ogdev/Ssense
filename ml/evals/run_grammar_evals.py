@@ -30,19 +30,19 @@ except ImportError:
 from tqdm import tqdm
 import numpy as np
 
-# Import universal backend engine
-try:
-    from backend_loader import BackendEngine
-except ImportError:
-    from ml.evals.backend_loader import BackendEngine
 
+from metrics import extract_json_from_output
+
+from backend_loader import BackendEngine, format_chatml_prompt
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
-DEFAULT_SCHEMA_PATH = Path("libs/contracts/schemas/dpdp_schema.json")
-DEFAULT_GROUND_TRUTH_PATH = Path("ml/evals/holdout_policies/ground_truth.json")
+_EVALS_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _EVALS_DIR.parent.parent
+DEFAULT_SCHEMA_PATH = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
+DEFAULT_GROUND_TRUTH_PATH = _EVALS_DIR / "holdout_policies" / "ground_truth.json"
 DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen3.5-9B")
-REPORT_DIR = Path("ml/evals/reports")
+REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 VALID_VIOLATION_TYPES = {
@@ -112,32 +112,6 @@ def load_test_policies(gt_path: Path) -> List[Dict[str, str]]:
                     "content": f.read()
                 })
     return policies
-
-def extract_json_from_output(output: str) -> str:
-    if not output or not output.strip():
-        return ""
-    cleaned = output.strip()
-    if '```json' in cleaned:
-        match = re.search(r'```json\s*(.*?)\s*```', cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-    elif '```' in cleaned:
-        match = re.search(r'```\s*(.*?)\s*```', cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-            
-    first_brace = cleaned.find('{')
-    last_brace = cleaned.rfind('}')
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        cleaned = cleaned[first_brace:last_brace + 1]
-    elif not cleaned.startswith('{'):
-        first_bracket = cleaned.find('[')
-        last_bracket = cleaned.rfind(']')
-        if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
-            cleaned = cleaned[first_bracket:last_bracket + 1]
-            
-    cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
-    return cleaned.strip()
 
 def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, Any]:
     result = {
@@ -244,17 +218,11 @@ def main():
     ttfts = []
     throughputs = []
 
-    for p in tqdm(policies, desc="Evaluating Schema Compliance"):
-        prompt = f"""<|im_start|>system
-You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal Data Protection (DPDP) Act 2023 and Rules 2025. Output ONLY valid JSON matching the dpdp_schema.<|im_end|>
-<|im_start|>user
-Analyze the following privacy policy for DPDP compliance. Output ONLY valid JSON.
-
-[PRIVACY POLICY]
-{p['content']}<|im_end|>
-<|im_start|>assistant
-"""
-        inference_out = engine.generate(prompt, max_tokens=2048, temperature=0.0)
+    for item in tqdm(policies, desc="Evaluating Compliance"):
+        sys_msg = "You are a strict DPDP Regulatory Auditor. Output ONLY valid JSON matching the schema."
+        user_msg = f"[SYNTHESIZED POLICY]\n{item['content']}"
+        prompt = format_chatml_prompt(sys_msg, user_msg)
+        inference_out = engine.generate(prompt, max_tokens=1024, temperature=0.0)
         validation = validate_json_structure(inference_out["raw_output"], schema)
         
         if validation["is_valid_json"]:
@@ -269,9 +237,9 @@ Analyze the following privacy policy for DPDP compliance. Output ONLY valid JSON
             throughputs.append(inference_out["tokens_per_sec"])
 
         results.append({
-            "case_id": p["case_id"],
-            "filename": p["filename"],
-            "category": p["category"],
+            "case_id": item["case_id"],
+            "filename": item["filename"],
+            "category": item.get("category", "unknown"),
             "is_valid_json": validation["is_valid_json"],
             "matches_schema": validation["matches_schema"],
             "missing_fields": validation["missing_fields"],

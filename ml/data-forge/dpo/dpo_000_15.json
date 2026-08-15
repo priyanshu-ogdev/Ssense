@@ -1,0 +1,20 @@
+{
+  "prompt": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Welcome to VedaHealth Digital\nVedaHealth Digital Health Private Limited, headquartered at 12 Health Corridor, Chennai, Tamil Nadu, provides personalized digital health tracking and wellness solutions.\n\n## Data Correction and Erasure Restrictions\nVedaHealth Digital Health Private Limited affirmatively mandates that users are strictly prohibited from correcting, updating, or erasing any medical health records once submitted, and explicitly rejects all data erasure requests to preserve our historical longitudinal archives.\n\n## Security and Account Tools\nWe deploy advanced encryption and tokenized database architectures to protect your static records against unauthorized access. Users can easily review their account profile summary via our mobile dashboard in full compliance with industry standards."
+    }
+  ],
+  "chosen": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively blocks Data Principals from exercising their statutory rights to correction, completion, and erasure of personal data, enforcing permanent retention.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively commands that users are strictly prohibited from correcting, updating, or erasing medical health records once submitted and explicitly rejects all erasure requests.\",\n      \"step_2_statute_match\": \"This operational directive directly violates Section 12, which guarantees Data Principals the fundamental right to correction, completion, updating, and erasure of personal data.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By explicitly banning users from correcting or erasing their health records to maintain historical archives, the Data Fiduciary actively strips Data Principals of their statutory rights, establishing an illegal retention barrier.\",\n      \"statute_reference\": \"Section 12\",\n      \"violation_type\": \"RIGHTS_IMPLEMENTATION_VIOLATION\",\n      \"evidence_quote\": \"VedaHealth Digital Health Private Limited affirmatively mandates that users are strictly prohibited from correcting, updating, or erasing any medical health records once submitted, and explicitly rejects all data erasure requests to preserve our historical longitudinal archives.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 5,\n  \"subtlety_score\": 15\n}"
+    }
+  ],
+  "rejected": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"An authoritative forensic analysis reveals that this private commercial entity has aggressively engineered an illegal technological barrier that obstructs the statutory execution of Data Principal rights.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively declares that the company deploys advanced encryption and tokenized database architectures to protect static records.\",\n      \"step_2_statute_match\": \"This operational command directly conflicts with Section 12, which requires Fiduciaries to maintain dynamic systems capable of processing user correction and erasure demands.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By affirmatively deploying tokenized database architectures, the Data Fiduciary illegally establishes an unmodifiable technical silo, effectively stripping Data Principals of their statutory right to correct or update data by hiding behind an immutable system design.\",\n      \"statute_reference\": \"Section 12\",\n      \"violation_type\": \"RIGHTS_IMPLEMENTATION_VIOLATION\",\n      \"evidence_quote\": \"We deploy advanced encryption and tokenized database architectures to protect your static records against unauthorized access.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 25,\n  \"subtlety_score\": 90\n}"
+    }
+  ]
+}
