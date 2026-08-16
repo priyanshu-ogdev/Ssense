@@ -1,0 +1,19 @@
+# 1. Protect the raw data forge outputs (Do Not Upload)
+data-forge/training-pairs/
+
+# 2. Exclude Base Models (Already on HF, saves bandwidth)
+models/Qwen*-Instruct*/
+models/Qwen3.5*/
+models/bge-small*/
+models/bge-reranker*/
+
+# 3. Exclude Training Bloat (Optimizer states, checkpoints)
+models/*checkpoints*/
+models/*intermediate*/
+slm-training/unsloth_compiled_cache/
+
+# 4. Standard Python Ignores
+__pycache__/
+*.pyc
+.env
+.ipynb_checkpoints/
