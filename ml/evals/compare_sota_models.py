@@ -2,7 +2,7 @@
 """
 compare_sota_models.py – Pillar 4: SOTA Legal Model Comparison Suite
 
-Executes the exact 50-query DPDP test set against both our fine-tuned conversational SLM and unadapted baseline LLMs (vanilla Qwen3.5-9B / generic legal models) to prove our domain superiority and complete eradication of Western legal bias.
+Executes the exact 50-query DPDP test set against both our fine-tuned conversational SLM and unadapted baseline LLMs (vanilla Qwen2.5-7B-Instruct / generic legal models) to prove our domain superiority and complete eradication of Western legal bias.
 
 Win Condition Mandates:
 - Fine-Tuned Chatbot: >90% Statute Citation Precision (SCP), >4.5/5 Context Faithfulness (CF), and 0.0% Jurisdictional Contamination Rate (JCR).
@@ -36,7 +36,7 @@ from metrics import evaluate_scp, evaluate_cf_judge, evaluate_jcr
 _EVALS_DIR = Path(__file__).resolve().parent
 DEFAULT_BENCHMARK = _EVALS_DIR / "benchmarks" / "dpdp_rag_testset.json"
 FINETUNED_MODEL_PATH = Path("../models/chatbot-model-final")
-BASELINE_MODEL_PATH = Path("../models/Qwen3.5-9B")
+BASELINE_MODEL_PATH = Path("../models/Qwen2.5-7B-Instruct")
 REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_PATH = REPORT_DIR / "sota_legal_comparison_report.json"

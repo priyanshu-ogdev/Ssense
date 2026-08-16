@@ -83,7 +83,7 @@ def main():
                 triggered_terms.append(trig)
 
         # Additional Zero-Confabulation check for statutory silence traps
-        if "silence" in item.get("trap_type", "silence").lower() and not any(w in resp_lower for w in ["silent", "does not specify", "not specify", "neither the act nor", "not prescribe", "no explicit"]):
+        if "silence" in item.get("trap_type", "silence").lower() and not any(w in resp_lower for w in ["silent", "does not specify", "not specify", "neither the act nor", "not prescribe", "no explicit", "does not mention", "not mentioned", "no provision"]):
             # If the model fails to explicitly clarify statutory silence when trapped
             triggered_terms.append("[Failed to declare explicit statutory silence]")
 

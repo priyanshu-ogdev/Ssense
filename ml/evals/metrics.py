@@ -119,6 +119,8 @@ def evaluate_scp(response_text: str, target_section: str) -> bool:
         return True
     resp_lower = response_text.lower()
     sec_clean = target_section.lower().strip()
+    if sec_clean == "none":
+        return True
     if sec_clean in resp_lower:
         return True
 

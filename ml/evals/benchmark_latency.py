@@ -32,7 +32,7 @@ from backend_loader import BackendEngine, format_chatml_prompt
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
-DEFAULT_MODEL_PATH = Path("../models/chatbot-model-final") if Path("../models/chatbot-model-final").exists() else Path("../models/Qwen3.5-9B")
+DEFAULT_MODEL_PATH = Path("../models/chatbot-model-final") if Path("../models/chatbot-model-final").exists() else Path("../models/Qwen2.5-7B-Instruct")
 LAW_TXT_PATH = Path(__file__).resolve().parent.parent / "data-forge" / "dpdp_act_and_rules_2025.txt"
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)

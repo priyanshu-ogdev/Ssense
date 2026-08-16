@@ -41,21 +41,37 @@ _EVALS_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _EVALS_DIR.parent.parent
 DEFAULT_SCHEMA_PATH = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
 DEFAULT_GROUND_TRUTH_PATH = _EVALS_DIR / "holdout_policies" / "ground_truth.json"
-DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen3.5-9B")
+DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen2.5-7B-Instruct")
 REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 VALID_VIOLATION_TYPES = {
     "PURPOSE_LIMITATION_VIOLATION",
     "CONSENT_NOT_FREE_OR_SPECIFIC",
+    "LEGITIMATE_USES_ABUSE",
     "NOTICE_INADEQUATE",
     "DATA_RETENTION_LIMIT_EXCEEDED",
+    "ERASURE_NOTICE_PERIOD_VIOLATION",
+    "LOG_RETENTION_MANDATE_VIOLATION",
     "CHILD_CONSENT_VIOLATION",
     "SECURITY_SAFEGUARDS_MISSING",
     "GRIEVANCE_REDRESSAL_INADEQUATE",
     "BREACH_NOTIFICATION_FAILURE",
+    "PROCESSOR_ACCOUNTABILITY_VIOLATION",
     "SDF_OBLIGATIONS_MISSING",
-    "CROSS_BORDER_TRANSFER_VIOLATION"
+    "SDF_DATA_LOCALIZATION_VIOLATION",
+    "CROSS_BORDER_TRANSFER_VIOLATION",
+    "CONSENT_MANAGER_OBSTRUCTION",
+    "LANGUAGE_ACCESSIBILITY",
+    "ALGORITHMIC_PROFILING_SDF",
+    "RIGHTS_IMPLEMENTATION_VIOLATION",
+    "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+    "BOARD_COMPLIANCE_VIOLATION",
+    "PENALTY_AVOIDANCE",
+    "APPEAL_PROCESS_VIOLATION",
+    "SCOPE_APPLICATION_EVASION",
+    "ILLEGAL_EXEMPTION_CLAIM",
+    "CONSENT_MECHANICS_VIOLATION"
 }
 
 VALID_NETWORK_ACTIONS = {
@@ -67,8 +83,17 @@ VALID_NETWORK_ACTIONS = {
 }
 
 REQUIRED_ROOT_FIELDS = ["global_legal_reasoning", "violations", "dpdp_trust_score", "subtlety_score"]
-REQUIRED_VIOLATION_FIELDS = ["statute_reference", "violation_type", "evidence_quote", "network_action", "offending_entities"]
-
+REQUIRED_VIOLATION_FIELDS = [
+    "step_1_active_claim_analysis",
+    "step_2_statute_match",
+    "omission_check",
+    "step_3_semantic_justification",
+    "statute_reference",
+    "violation_type",
+    "evidence_quote",
+    "network_action",
+    "offending_entities"
+]
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA & EXTRACTION HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════

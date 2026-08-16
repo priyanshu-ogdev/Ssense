@@ -157,7 +157,7 @@ def main():
         top_bm25_idx = np.argsort(bm25_scores)[::-1][:10]
         
         # Dense Phase (Top 10)
-        q_emb = bge_model.encode([f"Represent this query for retrieval: {query}"])[0]
+        q_emb = bge_model.encode([f"Represent this sentence for searching relevant passages: {query}"])[0]
         q_emb = q_emb / (np.linalg.norm(q_emb) + 1e-10)
         dense_scores = np.dot(dense_embeddings, q_emb)
         top_dense_idx = np.argsort(dense_scores)[::-1][:10]

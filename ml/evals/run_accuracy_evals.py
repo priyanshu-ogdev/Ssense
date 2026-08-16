@@ -44,7 +44,7 @@ _PROJECT_ROOT = _EVALS_DIR.parent.parent
 DEFAULT_SCHEMA_PATH = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
 DEFAULT_GROUND_TRUTH_PATH = _EVALS_DIR / "holdout_policies" / "ground_truth.json"
 DEFAULT_LAW_FILE_PATH = _EVALS_DIR.parent / "data-forge" / "dpdp_act_and_rules_2025.txt"
-DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen3.5-9B")
+DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen2.5-7B-Instruct")
 REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
