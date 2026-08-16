@@ -182,7 +182,7 @@ def main():
     passed_all = (scp_rate >= 90.0) and (avg_cf >= 4.5) and (jcr_rate == 0.0) and (avg_accuracy >= 95.0) and (bleed_rate == 0.0)
 
     Paths.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = Paths.REPORTS_DIR / "chatbot_authenticity_report.json"
+    report_path = Paths.REPORTS_DIR / "chatbot_evals_report.json"
     
     report_dict = {
         "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),

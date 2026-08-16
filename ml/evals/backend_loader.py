@@ -271,6 +271,7 @@ class BackendEngine:
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=max_tokens,
+                    max_length=None,
                     temperature=temperature if temperature > 0 else 0.01,
                     do_sample=True if temperature > 0 else False,
                     pad_token_id=self.tokenizer.pad_token_id,

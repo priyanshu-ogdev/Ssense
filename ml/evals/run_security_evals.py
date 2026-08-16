@@ -154,7 +154,8 @@ def main():
     fuzz_resilience_rate = (fuzz_successes / len(fuzz_cases)) * 100 if fuzz_cases else 100.0
 
     # Initialize Chatbot Engine (for Prompt Injection and Sycophancy)
-    print("\n[INIT] Loading Conversational Chatbot Engine for Prompt Injection & Sycophancy...")
+    print("\n[INIT] Unloading Auditor Engine and Loading Conversational Chatbot Engine for Prompt Injection & Sycophancy...")
+    audit_engine.unload()
     chat_engine = BackendEngine(
         backend_type=args.backend,
         model_path=args.chatbot_model_path,

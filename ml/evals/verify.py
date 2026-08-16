@@ -227,7 +227,8 @@ def main():
         run_script("compare_sota_models.py", [
             "--backend", args.backend,
             "--finetuned-path", args.chatbot_model_path,
-            "--lora-name", args.chatbot_lora_name
+            "--lora-name", args.chatbot_lora_name,
+            "--allow-simulated-baseline"
         ])
 
     # ═══════════════════════════════════════════════════════════════════
@@ -240,8 +241,8 @@ def main():
         "hallucination": REPORT_DIR / "hallucination_benchmark_report.json",
         "security": REPORT_DIR / "security_eval_report.json",
         "rag": REPORT_DIR / "rag_retrieval_evaluation_report.json",
-        "chatbot": REPORT_DIR / "chatbot_authenticity_report.json",
-        "chatbot_authenticity": REPORT_DIR / "chatbot_authenticity_report.json",
+        "chatbot": REPORT_DIR / "chatbot_evals_report.json",
+        "chatbot_authenticity": REPORT_DIR / "chatbot_evals_report.json",
         "latency_stress": REPORT_DIR / "latency_stress_benchmark_report.json",
         "sota_comparison": REPORT_DIR / "sota_legal_comparison_report.json"
     }

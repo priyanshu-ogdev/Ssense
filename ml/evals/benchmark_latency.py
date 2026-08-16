@@ -102,7 +102,8 @@ def main():
         backend_type=args.backend,
         model_path=args.model_path,
         adapter_path=args.adapter_path,
-        lora_name=args.lora_name
+        lora_name=args.lora_name,
+        max_seq_length=32768
     )
 
     batch_results = {}
@@ -117,7 +118,8 @@ def main():
         # For unsloth/local single-GPU, requests are still GPU-serialized, but this correctly
         # measures system throughput under concurrent load (queuing, scheduling overhead).
         # For vLLM, this genuinely issues simultaneous HTTP requests.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=bs) as executor:
+        max_workers = bs if engine.backend_type != "unsloth" else 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             built_prompt = format_chatml_prompt(STANDARD_SYS_MSG, STANDARD_USER_MSG)
             futures = [
                 executor.submit(run_single_inference_task, engine, built_prompt, 128)
