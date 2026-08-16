@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """
-backend_loader.py – Universal Dual-Backend & Multi-LoRA Inference Abstraction for DPDP SLM Evaluation
+backend_loader.py – Universal Dual-Backend & Multi-LoRA Inference Abstraction
 
 Supports three universal backends:
-1. `unsloth` / `transformers`: Direct PyTorch bfloat16 safetensors / LoRA adapters loaded in DGX VRAM.
-2. `vllm`: High-throughput production REST API (`http://localhost:8000/v1/completions`) with Multi-LoRA routing.
-3. `llamacpp`: Quantized local GGUF evaluation with optional GBNF grammar enforcement.
+1. `unsloth` / `transformers`: Direct PyTorch BF16 safetensors / LoRA adapters loaded in DGX VRAM.
+2. `vllm`: High-throughput production engine with Multi-LoRA routing & PagedAttention.
+3. `llamacpp`: Quantized local GGUF evaluation with native FlashAttention support.
 
-Enhancements:
-- DGX 128GB Production Ready: Implements polymorphic loading (standalone vs adapter), torchao compat, and explicit garbage collection.
-- GGUF auto-discovery.
-- ChatML template enforcement via native tokenizers.
-- LLM-as-Judge client.
+SOTA Enhancements:
+- Strict VRAM Airlock: Implements deep distributed state destruction for vLLM to prevent memory leaks.
+- Dynamic LoRA Routing: vLLM natively mounts `adapter_path` via `LoRARequest` on top of base model.
+- LlamaCPP Acceleration: Compiles with hardware-native flash attention.
+- JudgeClient Resiliency: LLM-as-a-Judge API includes exponential backoff.
 """
 
 import os
 import sys
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-if hasattr(sys.stderr, 'reconfigure'):
-    sys.stderr.reconfigure(encoding='utf-8')
 import time
 import json
 import urllib.request
@@ -28,9 +24,16 @@ import gc
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 
+# Ensure terminal stdout/stderr uses UTF-8 encoding
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 DEFAULT_BASE_MODEL = "../models/Qwen2.5-7B-Instruct"
 
 def patch_torchao_dispatch_compat():
+    """Patches TorchAO dispatch logic to prevent Unsloth PEFT instantiation crashes."""
     try:
         import torchao.quantization as _tao_q
         if hasattr(_tao_q, "LinearActivationQuantizedTensor"):
@@ -56,6 +59,7 @@ def format_chatml_prompt(
     user_message: str,
     assistant_prefix: str = ""
 ) -> str:
+    """Strictly formats prompts using the native Qwen ChatML delimiters."""
     prompt = f"<|im_start|>system\n{system_message}<|im_end|>\n"
     prompt += f"<|im_start|>user\n{user_message}<|im_end|>\n"
     prompt += f"<|im_start|>assistant\n{assistant_prefix}"
@@ -65,6 +69,7 @@ def format_chatml_multi_turn(
     messages: List[Dict[str, str]],
     add_generation_prompt: bool = True
 ) -> str:
+    """Formats an arbitrary conversation history into a unified ChatML string."""
     prompt = ""
     for msg in messages:
         role = msg["role"]
@@ -78,6 +83,7 @@ def format_chatml_multi_turn(
 # GGUF AUTO-DISCOVERY
 # ═══════════════════════════════════════════════════════════════════════════
 def _resolve_gguf_path(model_path: str) -> str:
+    """Intelligently detects and resolves target .gguf binaries from a directory."""
     p = Path(model_path)
     if p.is_file() and p.suffix == ".gguf":
         return str(p)
@@ -94,6 +100,9 @@ def _resolve_gguf_path(model_path: str) -> str:
     return str(p)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# UNIVERSAL BACKEND ENGINE
+# ═══════════════════════════════════════════════════════════════════════════
 class BackendEngine:
     def __init__(
         self,
@@ -105,14 +114,16 @@ class BackendEngine:
         max_seq_length: int = 24576
     ):
         self.backend_type = backend_type.lower().strip()
-        self.model_path = model_path
-        self.adapter_path = adapter_path if adapter_path else None
+        self.model_path = str(model_path) if model_path else None
+        self.adapter_path = str(adapter_path) if adapter_path else None
         self.vllm_url = vllm_url
-        self.lora_name = lora_name
+        self.lora_name = lora_name or "default_lora"
         self.max_seq_length = max_seq_length
+        
         self.llm = None
         self.tokenizer = None
         self.model = None
+        self.lora_request = None
 
         if self.backend_type == "unsloth":
             self._init_unsloth()
@@ -125,10 +136,23 @@ class BackendEngine:
         elif self.backend_type == "mock":
             self._init_mock()
         else:
-            raise ValueError(f"Unknown backend type: {self.backend_type}.")
+            raise ValueError(f"Unknown backend type: {self.backend_type}. Supported: unsloth, vllm, llamacpp.")
 
     def unload(self):
-        """Deterministically clear GPU memory to prevent VRAM fragmentation."""
+        """
+        Deterministically clears GPU memory to prevent VRAM fragmentation.
+        Critically implements vLLM distributed state destruction.
+        """
+        if self.backend_type == "vllm" and self.llm is not None:
+            print("🧹 [VRAM Airlock] Destroying vLLM distributed engine state...")
+            try:
+                from vllm.distributed.parallel_state import destroy_model_parallel
+                destroy_model_parallel()
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"⚠️ [VRAM Airlock] Non-fatal vLLM cleanup issue: {e}")
+
         if self.model is not None:
             del self.model
             self.model = None
@@ -138,11 +162,15 @@ class BackendEngine:
         if self.llm is not None:
             del self.llm
             self.llm = None
+            
+        self.lora_request = None
+
         gc.collect()
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
         except ImportError:
             pass
 
@@ -157,6 +185,10 @@ class BackendEngine:
         from unsloth import FastLanguageModel
         from unsloth.chat_templates import get_chat_template
         
+        # Maximize Ampere/Hopper GPU efficiency
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        
         patch_torchao_dispatch_compat()
 
         load_path = self.adapter_path if (self.adapter_path and os.path.exists(self.adapter_path)) else self.model_path
@@ -167,9 +199,7 @@ class BackendEngine:
         is_adapter = is_local_dir and os.path.exists(os.path.join(load_path, "adapter_config.json"))
         is_merged = is_local_dir and os.path.exists(os.path.join(load_path, "config.json")) and not is_adapter
 
-        # If it's not a local directory, assume it's a HuggingFace Hub repo ID
         if not is_local_dir:
-            print(f"[BackendEngine] Assuming {load_path} is a HuggingFace Hub repo ID.")
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
                 model_name=load_path,
                 max_seq_length=self.max_seq_length,
@@ -193,8 +223,6 @@ class BackendEngine:
                 load_in_4bit=False
             )
             self.model.load_adapter(load_path)
-        else:
-            raise ValueError(f"Path {load_path} does not appear to be a valid merged model or adapter.")
 
         # Enforce native ChatML template
         self.tokenizer = get_chat_template(
@@ -222,25 +250,38 @@ class BackendEngine:
         self.llm = Llama(
             model_path=self.model_path,
             n_ctx=min(self.max_seq_length, 32768),
-            n_gpu_layers=-1,
+            n_gpu_layers=-1, # Offload entirely to GPU
+            flash_attn=True, # Dramatically reduces KV cache memory footprint
             verbose=False
         )
         print("[BackendEngine] llama_cpp GGUF model successfully loaded.")
 
     def _init_vllm(self):
-        print(f"[BackendEngine] Initializing vLLM Backend natively for: {self.model_path}...")
+        print(f"[BackendEngine] Initializing vLLM Production Backend natively for: {self.model_path}...")
         try:
             import vllm
-            from vllm import LLM, SamplingParams
+            from vllm import LLM
+            from vllm.lora.request import LoRARequest
         except ImportError:
             raise ImportError("vLLM is not installed in this environment. Use a dedicated vLLM env for serving.")
+        
+        # Base Model Initialization with dynamic LoRA allocation support
+        enable_lora_flag = bool(self.adapter_path and os.path.exists(self.adapter_path))
         
         self.llm = LLM(
             model=self.model_path,
             tensor_parallel_size=1,
-            trust_remote_code=True
+            trust_remote_code=True,
+            enable_lora=enable_lora_flag,
+            max_lora_rank=128 if enable_lora_flag else 16,
+            max_model_len=self.max_seq_length
         )
-        print("[BackendEngine] vLLM Engine successfully initialized natively.")
+        
+        if enable_lora_flag:
+            print(f"[BackendEngine] Multi-LoRA vLLM Routing Enabled. Mounting {self.lora_name} -> {self.adapter_path}")
+            self.lora_request = LoRARequest(self.lora_name, 1, self.adapter_path)
+            
+        print("[BackendEngine] vLLM Engine successfully initialized.")
 
     def generate(
         self,
@@ -250,42 +291,53 @@ class BackendEngine:
         stop: Optional[List[str]] = None,
         grammar: Optional[Any] = None
     ) -> Dict[str, Any]:
+        
         if stop is None:
-            stop = ["<|im_end|>"]
+            stop = ["<|im_end|>", "<|endoftext|>"]
 
         if self.backend_type == "mock":
             time.sleep(0.01)
             mock_resp = '{"violations": [{"type": "Excessive Collection", "severity": "HIGH"}], "dpdp_trust_score": 30, "subtlety_score": 5}'
-            return {"raw_output": mock_resp, "latency_ms": 10.0, "ttft_ms": 5.0, "tokens_generated": 10, "tokens_per_sec": 100.0}
+            return {"raw_output": mock_resp, "latency_ms": 10.0, "ttft_ms": 5.0, "tokens_generated": 10, "tokens_per_sec": 1000.0}
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         first_token_time = None
         output_text = ""
         token_count = 0
 
+        # ---------------------------------------------------------------------
+        # UNSLOTH INFERENCE
+        # ---------------------------------------------------------------------
         if self.backend_type == "unsloth":
             import torch
             inputs = self.tokenizer([prompt], return_tensors="pt").to("cuda")
-            first_token_time = time.time()
+            first_token_time = time.perf_counter()
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=max_tokens,
-                    max_length=None,
+                    max_length=None, # Prevents CUDA illegal memory access
                     temperature=temperature if temperature > 0 else 0.01,
                     do_sample=True if temperature > 0 else False,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     use_cache=True
                 )
-            end_time = time.time()
+            end_time = time.perf_counter()
             gen_tokens = outputs[0][inputs["input_ids"].shape[1]:]
-            output_text = self.tokenizer.decode(gen_tokens, skip_special_tokens=True)
+            
+            # Explicitly decode WITHOUT dropping special tokens to reliably split on stop words
+            output_text = self.tokenizer.decode(gen_tokens, skip_special_tokens=False)
             for s in stop:
                 if s in output_text:
                     output_text = output_text.split(s)[0]
+                    
+            output_text = output_text.strip()
             token_count = len(gen_tokens)
 
+        # ---------------------------------------------------------------------
+        # LLAMACPP INFERENCE
+        # ---------------------------------------------------------------------
         elif self.backend_type == "llamacpp":
             kwargs = {
                 "max_tokens": max_tokens,
@@ -299,12 +351,15 @@ class BackendEngine:
             stream = self.llm(prompt, **kwargs)
             for chunk in stream:
                 if first_token_time is None and chunk['choices'][0].get('text', ''):
-                    first_token_time = time.time()
+                    first_token_time = time.perf_counter()
                 text = chunk['choices'][0].get('text', '')
                 output_text += text
                 token_count += 1
-            end_time = time.time()
+            end_time = time.perf_counter()
 
+        # ---------------------------------------------------------------------
+        # vLLM INFERENCE
+        # ---------------------------------------------------------------------
         elif self.backend_type == "vllm":
             from vllm import SamplingParams
             sampling_params = SamplingParams(
@@ -312,16 +367,27 @@ class BackendEngine:
                 max_tokens=max_tokens,
                 stop=stop
             )
-            outputs = self.llm.generate([prompt], sampling_params, use_tqdm=False)
+            
+            kwargs = {"use_tqdm": False}
+            if self.lora_request is not None:
+                kwargs["lora_request"] = self.lora_request
+                
+            outputs = self.llm.generate([prompt], sampling_params, **kwargs)
+            
             output_text = outputs[0].outputs[0].text
             token_count = len(outputs[0].outputs[0].token_ids)
-            first_token_time = start_time
-            end_time = time.time()
+            first_token_time = start_time # vLLM batch abstraction
+            end_time = time.perf_counter()
 
-        total_latency_ms = (end_time - start_time) * 1000
-        ttft_ms = (first_token_time - start_time) * 1000 if first_token_time else total_latency_ms
+        total_latency_ms = (end_time - start_time) * 1000.0
+        ttft_ms = (first_token_time - start_time) * 1000.0 if first_token_time else total_latency_ms
         generation_time_ms = total_latency_ms - ttft_ms
-        tokens_per_sec = (token_count / (generation_time_ms / 1000)) if generation_time_ms > 0.001 else 0
+        
+        # Fallback estimation for TTFT if generation was instantaneous
+        if generation_time_ms <= 0.001:
+            tokens_per_sec = token_count / (total_latency_ms / 1000.0) if total_latency_ms > 0 else 0
+        else:
+            tokens_per_sec = token_count / (generation_time_ms / 1000.0)
 
         return {
             "raw_output": output_text.strip(),
@@ -347,6 +413,7 @@ class JudgeClient:
         model_name: str = "teacher",
         timeout: int = 5
     ) -> Optional["JudgeClient"]:
+        """Verifies connection to the LLM-as-a-Judge teacher model API."""
         health_url = api_url.replace("/v1/completions", "/health")
         try:
             req = urllib.request.Request(health_url, method="GET")
@@ -361,11 +428,12 @@ class JudgeClient:
             print(f"⚠️ [JudgeClient] LOUD SKIP: Cannot reach LLM-as-Judge at {api_url}: {e}")
             return None
 
-    def generate(self, prompt: str, max_tokens: int = 10, temperature: float = 0.0) -> Dict[str, Any]:
+    def generate(self, prompt: str, max_tokens: int = 10, temperature: float = 0.0, retries: int = 3) -> Dict[str, Any]:
+        """Dispatches prompts to the LLM judge API with exponential backoff."""
         if self.api_url == "mock":
             time.sleep(0.01)
-            mock_resp = '{"violations": [{"type": "Excessive Collection", "severity": "HIGH"}], "dpdp_trust_score": 30, "subtlety_score": 5}'
-            return {"raw_output": mock_resp, "latency_ms": 10.0, "tokens_per_second": 100.0, "token_count": 10}
+            return {"raw_output": "5", "latency_ms": 10.0, "tokens_per_second": 100.0, "token_count": 1}
+            
         payload = {
             "model": self.model_name,
             "prompt": prompt,
@@ -374,13 +442,20 @@ class JudgeClient:
             "stop": ["<|im_end|>"],
             "stream": False
         }
-        req = urllib.request.Request(
-            self.api_url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            text = data.get("choices", [{}])[0].get("text", "")
-            return {"raw_output": text.strip()}
+        
+        for attempt in range(retries):
+            try:
+                req = urllib.request.Request(
+                    self.api_url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    text = data.get("choices", [{}])[0].get("text", "")
+                    return {"raw_output": text.strip()}
+            except Exception as e:
+                if attempt == retries - 1:
+                    raise Exception(f"Judge API failed after {retries} attempts: {e}")
+                time.sleep(2 ** attempt)  # Exponential backoff

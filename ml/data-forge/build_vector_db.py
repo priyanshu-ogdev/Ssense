@@ -181,8 +181,8 @@ def build_db():
     print("🧠 Embedding chunks with BAAI/bge-small-en-v1.5 (Instruction Tuned)...")
     embed_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
     
-    # Instruction prefix is mandatory for BGE retrieval models
-    docs_for_embed = [f"Represent this legal text for retrieval: {c}" for c in chunks]
+    # Instruction prefix is mandatory for queries, but NOT for corpus documents
+    docs_for_embed = chunks
     embeddings = embed_model.encode(docs_for_embed, batch_size=32, show_progress_bar=True, normalize_embeddings=True)
     
     print("📚 Building Lexical BM25 Index...")
@@ -234,7 +234,7 @@ def build_db():
         bm25_ranks = np.argsort(bm25_scores)[::-1]
         
         # Dense Search
-        q_emb = embed_model.encode([f"Represent this query for retrieval: {q}"], normalize_embeddings=True)[0]
+        q_emb = embed_model.encode([f"Represent this sentence for searching relevant passages: {q}"], normalize_embeddings=True)[0]
         dense_scores = np.dot(embeddings, q_emb)
         dense_ranks = np.argsort(dense_scores)[::-1]
         

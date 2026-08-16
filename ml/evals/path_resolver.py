@@ -2,27 +2,37 @@
 """
 path_resolver.py – Centralized, Deterministic Path Resolution for the DPDP Eval Suite.
 
-Every script in the eval suite MUST import paths from here instead of constructing
-its own CWD-relative or ad-hoc paths. This guarantees the suite works identically
-regardless of which directory the user invokes it from.
-
-Usage:
-    from path_resolver import Paths
-    schema = Paths.SCHEMA_PATH
-    report_dir = Paths.REPORTS_DIR
+SOTA Upgrades Implemented:
+1. Dynamic Root Discovery: Climbs the AST/directory tree dynamically to find `ml/`
+   regardless of where or how the script is executed.
+2. Fresh-Clone Safeguards: Automatically ensures requisite output directories exist.
+3. Fallback Hierarchy: Bulletproof resolution for relative vs absolute model paths.
 """
 
+import json
 from pathlib import Path
-from typing import Optional
-
+from typing import Optional, List
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ROOT ANCHORS – everything is relative to the `ml/evals/` directory
+# DYNAMIC ROOT DISCOVERY
 # ═══════════════════════════════════════════════════════════════════════════
-_EVALS_DIR = Path(__file__).resolve().parent          # ml/evals/
-_CORE_DIR = _EVALS_DIR                                # ml/evals/
-_ML_DIR = _EVALS_DIR.parent                           # ml/
-_PROJECT_ROOT = _ML_DIR.parent                        # Ssense/
+def _find_ml_root() -> Path:
+    """
+    Dynamically traverses upwards from this file to find the true `ml/` root.
+    Immune to symlinks and file relocations.
+    """
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / "data-forge").exists() and (current / "evals").exists():
+            return current
+        current = current.parent
+    
+    # Absolute Fallback if executed in a detached context
+    return Path(__file__).resolve().parent.parent
+
+_ML_DIR = _find_ml_root()
+_EVALS_DIR = _ML_DIR / "evals"
+_PROJECT_ROOT = _ML_DIR.parent
 
 
 class Paths:
@@ -30,7 +40,7 @@ class Paths:
 
     # ── Eval Suite ──────────────────────────────────────────────────────
     EVALS_DIR = _EVALS_DIR
-    CORE_DIR = _CORE_DIR
+    CORE_DIR = _EVALS_DIR
     SUITES_DIR = _EVALS_DIR / "suites"
 
     # ── Benchmark Data ──────────────────────────────────────────────────
@@ -56,90 +66,103 @@ class Paths:
     # ── Hybrid Index ────────────────────────────────────────────────────
     HYBRID_INDEX = _ML_DIR / "data-forge" / "dpdp_hybrid_index.pkl"
 
-    # ── Default Model Paths (relative to project root, resolved at call-time) ──
+    # ── Default Model & Data Paths ──────────────────────────────────────
     MODELS_DIR = _ML_DIR / "models"
-
-    # ── Training Data (for leakage detection) ───────────────────────────
     TRAINING_DATA_DIR = _ML_DIR / "slm-training" / "data"
 
     @classmethod
     def ensure_reports_dir(cls) -> Path:
-        """Create and return the reports directory."""
+        """Create and return the reports directory safely."""
         cls.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
         return cls.REPORTS_DIR
 
     @classmethod
     def resolve_model_path(cls, model_arg: Optional[str], default_name: str) -> Path:
         """
-        Resolve a model path from a CLI argument or default.
-        Checks both the models dir and parent-relative ../models/ pattern.
+        Bulletproof model path resolution. 
+        Hierarchy: Absolute Path -> CWD Relative -> ML_DIR/models Relative -> Fallback.
         """
         if model_arg:
             p = Path(model_arg)
+            # 1. Check if it's a direct valid path (Absolute or relative to CWD)
             if p.exists():
                 return p.resolve()
-            # Try relative to project root
+            
+            # 2. Check if it's relative to the project root
             pr = _PROJECT_ROOT / model_arg
             if pr.exists():
                 return pr.resolve()
-            # Return as-is (will fail downstream with a clear error)
-            return p
+                
+            # 3. Check if it's relative to the models directory
+            pm = cls.MODELS_DIR / model_arg
+            if pm.exists():
+                return pm.resolve()
 
-        # Default resolution
+            return p  # Return as-is (will throw expected downstream error)
+
+        # 4. Default resolution paths
         candidates = [
             cls.MODELS_DIR / default_name,
-            _PROJECT_ROOT.parent / "models" / default_name,  # ../models/ pattern
+            _PROJECT_ROOT.parent / "models" / default_name,  # legacy mapping support
         ]
         for c in candidates:
             if c.exists():
                 return c.resolve()
+                
         return cls.MODELS_DIR / default_name
 
     @classmethod
     def resolve_gguf_path(cls, dir_or_file: str) -> Path:
         """
-        For llama.cpp backend: if given a directory, auto-discover the .gguf file.
-        Errors if 0 or >1 .gguf files found.
+        For llama.cpp backend: dynamically auto-discovers the optimal .gguf file.
+        Safely prioritizes Q4_K_M if multiple exist.
         """
         p = Path(dir_or_file)
         if p.is_file() and p.suffix == ".gguf":
             return p.resolve()
+            
         if p.is_dir():
             ggufs = list(p.glob("*.gguf"))
-            if len(ggufs) == 0:
+            if not ggufs:
                 raise FileNotFoundError(
-                    f"No .gguf files found in directory: {p}\n"
-                    f"Expected a quantized model file (e.g., *Q4_K_M.gguf) inside this directory."
+                    f"❌ No .gguf files found in directory: {p}\n"
+                    f"Expected a quantized model file inside this directory."
                 )
             if len(ggufs) > 1:
+                # Prioritize Q4_K_M quantization if multiple exist
+                q4_candidates = [g for g in ggufs if "Q4_K_M" in g.name]
+                if len(q4_candidates) == 1:
+                    return q4_candidates[0].resolve()
+                    
                 names = [g.name for g in ggufs]
                 raise ValueError(
-                    f"Multiple .gguf files found in {p}: {names}\n"
-                    f"Please specify the exact file path, not the directory."
+                    f"⚠️ Multiple .gguf files found in {p}: {names}\n"
+                    f"Please specify the exact file path explicitly."
                 )
             return ggufs[0].resolve()
-        raise FileNotFoundError(f"Model path does not exist: {p}")
+            
+        raise FileNotFoundError(f"❌ Model path does not exist: {p}")
 
     @classmethod
     def read_model_label(cls, model_path: str, fallback: str = "Unknown Model") -> str:
         """
-        Dynamically resolve the model label from the model's own config.json.
-        Falls back to the provided fallback string.
+        Dynamically extracts the model's true architectural name from its config.json.
         """
-        import json
         config_path = Path(model_path) / "config.json"
         if config_path.exists():
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                # Try common fields
+                
+                # Check standard HuggingFace config keys in order of precedence
                 for key in ["_name_or_path", "model_type", "architectures"]:
                     if key in config:
                         val = config[key]
-                        if isinstance(val, list):
+                        if isinstance(val, list) and len(val) > 0:
                             val = val[0]
                         if val and isinstance(val, str):
                             return val
             except Exception:
                 pass
+                
         return fallback
