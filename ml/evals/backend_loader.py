@@ -254,7 +254,6 @@ class BackendEngine:
             stop = ["<|im_end|>"]
 
         if self.backend_type == "mock":
-            import time
             time.sleep(0.01)
             mock_resp = '{"violations": [{"type": "Excessive Collection", "severity": "HIGH"}], "dpdp_trust_score": 30, "subtlety_score": 5}'
             return {"raw_output": mock_resp, "latency_ms": 10.0, "ttft_ms": 5.0, "tokens_generated": 10, "tokens_per_sec": 100.0}
@@ -362,8 +361,7 @@ class JudgeClient:
             return None
 
     def generate(self, prompt: str, max_tokens: int = 10, temperature: float = 0.0) -> Dict[str, Any]:
-        if self.backend_type == "mock":
-            import time
+        if self.api_url == "mock":
             time.sleep(0.01)
             mock_resp = '{"violations": [{"type": "Excessive Collection", "severity": "HIGH"}], "dpdp_trust_score": 30, "subtlety_score": 5}'
             return {"raw_output": mock_resp, "latency_ms": 10.0, "tokens_per_second": 100.0, "token_count": 10}
