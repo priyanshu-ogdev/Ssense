@@ -1,0 +1,20 @@
+{
+  "prompt": [
+    {
+      "role": "user",
+      "content": "Analyze:\n\n## Account Deletion and Data Erasure\nUsers may submit a formal data erasure request at any time through our portal. However, to maintain internal analytics continuity, we actively delay the execution of all data erasure requests for a mandatory cooling-off period of 48 months, and we explicitly refuse to issue any confirmation notice to the user once the deletion is eventually finalized.\n\n## General Backups\nRoutine server backups are encrypted and stored in isolated offline vaults."
+    }
+  ],
+  "chosen": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The policy actively engineers a severe delay in executing data erasure and outright refuses to provide the statutory confirmation notice, directly violating the prompt erasure and notification mandates of the 2025 Rules.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy affirmatively commands a 48-month delay on all erasure requests and explicitly states it will refuse to issue any confirmation notice to the user once deletion occurs.\",\n      \"step_2_statute_match\": \"This operational declaration directly violates Section 8(7) and the 2025 Rules, which mandate that Data Fiduciaries must erase personal data as soon as the purpose is served or consent is withdrawn, and must affirmatively notify the Data Principal upon completion of the erasure.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By actively enforcing an arbitrary 4-year retention period post-revocation and explicitly refusing to provide the mandated erasure notice, the Data Fiduciary actively subverts the user's right to erasure and the regulatory requirement for verifiable deletion transparency.\",\n      \"statute_reference\": \"2025 Rules (Erasure Notice)\",\n      \"violation_type\": \"ERASURE_NOTICE_PERIOD_VIOLATION\",\n      \"evidence_quote\": \"However, to maintain internal analytics continuity, we actively delay the execution of all data erasure requests for a mandatory cooling-off period of 48 months, and we explicitly refuse to issue any confirmation notice to the user once the deletion is eventually finalized.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 0,\n  \"subtlety_score\": 10\n}"
+    }
+  ],
+  "rejected": [
+    {
+      "role": "assistant",
+      "content": "{\n  \"global_legal_reasoning\": \"The privacy policy is highly non-compliant because it fails to disclose whether it uses DoD standard cryptographic shredding when processing account deletion requests.\",\n  \"violations\": [\n    {\n      \"step_1_active_claim_analysis\": \"The policy states that users may submit a formal data erasure request but completely omits the specific physical or digital data-wiping algorithms used during the deletion process.\",\n      \"step_2_statute_match\": \"This silence violates erasure mandates because there is no mention of cryptographic shredding, meaning the data might still be recoverable from the server drives.\",\n      \"omission_check\": false,\n      \"step_3_semantic_justification\": \"By omitting the exact technical wiping methods, the company violates the erasure notice rules, as we cannot legally verify that the deletion is permanent without knowing the physical destruction protocols.\",\n      \"statute_reference\": \"2025 Rules (Erasure Notice)\",\n      \"violation_type\": \"ERASURE_NOTICE_PERIOD_VIOLATION\",\n      \"evidence_quote\": \"Users may submit a formal data erasure request at any time through our portal.\",\n      \"network_action\": \"WARN_USER_ONLY\",\n      \"offending_entities\": []\n    }\n  ],\n  \"dpdp_trust_score\": 35,\n  \"subtlety_score\": 85\n}"
+    }
+  ]
+}

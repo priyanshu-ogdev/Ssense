@@ -25,40 +25,28 @@ from datetime import datetime, timezone
 from tqdm import tqdm
 import numpy as np
 
-try:
-    from backend_loader import BackendEngine
-except ImportError:
-    from ml.evals.backend_loader import BackendEngine
 
+# Fix import path for core
+import sys
+
+from backend_loader import BackendEngine, format_chatml_prompt
+from metrics import (
+    extract_json_from_output,
+    calculate_violation_f1,
+    calculate_evidence_hallucination_rate,
+    calculate_parametric_citation_validity
+)
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
-DEFAULT_SCHEMA_PATH = Path("libs/contracts/schemas/dpdp_schema.json")
-DEFAULT_GROUND_TRUTH_PATH = Path("ml/evals/holdout_policies/ground_truth.json")
-DEFAULT_LAW_FILE_PATH = Path("ml/data-forge/dpdp_act_and_rules_2025.txt")
+_EVALS_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _EVALS_DIR.parent.parent
+DEFAULT_SCHEMA_PATH = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
+DEFAULT_GROUND_TRUTH_PATH = _EVALS_DIR / "holdout_policies" / "ground_truth.json"
+DEFAULT_LAW_FILE_PATH = _EVALS_DIR.parent / "data-forge" / "dpdp_act_and_rules_2025.txt"
 DEFAULT_MODEL_PATH = Path("../models/audit-model-final") if Path("../models/audit-model-final").exists() else Path("../models/Qwen3.5-9B")
-REPORT_DIR = Path("ml/evals/reports")
+REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
-
-VIOLATION_SEVERITY_MAP = {
-    "CHILD_CONSENT_VIOLATION": "CRITICAL",
-    "CROSS_BORDER_TRANSFER_VIOLATION": "HIGH",
-    "CONSENT_NOT_FREE_OR_SPECIFIC": "HIGH",
-    "DATA_RETENTION_LIMIT_EXCEEDED": "HIGH",
-    "PURPOSE_LIMITATION_VIOLATION": "HIGH",
-    "SECURITY_SAFEGUARDS_MISSING": "HIGH",
-    "NOTICE_INADEQUATE": "MEDIUM",
-    "GRIEVANCE_REDRESSAL_INADEQUATE": "MEDIUM",
-    "SDF_OBLIGATIONS_MISSING": "MEDIUM",
-    "BREACH_NOTIFICATION_FAILURE": "HIGH",
-}
-
-SEVERITY_WEIGHTS = {
-    "CRITICAL": 1.0,
-    "HIGH": 0.8,
-    "MEDIUM": 0.6,
-    "LOW": 0.4
-}
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -93,131 +81,7 @@ def load_test_data(gt_path: Path) -> List[Dict[str, Any]]:
         })
     return test_data
 
-def normalize_section_reference(section: str) -> Set[str]:
-    if not section:
-        return set()
-    section = section.strip()
-    variations = {section}
-    if "read with" in section.lower():
-        parts = re.split(r'\s+read\s+with\s+', section, flags=re.IGNORECASE)
-        for part in parts:
-            variations.update(normalize_section_reference(part.strip()))
-    if '(' in section:
-        base = section.split('(')[0].strip()
-        variations.add(base)
-    if section.startswith("Section "):
-        variations.add(section.replace("Section ", ""))
-    if section.startswith("Rule ") and '(' in section:
-        base = section.split('(')[0].strip()
-        variations.add(base)
-    if section.startswith("Rule "):
-        variations.add(section.replace("Rule ", ""))
-    variations.add(section.lower())
-    return variations
 
-def sections_match(pred: str, gt: str) -> bool:
-    return bool(normalize_section_reference(pred) & normalize_section_reference(gt))
-
-def extract_json_from_output(output: str) -> str:
-    if not output or not output.strip():
-        return ""
-    cleaned = output.strip()
-    if '```json' in cleaned:
-        match = re.search(r'```json\s*(.*?)\s*```', cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-    elif '```' in cleaned:
-        match = re.search(r'```\s*(.*?)\s*```', cleaned, re.DOTALL)
-        if match:
-            cleaned = match.group(1).strip()
-    first_brace = cleaned.find('{')
-    last_brace = cleaned.rfind('}')
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        cleaned = cleaned[first_brace:last_brace + 1]
-    cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
-    return cleaned.strip()
-
-# ═══════════════════════════════════════════════════════════════════════════
-# METRIC CALCULATION ENGINES
-# ═══════════════════════════════════════════════════════════════════════════
-def calculate_violation_f1(pred_violations: List[Dict[str, Any]], gt_violations: List[Dict[str, Any]]) -> Dict[str, Any]:
-    if not pred_violations and not gt_violations:
-        return {"f1": 1.0, "precision": 1.0, "recall": 1.0, "weighted_f1": 1.0}
-    if not pred_violations or not gt_violations:
-        return {"f1": 0.0, "precision": 0.0, "recall": 0.0, "weighted_f1": 0.0}
-
-    matched_gt = set()
-    true_positives = 0
-    weighted_tp = 0.0
-    weighted_fn = 0.0
-    weighted_fp = 0.0
-
-    for idx_pred, pv in enumerate(pred_violations):
-        p_type = pv.get("violation_type", "")
-        p_sec = pv.get("statute_reference", "")
-        severity = VIOLATION_SEVERITY_MAP.get(p_type, "MEDIUM")
-        weight = SEVERITY_WEIGHTS[severity]
-
-        match_found = False
-        for idx_gt, gv in enumerate(gt_violations):
-            if idx_gt in matched_gt:
-                continue
-            g_type = gv.get("violation_type", "")
-            g_sec = gv.get("statute_reference", "")
-            if p_type == g_type and sections_match(p_sec, g_sec):
-                matched_gt.add(idx_gt)
-                true_positives += 1
-                weighted_tp += weight
-                match_found = True
-                break
-        if not match_found:
-            weighted_fp += weight
-
-    for idx_gt, gv in enumerate(gt_violations):
-        if idx_gt not in matched_gt:
-            g_type = gv.get("violation_type", "")
-            severity = VIOLATION_SEVERITY_MAP.get(g_type, "MEDIUM")
-            weighted_fn += SEVERITY_WEIGHTS[severity]
-
-    precision = true_positives / len(pred_violations) if pred_violations else 0.0
-    recall = true_positives / len(gt_violations) if gt_violations else 0.0
-    f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-    w_prec = weighted_tp / (weighted_tp + weighted_fp) if (weighted_tp + weighted_fp) > 0 else 0.0
-    w_rec = weighted_tp / (weighted_tp + weighted_fn) if (weighted_tp + weighted_fn) > 0 else 0.0
-    weighted_f1 = (2 * w_prec * w_rec) / (w_prec + w_rec) if (w_prec + w_rec) > 0 else 0.0
-
-    return {
-        "f1": round(f1, 4),
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "weighted_f1": round(weighted_f1, 4)
-    }
-
-def calculate_evidence_hallucination_rate(pred_violations: List[Dict[str, Any]], policy_text: str) -> Dict[str, Any]:
-    """Pillar 4: Verifies verbatim quote existence within the input policy."""
-    if not pred_violations:
-        return {"hallucinated_quotes": 0, "total_quotes": 0, "hallucination_rate": 0.0}
-
-    hallucinated = 0
-    total = 0
-    clean_policy = re.sub(r'\s+', ' ', policy_text.lower()).strip()
-
-    for v in pred_violations:
-        quote = v.get("evidence_quote", "")
-        if not quote or not isinstance(quote, str) or len(quote.strip()) < 4:
-            continue
-        total += 1
-        clean_quote = re.sub(r'\s+', ' ', quote.lower()).strip()
-        if clean_policy.find(clean_quote) == -1:
-            hallucinated += 1
-
-    rate = (hallucinated / total) * 100 if total > 0 else 0.0
-    return {
-        "hallucinated_quotes": hallucinated,
-        "total_quotes": total,
-        "hallucination_rate": round(rate, 2)
-    }
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN ORCHESTRATOR
@@ -255,18 +119,13 @@ def main():
     subtlety_errors = []
     total_quotes = 0
     total_hallucinated = 0
+    total_citations = 0
+    valid_citations = 0
 
     for item in tqdm(test_data, desc="Evaluating Accuracy & Hallucination"):
-        prompt = f"""<|im_start|>system
-You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal Data Protection (DPDP) Act 2023 and Rules 2025. Output ONLY valid JSON matching the dpdp_schema.<|im_end|>
-<|im_start|>user
-[CONTEXT: THE LAW]
-{law_context[:8000]}
-
-[SYNTHESIZED POLICY]
-{item['content']}<|im_end|>
-<|im_start|>assistant
-"""
+        sys_msg = "You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal Data Protection (DPDP) Act 2023 and Rules 2025. Output ONLY valid JSON matching the dpdp_schema."
+        user_msg = f"[CONTEXT: THE LAW]\n{law_context[:8000]}\n\n[SYNTHESIZED POLICY]\n{item['content']}"
+        prompt = format_chatml_prompt(sys_msg, user_msg)
         out = engine.generate(prompt, max_tokens=2048, temperature=0.0)
         extracted = extract_json_from_output(out["raw_output"])
         parsed = {}
@@ -296,6 +155,10 @@ You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal D
         total_quotes += halluc_metrics["total_quotes"]
         total_hallucinated += halluc_metrics["hallucinated_quotes"]
 
+        cit_metrics = calculate_parametric_citation_validity(pred_violations)
+        total_citations += cit_metrics["total_citations"]
+        valid_citations += cit_metrics["valid_citations"]
+
         results.append({
             "case_id": item["case_id"],
             "filename": item["filename"],
@@ -304,6 +167,7 @@ You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal D
             "trust_score_error": abs(pred_trust - gt_trust) if isinstance(pred_trust, (int, float)) else 50,
             "subtlety_score_error": abs(pred_subt - gt_subt) if isinstance(pred_subt, (int, float)) else 5,
             "hallucination_rate": halluc_metrics["hallucination_rate"],
+            "parametric_citation_validity": cit_metrics["validity_rate"],
             "latency_ms": out["latency_ms"]
         })
 
@@ -312,17 +176,21 @@ You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal D
     mae_trust = float(np.mean(trust_errors)) if trust_errors else 0.0
     mae_subt = float(np.mean(subtlety_errors)) if subtlety_errors else 0.0
     overall_halluc_rate = (total_hallucinated / total_quotes) * 100 if total_quotes > 0 else 0.0
+    overall_cit_validity = (valid_citations / total_citations) * 100 if total_citations > 0 else 100.0
 
     summary = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "backend": args.backend,
         "model_path": args.model_path,
         "total_cases_evaluated": len(test_data),
+        "total_quotes": total_quotes,
+        "total_citations": total_citations,
         "avg_violation_f1": round(avg_f1, 4),
         "avg_weighted_violation_f1": round(avg_weighted_f1, 4),
         "trust_score_mae": round(mae_trust, 2),
         "subtlety_score_mae": round(mae_subt, 2),
         "evidence_quote_hallucination_rate": round(overall_halluc_rate, 2),
+        "parametric_citation_validity_rate": round(overall_cit_validity, 2),
         "details": results
     }
 
@@ -339,6 +207,7 @@ You are a strict DPDP Regulatory Auditor enforcing the Indian Digital Personal D
     print(f"   • Trust Score MAE:                 {mae_trust:.2f} pts (Threshold: <= 8.5 pts)")
     print(f"   • Subtlety Score MAE:              {mae_subt:.2f} pts")
     print(f"   • Evidence Quote Hallucination:    {overall_halluc_rate:.2f}% (Threshold: == 0.0%)")
+    print(f"   • Parametric Citation Validity:    {overall_cit_validity:.2f}% (Threshold: >= 95.0%)")
     print(f"💾 Detailed report saved to: {report_path}")
     print("═"*70 + "\n")
 

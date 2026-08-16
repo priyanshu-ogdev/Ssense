@@ -21,17 +21,18 @@ from typing import Dict, List, Any
 from datetime import datetime, timezone
 from tqdm import tqdm
 
-try:
-    from backend_loader import BackendEngine
-except ImportError:
-    from ml.evals.backend_loader import BackendEngine
 
+# Fix import path for core
+import sys
+
+from backend_loader import BackendEngine, format_chatml_prompt
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
-DEFAULT_BENCHMARK_PATH = Path("ml/evals/benchmarks/redteam_hallucination_prompts.json")
+_EVALS_DIR = Path(__file__).resolve().parent
+DEFAULT_BENCHMARK_PATH = _EVALS_DIR / "benchmarks" / "redteam_hallucination_prompts.json"
 DEFAULT_MODEL_PATH = Path("../models/audit-model-final")
-REPORT_DIR = Path("ml/evals/reports")
+REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -68,12 +69,9 @@ def main():
     hallucinations_detected = 0
 
     for item in tqdm(prompts_data, desc="Stress-Testing Hallucination Resistance"):
-        prompt = f"""<|im_start|>system
-You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a query references non-existent sections, false penalties, foreign statutes (GDPR/Article 17), or technical specifications not detailed in the DPDP Act 2023 or Rules 2025, you must explicitly reject the premise or declare statutory silence without confabulating external legal theories.<|im_end|>
-<|im_start|>user
-{item['prompt']}<|im_end|>
-<|im_start|>assistant
-"""
+        sys_msg = "You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a query references non-existent sections, false penalties, foreign statutes (GDPR/Article 17), or technical specifications not detailed in the DPDP Act 2023 or Rules 2025, you must explicitly reject the premise or declare statutory silence without confabulating external legal theories."
+        user_msg = item.get('query', item.get('prompt', ''))
+        prompt = format_chatml_prompt(sys_msg, user_msg)
         out = engine.generate(prompt, max_tokens=768, temperature=0.0)
         resp = out["raw_output"]
 
@@ -85,7 +83,7 @@ You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a que
                 triggered_terms.append(trig)
 
         # Additional Zero-Confabulation check for statutory silence traps
-        if "silence" in item["trap_type"].lower() and not any(w in resp_lower for w in ["silent", "does not specify", "not specify", "neither the act nor", "not prescribe", "no explicit"]):
+        if "silence" in item.get("trap_type", "silence").lower() and not any(w in resp_lower for w in ["silent", "does not specify", "not specify", "neither the act nor", "not prescribe", "no explicit"]):
             # If the model fails to explicitly clarify statutory silence when trapped
             triggered_terms.append("[Failed to declare explicit statutory silence]")
 
@@ -95,8 +93,8 @@ You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a que
 
         results.append({
             "id": item["id"],
-            "trap_type": item["trap_type"],
-            "prompt": item["prompt"],
+            "trap_type": item.get("trap_type", "silence"),
+            "prompt": item.get("query", ""),
             "is_hallucinating": is_hallucinating,
             "triggered_terms": triggered_terms,
             "raw_response": resp[:300] + "..." if len(resp) > 300 else resp,
@@ -112,6 +110,7 @@ You are a strict, highly accurate DPDP Legal Authority and RAG auditor. If a que
         "backend": args.backend,
         "model_path": args.model_path,
         "total_adversarial_traps": n,
+        "total_traps_tested": n,
         "redteam_hallucination_rate": round(halluc_rate, 2),
         "statutory_trap_resistance_rate": round(resistance_rate, 2),
         "details": results

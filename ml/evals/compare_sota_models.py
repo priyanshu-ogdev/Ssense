@@ -24,20 +24,20 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from tqdm import tqdm
 
-try:
-    from backend_loader import BackendEngine
-    from evaluate_chatbot import evaluate_scp, evaluate_cf_judge, evaluate_jcr
-except ImportError:
-    from ml.evals.backend_loader import BackendEngine
-    from ml.evals.evaluate_chatbot import evaluate_scp, evaluate_cf_judge, evaluate_jcr
 
+# Fix import path for core
+import sys
+
+from backend_loader import BackendEngine, format_chatml_prompt
+from metrics import evaluate_scp, evaluate_cf_judge, evaluate_jcr
 # ═══════════════════════════════════════════════════════════════════════════
-# CONFIGURATION
+# CONFIGURATION (paths anchored to __file__, not CWD)
 # ═══════════════════════════════════════════════════════════════════════════
-DEFAULT_BENCHMARK = Path(__file__).resolve().parent / "benchmarks" / "dpdp_rag_testset.json"
+_EVALS_DIR = Path(__file__).resolve().parent
+DEFAULT_BENCHMARK = _EVALS_DIR / "benchmarks" / "dpdp_rag_testset.json"
 FINETUNED_MODEL_PATH = Path("../models/chatbot-model-final")
 BASELINE_MODEL_PATH = Path("../models/Qwen3.5-9B")
-REPORT_DIR = Path(__file__).resolve().parent / "reports"
+REPORT_DIR = _EVALS_DIR / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_PATH = REPORT_DIR / "sota_legal_comparison_report.json"
 
@@ -57,12 +57,9 @@ def evaluate_model_on_testset(engine: BackendEngine, queries: List[Dict[str, Any
         target_sec = item["target_section"]
         target_kws = item["target_keywords"]
 
-        prompt = f"""<|im_start|>system
-You are a legal assistant. Answer the privacy law query accurately based on valid legal provisions.<|im_end|>
-<|im_start|>user
-Query: {query}<|im_end|>
-<|im_start|>assistant
-"""
+        sys_msg = "You are a legal assistant. Answer the privacy law query accurately based on valid legal provisions."
+        user_msg = f"Query: {query}"
+        prompt = format_chatml_prompt(sys_msg, user_msg)
         t0 = time.perf_counter()
         out = engine.generate(prompt, max_tokens=512, temperature=0.1)
         t1 = time.perf_counter()
@@ -96,6 +93,9 @@ def main():
     parser.add_argument("--baseline-path", type=str, default=str(BASELINE_MODEL_PATH))
     parser.add_argument("--benchmark-path", type=str, default=str(DEFAULT_BENCHMARK))
     parser.add_argument("--lora-name", type=str, default="chatbot")
+    parser.add_argument("--allow-simulated-baseline", action="store_true",
+                        help="Allow using hardcoded simulated baseline metrics when baseline model is unavailable. "
+                             "Without this flag, the script will HARD-FAIL if the baseline model is not found.")
     args = parser.parse_args()
 
     print("🏆 [PILLAR 4]: SOTA Legal Model Head-to-Head Comparative Benchmark")
@@ -113,21 +113,34 @@ def main():
     ft_results = evaluate_model_on_testset(ft_engine, queries, "RAFT-Trained DPDP Chatbot (9B)")
 
     # 2. Evaluate Base Model / Baseline
-    base_results = {
-        "model_label": "Vanilla Qwen3.5-9B (Unadapted Baseline)",
-        "scp_rate": 56.4,   # Simulated / unadapted generic baseline legal performance
-        "avg_cf_score": 3.2,
-        "jcr_rate": 18.0,   # Shows characteristic Western bias (citing GDPR/CCPA concepts)
-        "avg_latency_ms": ft_results["avg_latency_ms"] * 0.95
-    }
-    
+    baseline_is_simulated = False
+    base_results = None
+
     if Path(args.baseline_path).exists() and not (args.finetuned_path == args.baseline_path):
         try:
             print(f"📦 Loading Vanilla Baseline Model Engine from: {args.baseline_path}...")
             base_engine = BackendEngine(backend_type=args.backend, model_path=args.baseline_path)
-            base_results = evaluate_model_on_testset(base_engine, queries, "Vanilla Qwen3.5-9B Baseline")
+            base_results = evaluate_model_on_testset(base_engine, queries, "Vanilla Baseline")
         except Exception as e:
-            print(f"⚠️ Notice: Using pre-validated baseline comparative metrics due to: {e}")
+            print(f"⚠️ Baseline model failed to load: {e}")
+
+    if base_results is None:
+        if args.allow_simulated_baseline:
+            print("⚠️ WARNING: Baseline model not available. Using SIMULATED baseline metrics.")
+            print("   This means the comparative superiority claim is NOT empirically validated.")
+            baseline_is_simulated = True
+            base_results = {
+                "model_label": "[SIMULATED] Vanilla Baseline (NOT REAL)",
+                "scp_rate": 56.4,
+                "avg_cf_score": 3.2,
+                "jcr_rate": 18.0,
+                "avg_latency_ms": ft_results["avg_latency_ms"] * 0.95
+            }
+        else:
+            print("❌ HARD-FAIL: Baseline model not found and --allow-simulated-baseline not set.")
+            print(f"   Looked for baseline at: {args.baseline_path}")
+            print("   Either provide the baseline model or pass --allow-simulated-baseline to use fake numbers.")
+            return 1
 
     # Win Condition Assertions
     win_scp = ft_results["scp_rate"] >= 90.0 and ft_results["scp_rate"] > base_results["scp_rate"]
@@ -144,13 +157,14 @@ def main():
     print(f"| Context Faithfulness (CF Score) | {base_results['avg_cf_score']:22.2f}/5 | {ft_results['avg_cf_score']:24.2f}/5 | > 4.50 / 5    | {'✅ PASS' if win_cf else '⚠️ NOTICE'} |")
     print(f"| Jurisdictional Contamination    | {base_results['jcr_rate']:22.2f}% | {ft_results['jcr_rate']:24.2f}% | 0.00% (FT)    | {'✅ PASS' if win_jcr else '⚠️ NOTICE'} |")
     print("═══════════════════════════════════════════════════════════════════════\n")
-    print(f"🏁 Win Condition Verdict: {'✅ CERTIFIED SOTA SUPERIORITY' if certified_superiority else '✅ VALIDATED (HIGH COMPETITIVENESS)'}")
+    print(f"🏁 Win Condition Verdict: {'✅ CERTIFIED SOTA SUPERIORITY' if certified_superiority else '❌ NOT CERTIFIED — WIN CONDITIONS NOT MET'}")
 
     report_dict = {
         "evaluation_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "testset_queries": len(queries),
         "finetuned_model": ft_results,
         "baseline_model": base_results,
+        "baseline_is_simulated": baseline_is_simulated,
         "win_condition_verified": certified_superiority
     }
 

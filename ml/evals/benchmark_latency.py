@@ -24,11 +24,11 @@ import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any
 
-try:
-    from backend_loader import BackendEngine
-except ImportError:
-    from ml.evals.backend_loader import BackendEngine
 
+# Fix import path for core
+import sys
+
+from backend_loader import BackendEngine, format_chatml_prompt
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -39,12 +39,11 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_PATH = REPORT_DIR / "latency_stress_benchmark_report.json"
 
 BATCH_SIZES = [1, 4, 8, 16]
-STANDARD_PROMPT = """<|im_start|>system
-You are a fast, highly accurate DPDP Legal Assistant.<|im_end|>
-<|im_start|>user
-Summarize the Data Principal obligations under Section 15 of the DPDP Act 2023.<|im_end|>
-<|im_start|>assistant
-"""
+
+# Note: Using format_chatml_prompt at runtime, but defining standard inputs here.
+STANDARD_SYS_MSG = "You are a fast, highly accurate DPDP Legal Assistant."
+STANDARD_USER_MSG = "Summarize the Data Principal obligations under Section 15 of the DPDP Act 2023."
+STANDARD_PROMPT = ""  # We'll build this properly inside the script.
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BENCHMARK ENGINE
@@ -58,37 +57,31 @@ def generate_32k_stress_prompt() -> str:
     
     # Repeat text to reach ~110,000 characters (~30,000 tokens)
     repeated_law = (base_law * (110000 // len(base_law) + 1))[:115000]
-    prompt = f"""<|im_start|>system
-You are a legal document auditing LLM designed to handle up to 32k context windows without performance degradation or memory failure.<|im_end|>
-<|im_start|>user
-[MASSIVE STATUTORY CONTEXT (32K TOKEN TEST)]:
-{repeated_law}
-
-Based strictly on the above massive text, state whether Section 33 penalties apply to private enterprises.<|im_end|>
-<|im_start|>assistant
-"""
+    user_msg = f"[LEGAL CONTEXT: 30K TOKENS]\n{repeated_law}\n\n[USER QUERY]\nCan you identify all specific obligations that a Data Fiduciary must follow according to the provided text?"
+    prompt = format_chatml_prompt(STANDARD_SYS_MSG, user_msg)
     return prompt
 
 def run_single_inference_task(engine: BackendEngine, prompt: str, max_tokens: int = 128) -> Dict[str, Any]:
-    """Executes timed inference generation."""
+    """Executes timed inference generation using ACTUAL backend telemetry."""
     t0 = time.perf_counter()
     out = engine.generate(prompt, max_tokens=max_tokens, temperature=0.1)
     t1 = time.perf_counter()
     total_time = (t1 - t0) * 1000.0
     
-    # Extract latency telemetry or estimate TTFT if backend does not expose token timestamps
+    # FIX: Use actual TTFT and token count from BackendEngine, not heuristic re-derivations.
+    # BackendEngine.generate() already measures accurate TTFT via streaming timestamps
+    # and counts actual tokens generated. The old code discarded these and used:
+    #   ttft = latency * 0.35  (fabricated)
+    #   tokens = words * 1.3   (inaccurate)
     latency_ms = out.get("latency_ms", total_time)
-    words = len(out["raw_output"].split())
-    est_tokens = max(1, int(words * 1.3))
-    
-    # Estimated TTFT: typical pre-fill represents ~30% of total inference for short runs
-    ttft_ms = min(latency_ms * 0.35, 400.0) if latency_ms > 0 else 150.0
-    tps = (est_tokens / (latency_ms / 1000.0)) if latency_ms > 0 else 45.0
+    ttft_ms = out.get("ttft_ms", total_time * 0.35)  # Fallback only if backend truly doesn't report
+    tokens_generated = out.get("tokens_generated", max(1, len(out["raw_output"].split())))
+    tps = out.get("tokens_per_sec", (tokens_generated / (latency_ms / 1000.0)) if latency_ms > 0 else 0.0)
     
     return {
         "latency_ms": latency_ms,
         "ttft_ms": ttft_ms,
-        "tokens_generated": est_tokens,
+        "tokens_generated": tokens_generated,
         "throughput_tps": tps,
         "raw_output_length": len(out["raw_output"])
     }
@@ -115,21 +108,37 @@ def main():
     batch_results = {}
     print("\n🚀 Executing Multi-Batch Concurrency Throughput Benchmarks...")
     for bs in args.batch_sizes:
-        print(f"   ⏱️ Simulating concurrent batch size = {bs}...")
+        print(f"   ⏱️ Running concurrent batch size = {bs}...")
         t_start = time.perf_counter()
         results = []
         
-        # In unsloth / local simulation without external vLLM server, run sequential batch iteration
-        for _ in range(bs):
-            res = run_single_inference_task(engine, STANDARD_PROMPT, max_tokens=128)
-            results.append(res)
+        # FIX: Use ThreadPoolExecutor for REAL concurrent requests.
+        # The original code used a sequential for loop despite importing concurrent.futures.
+        # For unsloth/local single-GPU, requests are still GPU-serialized, but this correctly
+        # measures system throughput under concurrent load (queuing, scheduling overhead).
+        # For vLLM, this genuinely issues simultaneous HTTP requests.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=bs) as executor:
+            built_prompt = format_chatml_prompt(STANDARD_SYS_MSG, STANDARD_USER_MSG)
+            futures = [
+                executor.submit(run_single_inference_task, engine, built_prompt, 128)
+                for _ in range(bs)
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    print(f"   ⚠️ Concurrent task failed: {e}")
+                    results.append({
+                        "latency_ms": 0, "ttft_ms": 0, "tokens_generated": 0,
+                        "throughput_tps": 0, "raw_output_length": 0
+                    })
         
         t_end = time.perf_counter()
         total_duration_sec = t_end - t_start
         avg_ttft = float(np.mean([r["ttft_ms"] for r in results]))
         avg_latency = float(np.mean([r["latency_ms"] for r in results]))
         total_tokens = sum(r["tokens_generated"] for r in results)
-        system_throughput = (total_tokens / total_duration_sec) if total_duration_sec > 0 else 50.0
+        system_throughput = (total_tokens / total_duration_sec) if total_duration_sec > 0 else 0.0
 
         batch_results[f"batch_{bs}"] = {
             "avg_ttft_ms": avg_ttft,
@@ -177,10 +186,17 @@ def main():
     print(f"| 32k Context Stress Simulation Resistance | {'✅ PASSED (0% OOM Rate)' if stress_32k_passed else '❌ FAILED (OOM Encountered)'} |")
     print("═══════════════════════════════════════════════════════════════════════\n")
 
+    # Flatten key metrics at top level for verify.py consumption
+    b1_data = batch_results.get("batch_1", {})
     report_dict = {
         "evaluation_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "backend": args.backend,
         "model_path": str(args.model_path),
+        # Top-level flattened metrics for verify.py extraction
+        "avg_latency_ms": b1_data.get("avg_generation_latency_ms", 0.0),
+        "avg_ttft_ms": b1_data.get("avg_ttft_ms", 0.0),
+        "system_throughput_tps": b1_data.get("system_throughput_tps", 0.0),
+        # Nested detail
         "concurrency_benchmarks": batch_results,
         "stress_32k_simulation": stress_metrics,
         "certified_efficient": all(b["avg_ttft_ms"] < 1000.0 for b in batch_results.values()) and (stress_32k_passed or args.skip_32k)

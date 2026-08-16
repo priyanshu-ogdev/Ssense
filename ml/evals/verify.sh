@@ -3,18 +3,20 @@
 # verify.sh – Master Automated Evaluation & Certification Harness for DPDP SLMs
 #
 # Runs all 5 Functional & Adversarial Evaluation suites:
-# 1. Pillar 1 & 5: Schema Compliance & Efficiency (run_grammar_evals.py)
-# 2. Pillar 2, 3, & 4: Violation F1, Trust Score MAE, & Hallucination (run_accuracy_evals.py)
-# 3. Conversational Chatbot Benchmarks (run_chatbot_evals.py)
-# 4. Red-Team Statutory Hallucination Suite (run_hallucination_benchmark.py)
-# 5. Adversarial Security Suite: NIAH, Prompt Injection, Sycophancy, JSON Fuzzing (run_security_evals.py)
+# 1. Pillar 1 & 5: Schema Compliance & Efficiency (schema_compliance.py)
+# 2. Pillar 2, 3, & 4: Violation F1, Trust Score MAE, & Hallucination (accuracy_hallucination.py)
+# 4. Red-Team Statutory Hallucination Suite (hallucination_redteam.py)
+# 5. Adversarial Security Suite: NIAH, Prompt Injection, Sycophancy, JSON Fuzzing (security_adversarial.py)
 #
 # Usage:
 #   bash ml/evals/verify.sh --backend unsloth --audit-model ../models/audit-model-final --chatbot-model ../models/chatbot-model-final
 #   bash ml/evals/verify.sh --backend vllm --vllm-url http://localhost:8000/v1/completions
+#
+# FIX: Removed `set -e` which killed the script before the exit-code branch
+# could execute. Now uses `set -uo pipefail` and explicit exit code capture.
 # ═══════════════════════════════════════════════════════════════════════════
 
-set -euo pipefail
+set -uo pipefail
 
 # Mandatory multiprocessing/tokenizer deadlock defense
 export TOKENIZERS_PARALLELISM="false"
@@ -96,8 +98,9 @@ if [ "$SKIP_RUN" = true ]; then
   ARGS+=("--skip-run")
 fi
 
-"${PYTHON_CMD}" "${SCRIPT_DIR}/verify.py" "${ARGS[@]}"
-EXIT_CODE=$?
+# FIX: Capture exit code explicitly instead of letting set -e kill the script
+EXIT_CODE=0
+"${PYTHON_CMD}" "${SCRIPT_DIR}/verify.py" "${ARGS[@]}" || EXIT_CODE=$?
 
 if [ ${EXIT_CODE} -eq 0 ]; then
   echo "✅ MASTER CERTIFICATION PASSED! ALL FUNCTIONAL & ADVERSARIAL THRESHOLDS MET."

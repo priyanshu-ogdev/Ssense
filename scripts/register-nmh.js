@@ -18,11 +18,9 @@ const osPlatform = platform();
 
 if (osPlatform === 'win32') {
   binPath += '.exe';
-  // 🚀 SOTA FIX: DO NOT manually escape backslashes. 
-  // JSON.stringify automatically handles JSON specification escaping.
 }
 
-const checkPath = osPlatform === 'win32' ? binPath : binPath;
+const checkPath = binPath;
 if (!existsSync(checkPath)) {
   console.error(`❌ Rust binary not found at ${checkPath}. Run 'make build-daemon' first.`);
   process.exit(1);
@@ -58,8 +56,8 @@ try {
     writeFileSync(join(dir, 'com.ssense.daemon.json'), JSON.stringify(manifest, null, 2));
     console.log(`✅ Registered Native Messaging Host at ${dir}`);
   }
-  console.log(`🔗 Linked to Extension ID: ${EXT_ID}`);
-} catch (e) {
-  console.error('❌ Failed to register NMH:', e.message);
+  console.log('🚀 Native Messaging Host successfully linked to Chrome Extension!');
+} catch (err) {
+  console.error('❌ Failed to register Native Messaging Host:', err.message);
   process.exit(1);
 }
