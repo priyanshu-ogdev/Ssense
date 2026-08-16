@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-benchmark_latency.py – Pillar 3: End-to-End Inference Speed & Load Resilience
+benchmark_latency.py – Pillar 5: End-to-End Inference Latency & Load Resilience
 
 Benchmarks fine-tuned DPDP SLM inference across multiple concurrency batch sizes (1, 4, 8, 16)
 and tests maximum 32k context window stress resistance without Out-Of-Memory (OOM) failure.
@@ -10,7 +10,8 @@ SOTA Upgrades Implemented:
 2. Percentile Telemetry: Computes Mean, P50, P90, P95, and P99 for TTFT and Latency.
 3. Live VRAM Telemetry: Tracks peak CUDA memory allocation across concurrency runs.
 4. Robust 32k Token Stress: Accurately synthesizes 30k–32k token legal context payloads.
-5. Robust Path Anchoring: Dynamic ancestor traversal independent of caller working directory.
+5. Strict VRAM Airlock: Guarantees `engine.unload()` executes via a `try...finally` block to protect `compare_sota_models.py`.
+6. Deep Path Integration: Fully synced with `path_resolver.py`.
 """
 
 import os
@@ -18,12 +19,11 @@ import sys
 import gc
 import json
 import time
-import math
 import argparse
 import concurrent.futures
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any
 
 import torch
 
@@ -33,36 +33,24 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Dynamic path resolution for evaluation modules
+# Dynamic path resolution to ensure imports work from any execution directory
 _CURRENT_DIR = Path(__file__).resolve().parent
 if str(_CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(_CURRENT_DIR))
 
 try:
+    from path_resolver import Paths
     from backend_loader import BackendEngine, format_chatml_prompt
 except ImportError as e:
-    print(f"❌ Failed to import backend_loader: {e}")
+    print(f"❌ Failed to import core evaluation modules: {e}")
     sys.exit(1)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION & PATH RESOLUTION
 # ═══════════════════════════════════════════════════════════════════════════
-def get_ml_root() -> Path:
-    curr = _CURRENT_DIR
-    while curr != curr.parent:
-        if (curr / "models").exists() or (curr / "ml" / "models").exists():
-            return curr if (curr / "models").exists() else (curr / "ml")
-        curr = curr.parent
-    return _CURRENT_DIR.parent
-
-ML_ROOT = get_ml_root()
-DEFAULT_MODEL_PATH = ML_ROOT / "models" / "chatbot-model-final"
-if not DEFAULT_MODEL_PATH.exists():
-    DEFAULT_MODEL_PATH = ML_ROOT / "models" / "Qwen2.5-7B-Instruct"
-
-LAW_TXT_PATH = ML_ROOT / "data-forge" / "dpdp_act_and_rules_2025.txt"
-REPORT_DIR = _CURRENT_DIR / "reports"
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
+DEFAULT_MODEL_PATH = Paths.resolve_model_path(None, "chatbot-model-final")
+LAW_TXT_PATH = Paths.LAW_TEXT
+REPORT_DIR = Paths.ensure_reports_dir()
 REPORT_PATH = REPORT_DIR / "latency_stress_benchmark_report.json"
 
 BATCH_SIZES = [1, 4, 8, 16]
@@ -169,7 +157,7 @@ def execute_single_request(engine: BackendEngine, prompt: str, max_tokens: int =
 # MAIN ORCHESTRATION PIPELINE
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
-    parser = argparse.ArgumentParser(description="Pillar 3: End-to-End Inference Speed & Load Resilience")
+    parser = argparse.ArgumentParser(description="Pillar 5: End-to-End Inference Latency & Load Resilience")
     parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(DEFAULT_MODEL_PATH))
     parser.add_argument("--adapter-path", type=str, default=None)
@@ -180,7 +168,7 @@ def main():
     args = parser.parse_args()
 
     print("═══════════════════════════════════════════════════════════════════════")
-    print(f"🏎️ [PILLAR 3]: INFERENCE LATENCY, THROUGHPUT & STRESS BENCHMARK ({args.backend.upper()})")
+    print(f"🏎️ [PILLAR 5]: INFERENCE LATENCY, THROUGHPUT & STRESS BENCHMARK ({args.backend.upper()})")
     print("═══════════════════════════════════════════════════════════════════════")
     print(f"📦 Target Model Path: {args.model_path}")
 
@@ -194,103 +182,110 @@ def main():
         max_seq_length=32768
     )
 
-    # 1. Warm-up Phase
-    warmup_engine(engine)
-
-    # 2. Concurrency Load Benchmarks
     batch_results = {}
-    built_prompt = format_chatml_prompt(STANDARD_SYS_MSG, STANDARD_USER_MSG)
-
-    print("\n🚀 Executing Multi-Batch Concurrency Throughput Benchmarks...")
-    for bs in args.batch_sizes:
-        print(f"   ⏱️ Evaluating Concurrency Batch Size = {bs}...")
-        reset_vram_tracker()
-        t_batch_start = time.perf_counter()
-        results = []
-
-        # ThreadPool management:
-        # Unsloth is single-threaded in-memory CUDA (serialize to prevent temp_QA pointer collisions).
-        # vLLM / REST endpoints handle true parallel worker dispatch.
-        max_workers = bs if engine.backend_type != "unsloth" else 1
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(execute_single_request, engine, built_prompt, 128) for _ in range(bs)]
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    results.append(future.result())
-                except Exception as e:
-                    print(f"   ⚠️ Worker task failed: {e}")
-                    results.append({
-                        "latency_ms": 0.0, "ttft_ms": 0.0, "tokens_generated": 0,
-                        "throughput_tps": 0.0, "raw_output_len": 0
-                    })
-
-        t_batch_end = time.perf_counter()
-        total_duration_sec = max(1e-5, t_batch_end - t_batch_start)
-
-        # Statistical Aggregations
-        ttft_stats = calculate_percentiles([r["ttft_ms"] for r in results if r["ttft_ms"] > 0])
-        latency_stats = calculate_percentiles([r["latency_ms"] for r in results if r["latency_ms"] > 0])
-        
-        total_tokens = sum(r["tokens_generated"] for r in results)
-        system_throughput = total_tokens / total_duration_sec
-        peak_vram_mb = get_vram_usage_mb()
-
-        batch_results[f"batch_{bs}"] = {
-            "batch_size": bs,
-            "total_requests": bs,
-            "total_tokens_generated": total_tokens,
-            "total_wall_time_ms": round(total_duration_sec * 1000.0, 2),
-            "system_throughput_tps": round(system_throughput, 2),
-            "peak_vram_mb": round(peak_vram_mb, 2),
-            "ttft_ms": ttft_stats,
-            "latency_ms": latency_stats
-        }
-
-    # 3. Deep 32k Context Window OOM Stress Simulation
     stress_32k_passed = False
     stress_metrics = {}
-    if not args.skip_32k:
-        print("\n🌊 Initiating 32k Maximum Context Window Stress Simulation...")
-        reset_vram_tracker()
-        try:
-            stress_prompt = generate_32k_stress_prompt()
-            prompt_char_len = len(stress_prompt)
-            print(f"   📏 Synthesized context payload: {prompt_char_len:,} chars (~30,000–32,000 tokens)")
+
+    try:
+        # 1. Warm-up Phase
+        warmup_engine(engine)
+
+        # 2. Concurrency Load Benchmarks
+        built_prompt = format_chatml_prompt(STANDARD_SYS_MSG, STANDARD_USER_MSG)
+
+        print("\n🚀 Executing Multi-Batch Concurrency Throughput Benchmarks...")
+        for bs in args.batch_sizes:
+            print(f"   ⏱️ Evaluating Concurrency Batch Size = {bs}...")
+            reset_vram_tracker()
+            t_batch_start = time.perf_counter()
+            results = []
+
+            # ThreadPool management:
+            # Unsloth is single-threaded in-memory CUDA (serialize to prevent pointer collisions).
+            # vLLM / REST endpoints handle true parallel worker dispatch.
+            max_workers = bs if engine.backend_type != "unsloth" else 1
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(execute_single_request, engine, built_prompt, 128) for _ in range(bs)]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        results.append(future.result())
+                    except Exception as e:
+                        print(f"   ⚠️ Worker task failed: {e}")
+                        results.append({
+                            "latency_ms": 0.0, "ttft_ms": 0.0, "tokens_generated": 0,
+                            "throughput_tps": 0.0, "raw_output_len": 0
+                        })
+
+            t_batch_end = time.perf_counter()
+            total_duration_sec = max(1e-5, t_batch_end - t_batch_start)
+
+            # Statistical Aggregations
+            ttft_stats = calculate_percentiles([r["ttft_ms"] for r in results if r["ttft_ms"] > 0])
+            latency_stats = calculate_percentiles([r["latency_ms"] for r in results if r["latency_ms"] > 0])
             
-            t_s0 = time.perf_counter()
-            out_32k = engine.generate(stress_prompt, max_tokens=64, temperature=0.0)
-            t_s1 = time.perf_counter()
+            total_tokens = sum(r["tokens_generated"] for r in results)
+            system_throughput = total_tokens / total_duration_sec
+            peak_vram_mb = get_vram_usage_mb()
 
-            stress_dur_ms = (t_s1 - t_s0) * 1000.0
-            resp_32k = out_32k.get("raw_output", "").strip()
-            
-            # Non-empty response indicates successful full KV-cache prefill without OOM
-            stress_32k_passed = len(resp_32k) > 5
-            peak_stress_vram_mb = get_vram_usage_mb()
-
-            stress_metrics = {
-                "passed": stress_32k_passed,
-                "context_characters": prompt_char_len,
-                "execution_time_ms": round(stress_dur_ms, 2),
-                "peak_vram_mb": round(peak_stress_vram_mb, 2),
-                "tokens_generated": out_32k.get("tokens_generated", len(resp_32k.split())),
-                "output_snippet": resp_32k[:150] + "..." if len(resp_32k) > 150 else resp_32k,
-                "oom_crash_detected": not stress_32k_passed
-            }
-            print(f"   {'✅ 32k Stress Test PASSED without OOM' if stress_32k_passed else '❌ 32k Stress Test FAILED'}")
-        except Exception as e:
-            print(f"   ❌ 32k Stress Test CRASHED with Exception: {e}")
-            stress_metrics = {
-                "passed": False,
-                "oom_crash_detected": True,
-                "error_message": str(e),
-                "peak_vram_mb": get_vram_usage_mb()
+            batch_results[f"batch_{bs}"] = {
+                "batch_size": bs,
+                "total_requests": bs,
+                "total_tokens_generated": total_tokens,
+                "total_wall_time_ms": round(total_duration_sec * 1000.0, 2),
+                "system_throughput_tps": round(system_throughput, 2),
+                "peak_vram_mb": round(peak_vram_mb, 2),
+                "ttft_ms": ttft_stats,
+                "latency_ms": latency_stats
             }
 
-    # 4. Certification Verification & Terminal Report
+        # 3. Deep 32k Context Window OOM Stress Simulation
+        if not args.skip_32k:
+            print("\n🌊 Initiating 32k Maximum Context Window Stress Simulation...")
+            reset_vram_tracker()
+            try:
+                stress_prompt = generate_32k_stress_prompt()
+                prompt_char_len = len(stress_prompt)
+                print(f"   📏 Synthesized context payload: {prompt_char_len:,} chars (~30,000–32,000 tokens)")
+                
+                t_s0 = time.perf_counter()
+                out_32k = engine.generate(stress_prompt, max_tokens=64, temperature=0.0)
+                t_s1 = time.perf_counter()
+
+                stress_dur_ms = (t_s1 - t_s0) * 1000.0
+                resp_32k = out_32k.get("raw_output", "").strip()
+                
+                # Non-empty response indicates successful full KV-cache prefill without OOM
+                stress_32k_passed = len(resp_32k) > 5
+                peak_stress_vram_mb = get_vram_usage_mb()
+
+                stress_metrics = {
+                    "passed": stress_32k_passed,
+                    "context_characters": prompt_char_len,
+                    "execution_time_ms": round(stress_dur_ms, 2),
+                    "peak_vram_mb": round(peak_stress_vram_mb, 2),
+                    "tokens_generated": out_32k.get("tokens_generated", len(resp_32k.split())),
+                    "output_snippet": resp_32k[:150] + "..." if len(resp_32k) > 150 else resp_32k,
+                    "oom_crash_detected": not stress_32k_passed
+                }
+                print(f"   {'✅ 32k Stress Test PASSED without OOM' if stress_32k_passed else '❌ 32k Stress Test FAILED'}")
+            except Exception as e:
+                print(f"   ❌ 32k Stress Test CRASHED with Exception: {e}")
+                stress_metrics = {
+                    "passed": False,
+                    "oom_crash_detected": True,
+                    "error_message": str(e),
+                    "peak_vram_mb": get_vram_usage_mb()
+                }
+
+    finally:
+        # 4. Strict VRAM Airlock
+        engine.unload()
+        print("\n🧹 [VRAM Airlock] Model purged from GPU memory.")
+
+    # 5. Certification Verification & Terminal Report
     print("\n═══════════════════════════════════════════════════════════════════════════════════════════════")
-    print("📊 PILLAR 3 INFERENCE LATENCY & LOAD STRESS CERTIFICATION REPORT")
+    print("📊 PILLAR 5 INFERENCE LATENCY & LOAD STRESS CERTIFICATION REPORT")
     print("═══════════════════════════════════════════════════════════════════════════════════════════════")
     print(f"| Batch | TTFT Mean (P95) ms | Latency Mean (P95) ms | System TPS   | Peak VRAM   | Status |")
     print(f"|-------|--------------------|-----------------------|--------------|-------------|--------|")
@@ -336,9 +331,10 @@ def main():
 
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(report_payload, f, indent=2)
-    print(f"💾 Pillar 3 benchmark report saved to: {REPORT_PATH}")
+    print(f"💾 Pillar 5 benchmark report saved to: {REPORT_PATH}")
 
     return 0 if certified_efficient else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

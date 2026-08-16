@@ -1,100 +1,116 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 03_evaluate_models.sh – Stage 3: Functional & Adversarial Model Certification (DGX Spark)
+# 03_evaluate_models.sh – Stage 3: Master Certification Orchestrator (DGX Spark)
 # ==============================================================================
-# ⚠️ SPECIALIZED PIPELINE NOTICE:
-# This script is exclusively engineered for certifying the Indian Digital Personal Data Protection (DPDP) Act 2023 &
-# Rules 2025 specialized legal models (`Qwen2.5-7B-Instruct`) on NVIDIA DGX Spark infrastructure. It verifies all 18
-# certification thresholds across accuracy, grammar, TTR/MTLD fluidity, and adversarial security. Not a generic wrapper.
-#
-# Prerequisites for DGX Spark Execution:
-#   - NVIDIA DGX / GPU environment (`TOKENIZERS_PARALLELISM=false`)
-#   - Python 3.10+ / 3.12 with CUDA 12.x/13.x support
-#   - Packages installed (`pip install -r ml/requirements.txt`): unsloth, trl, transformers, vllm, datasets, torch, jsonschema
-# ==============================================================================
-# This script executes the master evaluation suite across all 5 evaluation modules:
-#   1. Pillar 1 & 5: Schema Compliance & Inference Efficiency (run_grammar_evals.py)
-#   2. Pillar 2-4: Violation F1, Trust MAE, & Zero Hallucination (run_accuracy_evals.py)
-#   3. Chatbot Evals: Statutory Accuracy, TTR/MTLD Vocabulary Fluidity, & Schema Bleed (run_chatbot_evals.py)
-#   4. Red-Team Hallucination Benchmark: Statutory Trap Resistance (run_hallucination_benchmark.py)
-#   5. Adversarial Vulnerability Suite: NIAH 20k context recall, Prompt Injection refusal,
-#      Anti-Sycophancy false premise correction, and JSON Fuzzing resilience (run_security_evals.py)
-#
-# Usage:
-#   bash ml/scripts/03_evaluate_models.sh [options]
-#
-# Options:
-#   --backend <unsloth|vllm|llamacpp>    Backend inference engine (default: unsloth)
-#   --audit-model <path>                 Path to Forensic Auditor model
-#   --chatbot-model <path>               Path to Conversational Chatbot model
-#   --audit-lora <name>                  LoRA routing name for vLLM auditor endpoint
-#   --chatbot-lora <name>                LoRA routing name for vLLM chatbot endpoint
-#   --vllm-url <url>                     vLLM endpoint URL
-#   --skip-run                           Skip inference runs and only aggregate existing reports
-#   -h, --help                           Show help menu and exit
+# SOTA Upgrades Implemented:
+# 1. Single CI/CD Entrypoint: Absorbs legacy verify.sh, evaluate.sh, and verify_edge.sh.
+# 2. Native Edge Routing: Pass `--edge` to automatically target GGUF binaries via llama.cpp.
+# 3. Direct Python Invocation: Bypasses redundant bash wrappers for flawless exit-code trapping.
+# 4. Hardware Env Overrides: Forces TOKENIZERS_PARALLELISM=false for safe VRAM airlocking.
 # ==============================================================================
 
-set -uo pipefail
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ML_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${ML_DIR}/.." && pwd)"
 
+# ─── DGX & PYTORCH ENVIRONMENT HARDENING ──────────────────────────────────────
+export PYTHONUNBUFFERED=1
+export TOKENIZERS_PARALLELISM=false
+export CUDA_DEVICE_ORDER="PCI_BUS_ID"
+
+# ─── DEFAULT CONFIGURATION ────────────────────────────────────────────────────
+BACKEND="unsloth"
+AUDIT_MODEL="../models/audit-model-final"
+CHATBOT_MODEL="../models/chatbot-model-final"
+AUDIT_LORA="audit"
+CHATBOT_LORA="chatbot"
+VLLM_URL="http://localhost:8000/v1/completions"
+EDGE_MODE=false
+EXTRA_ARGS=()
+
+# ─── ARGUMENT PARSING ─────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --backend) BACKEND="$2"; shift 2 ;;
+        --audit-model) AUDIT_MODEL="$2"; shift 2 ;;
+        --chatbot-model) CHATBOT_MODEL="$2"; shift 2 ;;
+        --audit-lora) AUDIT_LORA="$2"; shift 2 ;;
+        --chatbot-lora) CHATBOT_LORA="$2"; shift 2 ;;
+        --vllm-url) VLLM_URL="$2"; shift 2 ;;
+        --skip-run) EXTRA_ARGS+=("--skip-run"); shift ;;
+        --edge) EDGE_MODE=true; shift ;;
         -h|--help)
             echo "Usage: bash ml/scripts/03_evaluate_models.sh [options]"
             echo "Options:"
-            echo "  --backend <unsloth|vllm|llamacpp>    Backend inference engine (default: unsloth)"
-            echo "  --audit-model <path>                 Path to Forensic Auditor model (default: ../models/audit-model-final)"
-            echo "  --chatbot-model <path>               Path to Conversational Chatbot model (default: ../models/chatbot-model-final)"
-            echo "  --audit-lora <name>                  LoRA routing name for vLLM auditor endpoint (default: audit)"
-            echo "  --chatbot-lora <name>                LoRA routing name for vLLM chatbot endpoint (default: chatbot)"
-            echo "  --vllm-url <url>                     vLLM endpoint URL (default: http://localhost:8000/v1/completions)"
-            echo "  --skip-run                           Skip inference evaluation runs and only aggregate existing reports"
-            echo "  -h, --help                           Show this help message and exit"
+            echo "  --backend <unsloth|vllm|llamacpp>    Backend engine (default: unsloth)"
+            echo "  --edge                               Auto-configures llama.cpp to test quantized GGUF Edge models"
+            echo "  --audit-model <path>                 Path to Auditor model"
+            echo "  --chatbot-model <path>               Path to Chatbot model"
+            echo "  --skip-run                           Skip inference, aggregate existing JSON reports only"
             exit 0
             ;;
-        *)
-            # Forward all arguments directly to verify.sh
-            break
+        *) 
+            echo "Unknown argument: $1"
+            exit 1 
             ;;
     esac
 done
 
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-export LOG_DIR="${REPO_ROOT}/logs"
-export PYTHONUNBUFFERED=1
-mkdir -p "${LOG_DIR}"
+# ─── EDGE/GGUF AUTO-CONFIGURATION ─────────────────────────────────────────────
+if [[ "$EDGE_MODE" == true ]]; then
+    BACKEND="llamacpp"
+    AUDIT_MODEL="../models/audit-model-final-gguf"
+    CHATBOT_MODEL="../models/chatbot-model-final-gguf"
+    EXTRA_ARGS+=("--base-model-label" "GGUF-Q4_K_M-Edge")
+fi
 
-SCRIPT_NAME=$(basename "$0" .sh)
-MASTER_LOG="${LOG_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
+# ─── DGX LOGGING SETUP ────────────────────────────────────────────────────────
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="${REPO_ROOT}/logs"
+mkdir -p "${LOG_DIR}"
+MASTER_LOG="${LOG_DIR}/03_evaluate_models_${TIMESTAMP}.log"
+
+# Setup dual-logging to both terminal and log file safely
 exec > >(tee -i "${MASTER_LOG}")
 exec 2>&1
 
 echo "════════════════════════════════════════════════════════════════════════════════"
-echo "🏆 INITIATING STAGE 3: FUNCTIONAL & ADVERSARIAL MODEL CERTIFICATION"
+if [[ "$EDGE_MODE" == true ]]; then
+    echo "🔧 INITIATING STAGE 3: GGUF EDGE-DEPLOYMENT CERTIFICATION HARNESS"
+else
+    echo "🏆 INITIATING STAGE 3: FUNCTIONAL & ADVERSARIAL MODEL CERTIFICATION"
+fi
 echo "════════════════════════════════════════════════════════════════════════════════"
-echo "   • Repository Root: ${REPO_ROOT}"
-echo "   • ML Root:         ${ML_DIR}"
-echo "   • Logs Directory:  ${LOG_DIR}"
-echo "   • Forwarded Args:  $*"
+echo "   • Inference Backend: ${BACKEND}"
+echo "   • Auditor Model:     ${AUDIT_MODEL}"
+echo "   • Chatbot Model:     ${CHATBOT_MODEL}"
+echo "   • Master Log:        ${MASTER_LOG}"
 echo "════════════════════════════════════════════════════════════════════════════════"
 
+# ─── EXECUTE PYTHON ORCHESTRATOR ──────────────────────────────────────────────
 cd "${ML_DIR}/evals"
 
-# Execute verify.sh inside ml/evals with forwarded arguments
 EXIT_CODE=0
-bash verify.sh "$@" || EXIT_CODE=$?
+python3 verify.py \
+    --backend "${BACKEND}" \
+    --audit-model-path "${AUDIT_MODEL}" \
+    --chatbot-model-path "${CHATBOT_MODEL}" \
+    --audit-lora-name "${AUDIT_LORA}" \
+    --chatbot-lora-name "${CHATBOT_LORA}" \
+    --vllm-url "${VLLM_URL}" \
+    "${EXTRA_ARGS[@]}" || EXIT_CODE=$?
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"
 if [ ${EXIT_CODE} -eq 0 ]; then
-    echo "✅ STAGE 3 COMPLETE: Models certified across all functional and adversarial thresholds!"
+    echo "✅ STAGE 3 COMPLETE: Models certified across all 18 functional thresholds!"
 else
-    echo "❌ STAGE 3 COMPLETE: Certification checks encountered threshold infractions or errors."
+    echo "❌ STAGE 3 COMPLETE: Certification checks encountered threshold infractions."
+    echo "   (Review the scorecard. Threshold failures indicate model capability limits,"
+    echo "    not pipeline bugs. Adjust SimPO training data to improve.)"
 fi
 echo "════════════════════════════════════════════════════════════════════════════════"
-echo "📁 Execution logs saved to: ${LOG_DIR}"
-echo "📄 Scorecard summary saved to: ${ML_DIR}/evals/reports/final_model_certification_report.md"
+echo "📁 Execution logs saved to: ${MASTER_LOG}"
 
 exit ${EXIT_CODE}

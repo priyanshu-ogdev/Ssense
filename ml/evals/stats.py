@@ -3,16 +3,16 @@
 stats.py – Statistical Utilities for the DPDP Eval Suite.
 
 SOTA Upgrades Implemented:
-1. Wilson Score Confidence Intervals (Lower & Upper) for binomial rate metrics.
-2. MTLD (Measure of Textual Lexical Diversity) – length-unbiased replacement for TTR.
-3. Bootstrap Confidence Intervals for continuous distributions.
-4. Smart Boundary Evaluation: Solves the "Wilson Paradox" where finite sample sizes 
-   make strict 0.0% or 100.0% targets mathematically impossible to pass under CI bounds.
+1. Floating-Point Truncation Fix: Replaced naive `int()` casting with `int(round())` to prevent 
+   the systemic loss of success counts when converting percentages back to integers.
+2. Wilson Score Confidence Intervals (Lower & Upper) for binomial rate metrics.
+3. Smart Boundary Evaluation: Solves the "Wilson Paradox" on N=60 strict boundary thresholds.
+4. Cleaned Dead Code: Removed obsolete statutory lists (now internalized via AST in `metrics.py`).
 """
 
 import math
 import re
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional
 
 # ═══════════════════════════════════════════════════════════════════════════
 # WILSON SCORE CONFIDENCE INTERVALS
@@ -38,11 +38,20 @@ def wilson_ci(successes: int, total: int, confidence: float = 0.95) -> Tuple[flo
     lower = max(0.0, (centre - margin) / denominator)
     upper = min(1.0, (centre + margin) / denominator)
 
-    return (round(lower * 100, 2), round(upper * 100, 2))
+    return (round(lower * 100.0, 2), round(upper * 100.0, 2))
 
 def wilson_ci_from_pct(point_pct: float, total: int, confidence: float = 0.95) -> Tuple[float, float]:
-    """Helper to compute Wilson CI directly from a percentage and N."""
-    successes = int((max(0.0, min(100.0, point_pct)) / 100.0) * total)
+    """
+    Helper to compute Wilson CI directly from a percentage and N.
+    SOTA FIX: Applies standard rounding before int conversion to prevent float-truncation 
+    from deleting successful test passes (e.g., int(24.999) -> 24 vs round(24.999) -> 25).
+    """
+    if total <= 0:
+        return (0.0, 100.0)
+        
+    pct_clamped = max(0.0, min(100.0, point_pct))
+    successes = int(round((pct_clamped / 100.0) * total))
+    
     return wilson_ci(successes, total, confidence)
 
 # Alias for backward compatibility (used by compare_sota_models.py)
@@ -100,6 +109,7 @@ def evaluate_metric_against_target(
 # MTLD – MEASURE OF TEXTUAL LEXICAL DIVERSITY
 # ═══════════════════════════════════════════════════════════════════════════
 def _mtld_forward(tokens: List[str], threshold: float = 0.72) -> float:
+    """Core forward pass for MTLD."""
     if not tokens: return 0.0
     factors = 0.0
     factor_start = 0
@@ -120,30 +130,52 @@ def _mtld_forward(tokens: List[str], threshold: float = 0.72) -> float:
     return len(tokens) / factors if factors > 0 else float(len(tokens))
 
 def mtld(text: str, threshold: float = 0.72) -> float:
-    """Computes MTLD (Measure of Textual Lexical Diversity) - independent of length."""
+    """
+    Computes MTLD (Measure of Textual Lexical Diversity).
+    Unlike TTR, MTLD is mathematically independent of generation length.
+    """
     tokens = re.findall(r'\b\w+\b', text.lower())
     if len(tokens) < 10:
         return len(set(tokens)) / len(tokens) if tokens else 0.0
+    
     forward = _mtld_forward(tokens, threshold)
     backward = _mtld_forward(list(reversed(tokens)), threshold)
     return (forward + backward) / 2.0
 
-# ═══════════════════════════════════════════════════════════════════════════
-# VALID DPDP SECTIONS (Parametric Memory Audit)
-# ═══════════════════════════════════════════════════════════════════════════
-VALID_DPDP_SECTIONS = {
-    *{f"Section {i}" for i in range(1, 45)},
-    *{f"Rule {i}" for i in range(1, 23)},
-    "Section 8(1)", "Section 8(2)", "Section 8(5)", "Section 8(7)",
-    "Rule 3(1)", "Rule 3(2)", "Rule 8(1)", "Rule 8(2)", "Rule 8(3)"
-}
 
-def is_valid_dpdp_citation(citation: str) -> bool:
-    """Verifies citation exists in the statutory universe."""
-    clean = citation.strip()
-    if clean in VALID_DPDP_SECTIONS: return True
-    match = re.match(r'(Section|Rule)\s+(\d+)', clean, re.IGNORECASE)
-    if match:
-        root = f"{match.group(1).capitalize()} {match.group(2)}"
-        return root in VALID_DPDP_SECTIONS
-    return False
+# ═══════════════════════════════════════════════════════════════════════════
+# BOOTSTRAP CONFIDENCE INTERVALS (Continuous Metrics)
+# ═══════════════════════════════════════════════════════════════════════════
+def bootstrap_ci(
+    values: List[float],
+    confidence: float = 0.95,
+    n_bootstrap: int = 1000,
+    seed: int = 42
+) -> Tuple[float, float, float]:
+    """
+    Computes a bootstrap confidence interval for the mean of continuous values.
+    Returns (mean, ci_lower, ci_upper).
+    """
+    import random
+    if not values:
+        return (0.0, 0.0, 0.0)
+
+    rng = random.Random(seed)
+    n = len(values)
+    means = []
+
+    for _ in range(n_bootstrap):
+        sample = [rng.choice(values) for _ in range(n)]
+        means.append(sum(sample) / n)
+
+    means.sort()
+    alpha = 1 - confidence
+    lower_idx = int(math.floor(alpha / 2 * n_bootstrap))
+    upper_idx = int(math.ceil((1 - alpha / 2) * n_bootstrap)) - 1
+
+    mean_val = sum(values) / n
+    return (
+        round(mean_val, 4),
+        round(means[lower_idx], 4),
+        round(means[min(upper_idx, len(means) - 1)], 4)
+    )

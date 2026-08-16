@@ -2,12 +2,18 @@
 """
 run_accuracy_evals.py – Legal Reasoning Accuracy & Hallucination Evaluation (Universal Dual-Backend Grade)
 
-Measures Pillars 2, 3, 4, and 5:
+Measures Pillars 2, 3, and 4 (Diagnostic):
 1. Violation F1 Score (Severity-Weighted & Sub-clause Section Normalized)
 2. DPDP Trust Score & Subtlety Score MAE
 3. Evidence Quote Hallucination Rate (Verbatim Substring Validation)
 4. Parametric Statutory Citation Validity Rate
 5. Sector/Category Breakdown & Telemetry (Latency, TTFT, Throughput)
+
+SOTA Upgrades Implemented:
+1. Strict VRAM Airlock: Unloads model via `engine.unload()` to protect subsequent pipeline stages.
+2. Dynamic Exit Codes: Passes success/failure state up to `03_evaluate_models.sh`.
+3. Indestructible Paths: Utilizes `path_resolver.py` for absolute CWD independence.
+4. SFT Prompt Alignment: Ensures exact JSON instructions and `[POLICY TO AUDIT]` tags are used.
 """
 
 import os
@@ -103,7 +109,7 @@ def load_test_data(gt_path: Path) -> List[Dict[str, Any]]:
 # MAIN ACCURACY EVALUATION HARNESS
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
-    parser = argparse.ArgumentParser(description="Pillars 2-5: Legal Reasoning Accuracy & Hallucination Benchmark")
+    parser = argparse.ArgumentParser(description="Pillars 2, 3, & 4: Legal Reasoning Accuracy & Hallucination Benchmark")
     parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(DEFAULT_MODEL_PATH))
     parser.add_argument("--adapter-path", type=str, default=None)
@@ -121,11 +127,9 @@ def main():
         return 1
 
     print("═══════════════════════════════════════════════════════════════════════")
-    print(f"🚀 [PILLARS 2-5]: LEGAL REASONING, ACCURACY & HALLUCINATION AUDIT ({args.backend.upper()})")
+    print(f"🚀 [PILLARS 2, 3, 4]: LEGAL REASONING, ACCURACY & HALLUCINATION ({args.backend.upper()})")
     print("═══════════════════════════════════════════════════════════════════════")
-    print(f"📦 Model: {args.model_path}")
-    print(f"📁 Benchmark Cases: {len(test_data)} policies across multiple industry verticals")
-
+    
     # Initialize Engine
     engine = BackendEngine(
         backend_type=args.backend,
@@ -253,6 +257,7 @@ def main():
     finally:
         # Strict VRAM Airlock: Clean up engine from GPU memory
         engine.unload()
+        print("\n🧹 [VRAM Airlock] Auditor model purged from GPU memory.")
 
     # ═══════════════════════════════════════════════════════════════════
     # AGGREGATE METRICS & CONFIDENCE INTERVALS
@@ -289,7 +294,7 @@ def main():
     summary_report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "backend": args.backend,
-        "model_path": args.model_path,
+        "model_path": str(args.model_path),
         "total_cases_evaluated": total_cases,
         "total_quotes": total_quotes,
         "total_citations": total_citations,
@@ -322,12 +327,12 @@ def main():
     print("📊 PILLARS 2, 3, & 4: ACCURACY, REASONING & HALLUCINATION SUMMARY")
     print("═"*75)
     print(f"  • Total Test Policies:             {total_cases}")
-    print(f"  • Severity-Weighted Violation F1:   {avg_weighted_f1:.4f}  (Target: >= 0.8800) -> {'✅ PASS' if avg_weighted_f1 >= 0.88 else '❌ FAIL'}")
-    print(f"  • Macro Precision / Recall:         {avg_precision:.4f} / {avg_recall:.4f}")
-    print(f"  • DPDP Trust Score MAE:             {mae_trust:.2f} pts (Target: <= 8.50 pts) -> {'✅ PASS' if mae_trust <= 8.5 else '❌ FAIL'}")
-    print(f"  • Subtlety Score MAE:               {mae_subt:.2f} pts")
-    print(f"  • Evidence Quote Hallucination:     {overall_halluc_rate:.2f}% (Wilson Upper: {halluc_high:.2f}%) -> {'✅ PASS' if overall_halluc_rate == 0.0 else '❌ FAIL'}")
-    print(f"  • Parametric Citation Validity:     {overall_cit_validity:.2f}% (Wilson Lower: {cit_low:.2f}%) -> {'✅ PASS' if overall_cit_validity >= 95.0 else '❌ FAIL'}")
+    print(f"  • Severity-Weighted Violation F1:  {avg_weighted_f1:.4f}  (Target: >= 0.8800) -> {'✅ PASS' if avg_weighted_f1 >= 0.88 else '❌ FAIL'}")
+    print(f"  • Macro Precision / Recall:        {avg_precision:.4f} / {avg_recall:.4f}")
+    print(f"  • DPDP Trust Score MAE:            {mae_trust:.2f} pts (Target: <= 8.50 pts) -> {'✅ PASS' if mae_trust <= 8.5 else '❌ FAIL'}")
+    print(f"  • Subtlety Score MAE:              {mae_subt:.2f} pts")
+    print(f"  • Evidence Quote Hallucination:    {overall_halluc_rate:.2f}% (Wilson Upper: {halluc_high:.2f}%) -> {'✅ PASS' if overall_halluc_rate == 0.0 else '❌ FAIL'}")
+    print(f"  • Parametric Citation Validity:    {overall_cit_validity:.2f}% (Wilson Lower: {cit_low:.2f}%) -> {'✅ PASS' if overall_cit_validity >= 95.0 else '❌ FAIL'}")
     
     print("\n📈 Sectoral Performance Breakdown:")
     for cat, sdata in sector_summary.items():
@@ -336,7 +341,9 @@ def main():
     print(f"\n💾 Detailed report saved to: {report_path}")
     print("═"*75 + "\n")
 
-    return 0
+    # Exit code signaling for orchestrator (Hard-fail if basic model reasoning is entirely missing)
+    is_accurate = (avg_weighted_f1 >= 0.50)  # We use 0.50 as a terminal kill-switch, verify.py handles the strict 0.88 gating
+    return 0 if is_accurate else 1
 
 
 if __name__ == "__main__":

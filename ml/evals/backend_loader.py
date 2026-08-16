@@ -8,9 +8,10 @@ Supports three universal backends:
 3. `llamacpp`: Quantized local GGUF evaluation with native FlashAttention support.
 
 SOTA Enhancements:
-- Strict VRAM Airlock: Implements deep distributed state destruction for vLLM to prevent memory leaks.
+- Strict VRAM Airlock: Deep distributed state destruction for vLLM to prevent memory leaks.
 - Dynamic LoRA Routing: vLLM natively mounts `adapter_path` via `LoRARequest` on top of base model.
 - LlamaCPP Acceleration: Compiles with hardware-native flash attention.
+- Indestructible Paths: Perfectly synchronized with `path_resolver.py`.
 - JudgeClient Resiliency: LLM-as-a-Judge API includes exponential backoff.
 """
 
@@ -30,7 +31,17 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-DEFAULT_BASE_MODEL = "../models/Qwen2.5-7B-Instruct"
+# Dynamic path resolution to hit path_resolver.py
+_CURRENT_DIR = Path(__file__).resolve().parent
+if str(_CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(_CURRENT_DIR))
+
+try:
+    from path_resolver import Paths
+except ImportError:
+    print("❌ Core module import failed: path_resolver")
+    sys.exit(1)
+
 
 def patch_torchao_dispatch_compat():
     """Patches TorchAO dispatch logic to prevent Unsloth PEFT instantiation crashes."""
@@ -79,26 +90,6 @@ def format_chatml_multi_turn(
         prompt += "<|im_start|>assistant\n"
     return prompt
 
-# ═══════════════════════════════════════════════════════════════════════════
-# GGUF AUTO-DISCOVERY
-# ═══════════════════════════════════════════════════════════════════════════
-def _resolve_gguf_path(model_path: str) -> str:
-    """Intelligently detects and resolves target .gguf binaries from a directory."""
-    p = Path(model_path)
-    if p.is_file() and p.suffix == ".gguf":
-        return str(p)
-    if p.is_dir():
-        ggufs = sorted(p.glob("*.gguf"))
-        if len(ggufs) == 0:
-            raise FileNotFoundError(f"No .gguf files found in directory: {p}")
-        if len(ggufs) > 1:
-            q4_candidates = [g for g in ggufs if "Q4_K_M" in g.name]
-            if len(q4_candidates) == 1:
-                return str(q4_candidates[0])
-            raise ValueError(f"Multiple .gguf files found in {p}. Please specify exact file.")
-        return str(ggufs[0])
-    return str(p)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # UNIVERSAL BACKEND ENGINE
@@ -114,8 +105,10 @@ class BackendEngine:
         max_seq_length: int = 24576
     ):
         self.backend_type = backend_type.lower().strip()
-        self.model_path = str(model_path) if model_path else None
-        self.adapter_path = str(adapter_path) if adapter_path else None
+        
+        # SOTA FIX: Dynamically resolve paths against absolute repository anchors
+        self.model_path = str(Paths.resolve_model_path(model_path, "Qwen2.5-7B-Instruct")) if model_path else None
+        self.adapter_path = str(Paths.resolve_model_path(adapter_path, "")) if adapter_path else None
         self.vllm_url = vllm_url
         self.lora_name = lora_name or "default_lora"
         self.max_seq_length = max_seq_length
@@ -129,7 +122,7 @@ class BackendEngine:
             self._init_unsloth()
         elif self.backend_type == "llamacpp":
             if self.model_path:
-                self.model_path = _resolve_gguf_path(self.model_path)
+                self.model_path = str(Paths.resolve_gguf_path(self.model_path))
             self._init_llamacpp()
         elif self.backend_type == "vllm":
             self._init_vllm()
@@ -141,13 +134,14 @@ class BackendEngine:
     def unload(self):
         """
         Deterministically clears GPU memory to prevent VRAM fragmentation.
-        Critically implements vLLM distributed state destruction.
+        Critically implements deep vLLM distributed state destruction.
         """
         if self.backend_type == "vllm" and self.llm is not None:
             print("🧹 [VRAM Airlock] Destroying vLLM distributed engine state...")
             try:
-                from vllm.distributed.parallel_state import destroy_model_parallel
+                from vllm.distributed.parallel_state import destroy_model_parallel, destroy_env
                 destroy_model_parallel()
+                destroy_env()
             except ImportError:
                 pass
             except Exception as e:
@@ -215,9 +209,10 @@ class BackendEngine:
                 load_in_4bit=False
             )
         elif is_adapter:
-            print(f"[BackendEngine] Polymorphic detection: Loading ADAPTER from {load_path} onto base {DEFAULT_BASE_MODEL}")
+            base_model_abs = str(Paths.resolve_model_path(None, "Qwen2.5-7B-Instruct"))
+            print(f"[BackendEngine] Polymorphic detection: Loading ADAPTER from {load_path} onto base {base_model_abs}")
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-                model_name=DEFAULT_BASE_MODEL,
+                model_name=base_model_abs,
                 max_seq_length=self.max_seq_length,
                 dtype=torch.bfloat16,
                 load_in_4bit=False
@@ -332,7 +327,7 @@ class BackendEngine:
                 if s in output_text:
                     output_text = output_text.split(s)[0]
                     
-            output_text = output_text.strip()
+            output_text = output_text.replace("<|im_end|>", "").strip()
             token_count = len(gen_tokens)
 
         # ---------------------------------------------------------------------
@@ -383,7 +378,6 @@ class BackendEngine:
         ttft_ms = (first_token_time - start_time) * 1000.0 if first_token_time else total_latency_ms
         generation_time_ms = total_latency_ms - ttft_ms
         
-        # Fallback estimation for TTFT if generation was instantaneous
         if generation_time_ms <= 0.001:
             tokens_per_sec = token_count / (total_latency_ms / 1000.0) if total_latency_ms > 0 else 0
         else:
@@ -458,4 +452,4 @@ class JudgeClient:
             except Exception as e:
                 if attempt == retries - 1:
                     raise Exception(f"Judge API failed after {retries} attempts: {e}")
-                time.sleep(2 ** attempt)  # Exponential backoff
+                time.sleep(2 ** attempt)

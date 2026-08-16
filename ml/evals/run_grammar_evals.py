@@ -6,20 +6,19 @@ Tests Pillar 1: Schema Compliance Rate & Pillar 5: Hardware Efficiency.
 Evaluates whether the trained Auditor SLM outputs valid JSON strictly adhering to `dpdp_schema.json`.
 
 SOTA Upgrades Implemented:
-1. Strict VRAM Airlock: Guarantees GPU memory release via `engine.unload()` post-execution.
-2. P95 Telemetry: Captures distribution percentiles (P50, P90, P95) for latency and TTFT.
-3. SFT Prompt Alignment: Perfectly matches the exact ChatML prompt used during fine-tuning.
-4. Dynamic Path Resolution: Uses `path_resolver.py` for indestructible relative paths.
-5. Statistical Confidence: Calculates Wilson 95% CI bounds for JSON & Schema compliance rates.
+1. Strict Schema Enforcement: Eliminated "Soft Warning" anti-pattern. Any missing API contract field triggers an immediate schema failure.
+2. Silent Bug Fix: Fixed orphaned `missing_v_critical` variable that allowed missing statutory references to bypass failure gates.
+3. Strict VRAM Airlock: Guarantees GPU memory release via `engine.unload()`.
+4. P95 Telemetry: Captures distribution percentiles (P50, P90, P95) for latency and TTFT.
+5. Dynamic Path Resolution: Uses `path_resolver.py` for indestructible relative paths.
 """
 
 import os
 import sys
 import json
-import time
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from tqdm import tqdm
 import numpy as np
@@ -155,13 +154,12 @@ def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, An
         result["error"] = "Root output is not a JSON object (dict)"
         return result
 
-    # Granular Field Checks (Excellent for model debugging)
-    # Critical root fields: violations + at least one score field
-    CRITICAL_ROOT_FIELDS = ["violations"]
-    missing_critical = [f for f in CRITICAL_ROOT_FIELDS if f not in parsed]
+    # ─────────────────────────────────────────────────────────────────────────
+    # STRICT FIELD & ENUM CHECKS (Fixing the Soft-Warning Anti-Pattern)
+    # ─────────────────────────────────────────────────────────────────────────
     missing_all = [f for f in REQUIRED_ROOT_FIELDS if f not in parsed]
     if missing_all:
-        result["missing_fields"] = missing_all
+        result["missing_fields"].extend(missing_all)
 
     if "dpdp_trust_score" in parsed and not isinstance(parsed["dpdp_trust_score"], (int, float)):
         result["type_errors"].append("dpdp_trust_score must be numeric")
@@ -175,14 +173,10 @@ def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, An
                 result["type_errors"].append(f"violation[{idx}] is not a dict")
                 continue
             
-            # Track missing fields for diagnostics but don't fail on non-critical sub-fields
-            CRITICAL_VIOLATION_FIELDS = ["violation_type", "statute_reference"]
             missing_v_all = [f for f in REQUIRED_VIOLATION_FIELDS if f not in v]
-            missing_v_critical = [f for f in CRITICAL_VIOLATION_FIELDS if f not in v]
             if missing_v_all:
                 result["missing_fields"].extend([f"violation[{idx}].{f}" for f in missing_v_all])
                 
-            # Case-insensitive enum matching (model may output lowercase or mixed case)
             v_type = v.get("violation_type", "")
             v_type_upper = v_type.upper().strip() if isinstance(v_type, str) else ""
             if v_type_upper and v_type_upper not in VALID_VIOLATION_TYPES:
@@ -195,12 +189,13 @@ def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, An
     else:
         result["type_errors"].append("violations must be a list")
 
-    # Schema compliance gating: separate critical failures from soft warnings
-    has_critical_failures = bool(missing_critical) or bool(result["type_errors"])
-    has_soft_issues = bool(result["missing_fields"]) or bool(result["enum_violations"])
+    # ─────────────────────────────────────────────────────────────────────────
+    # STRICT COMPLIANCE GATING
+    # ─────────────────────────────────────────────────────────────────────────
+    # In MLOps, API contracts are binary. Missing fields, type mismatches, and enum violations are FATAL.
+    has_contract_failures = bool(result["missing_fields"]) or bool(result["type_errors"]) or bool(result["enum_violations"])
 
-    if not has_critical_failures and not has_soft_issues:
-        # Perfect structural match
+    if not has_contract_failures:
         if HAS_JSONSCHEMA and schema:
             try:
                 validate(instance=parsed, schema=schema)
@@ -209,14 +204,9 @@ def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, An
                 result["error"] = f"JSONSchema ValidationError: {e.message if hasattr(e, 'message') else str(e)}"
                 result["matches_schema"] = False
         else:
-            result["matches_schema"] = True
-    elif not has_critical_failures:
-        # Has soft issues (missing non-critical sub-fields or enum mismatches)
-        # Still counts as schema-compliant if critical structure is present
-        result["matches_schema"] = True
-        result["error"] = f"Soft warnings: {len(result['missing_fields'])} missing fields, {len(result['enum_violations'])} enum mismatches"
+            result["matches_schema"] = True # Passed strict manual structural checks
     else:
-        result["error"] = "Critical structural requirement check failed"
+        result["error"] = f"Strict Contract Failure: {len(result['missing_fields'])} missing fields, {len(result['enum_violations'])} enum errors."
 
     return result
 
@@ -283,10 +273,10 @@ def main():
             if validation["matches_schema"]:
                 total_schema_compliant += 1
                 
-            latencies.append(inference_out["latency_ms"])
-            if inference_out["ttft_ms"] > 0:
+            latencies.append(inference_out.get("latency_ms", 0.0))
+            if inference_out.get("ttft_ms", 0.0) > 0:
                 ttfts.append(inference_out["ttft_ms"])
-            if inference_out["tokens_per_sec"] > 0:
+            if inference_out.get("tokens_per_sec", 0.0) > 0:
                 throughputs.append(inference_out["tokens_per_sec"])
 
             results.append({
@@ -298,12 +288,12 @@ def main():
                 "missing_fields": validation["missing_fields"],
                 "enum_violations": validation["enum_violations"],
                 "type_errors": validation["type_errors"],
-                "latency_ms": inference_out["latency_ms"],
-                "ttft_ms": inference_out["ttft_ms"],
-                "tokens_per_sec": inference_out["tokens_per_sec"]
+                "latency_ms": inference_out.get("latency_ms", 0.0),
+                "ttft_ms": inference_out.get("ttft_ms", 0.0),
+                "tokens_per_sec": inference_out.get("tokens_per_sec", 0.0)
             })
     finally:
-        # Strict VRAM Airlock: Protects downstream eval scripts
+        # Strict VRAM Airlock: Protects downstream eval scripts from OOM
         engine.unload()
 
     # ═══════════════════════════════════════════════════════════════════

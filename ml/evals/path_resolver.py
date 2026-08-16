@@ -1,168 +1,185 @@
 #!/usr/bin/env python3
 """
-path_resolver.py – Centralized, Deterministic Path Resolution for the DPDP Eval Suite.
+path_resolver.py – Deterministic POSIX Path Resolution for DPDP Eval Suite (Linux/DGX)
 
-SOTA Upgrades Implemented:
-1. Dynamic Root Discovery: Climbs the AST/directory tree dynamically to find `ml/`
-   regardless of where or how the script is executed.
-2. Fresh-Clone Safeguards: Automatically ensures requisite output directories exist.
-3. Fallback Hierarchy: Bulletproof resolution for relative vs absolute model paths.
+Resolves relative paths consistently across arbitrary Linux working directories
+(repo root, ml/, ml/evals/, ml/scripts/, or Docker mount points).
+
+Hierarchy for resolving models & assets:
+1. Direct Path relative to current process CWD.
+2. Relative to `ml/evals/` (supports legacy `../models/...` args).
+3. Relative to `ml/` root directory.
+4. Relative to overall project root.
+5. Direct lookup in `ml/models/<basename>`.
 """
 
+import os
+import sys
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union
+
 
 # ═══════════════════════════════════════════════════════════════════════════
-# DYNAMIC ROOT DISCOVERY
+# DYNAMIC POSIX ROOT DISCOVERY
 # ═══════════════════════════════════════════════════════════════════════════
-def _find_ml_root() -> Path:
+def _discover_ml_root() -> Path:
     """
-    Dynamically traverses upwards from this file to find the true `ml/` root.
-    Immune to symlinks and file relocations.
+    Climbs the filesystem hierarchy from this file's realpath to locate `ml/`.
+    Guarantees correct anchoring regardless of Linux symlinks or shell CWD.
     """
     current = Path(__file__).resolve().parent
     while current != current.parent:
-        if (current / "data-forge").exists() and (current / "evals").exists():
+        if (current / "data-forge").is_dir() and (current / "evals").is_dir():
             return current
+        if (current / "ml" / "data-forge").is_dir():
+            return (current / "ml").resolve()
         current = current.parent
-    
-    # Absolute Fallback if executed in a detached context
+
+    # Standard POSIX fallback
     return Path(__file__).resolve().parent.parent
 
-_ML_DIR = _find_ml_root()
-_EVALS_DIR = _ML_DIR / "evals"
-_PROJECT_ROOT = _ML_DIR.parent
+
+_ML_DIR = _discover_ml_root()
+_EVALS_DIR = (_ML_DIR / "evals").resolve()
+_PROJECT_ROOT = _ML_DIR.parent.resolve()
 
 
 class Paths:
-    """Single source of truth for every file path used by the evaluation suite."""
+    """Single source of truth for all paths in the DPDP evaluation pipeline."""
 
-    # ── Eval Suite ──────────────────────────────────────────────────────
-    EVALS_DIR = _EVALS_DIR
-    CORE_DIR = _EVALS_DIR
-    SUITES_DIR = _EVALS_DIR / "suites"
+    # ── Directory Anchors ───────────────────────────────────────────────
+    PROJECT_ROOT: Path = _PROJECT_ROOT
+    ML_DIR: Path = _ML_DIR
+    EVALS_DIR: Path = _EVALS_DIR
+    CORE_DIR: Path = _EVALS_DIR
+    SUITES_DIR: Path = _EVALS_DIR / "suites"
 
-    # ── Benchmark Data ──────────────────────────────────────────────────
-    BENCHMARKS_DIR = _EVALS_DIR / "benchmarks"
-    CHATBOT_QA_BENCHMARK = BENCHMARKS_DIR / "dpdp_chatbot_qa.json"
-    RAG_TESTSET = BENCHMARKS_DIR / "dpdp_rag_testset.json"
-    REDTEAM_PROMPTS = BENCHMARKS_DIR / "redteam_hallucination_prompts.json"
-    SECURITY_SUITE = BENCHMARKS_DIR / "security_adversarial_suite.json"
+    # ── Benchmark Datasets ──────────────────────────────────────────────
+    BENCHMARKS_DIR: Path = _EVALS_DIR / "benchmarks"
+    CHATBOT_QA_BENCHMARK: Path = BENCHMARKS_DIR / "dpdp_chatbot_qa.json"
+    RAG_TESTSET: Path = BENCHMARKS_DIR / "dpdp_rag_testset.json"
+    REDTEAM_PROMPTS: Path = BENCHMARKS_DIR / "redteam_hallucination_prompts.json"
+    SECURITY_SUITE: Path = BENCHMARKS_DIR / "security_adversarial_suite.json"
 
-    # ── Ground Truth ────────────────────────────────────────────────────
-    HOLDOUT_DIR = _EVALS_DIR / "holdout_policies"
-    GROUND_TRUTH = HOLDOUT_DIR / "ground_truth.json"
+    # ── Ground Truth Policies ───────────────────────────────────────────
+    HOLDOUT_DIR: Path = _EVALS_DIR / "holdout_policies"
+    GROUND_TRUTH: Path = HOLDOUT_DIR / "ground_truth.json"
 
-    # ── Reports (auto-created) ──────────────────────────────────────────
-    REPORTS_DIR = _EVALS_DIR / "reports"
+    # ── Output Reports ──────────────────────────────────────────────────
+    REPORTS_DIR: Path = _EVALS_DIR / "reports"
 
-    # ── Schema ──────────────────────────────────────────────────────────
-    SCHEMA_PATH = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
+    # ── Schema Contracts ────────────────────────────────────────────────
+    SCHEMA_PATH: Path = _PROJECT_ROOT / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
 
-    # ── Law Source Text ─────────────────────────────────────────────────
-    LAW_TEXT = _ML_DIR / "data-forge" / "dpdp_act_and_rules_2025.txt"
+    # ── Knowledge Base & Vector Store ───────────────────────────────────
+    DATA_FORGE_DIR: Path = _ML_DIR / "data-forge"
+    LAW_TEXT: Path = DATA_FORGE_DIR / "dpdp_act_and_rules_2025.txt"
+    HYBRID_INDEX: Path = DATA_FORGE_DIR / "dpdp_hybrid_index.pkl"
 
-    # ── Hybrid Index ────────────────────────────────────────────────────
-    HYBRID_INDEX = _ML_DIR / "data-forge" / "dpdp_hybrid_index.pkl"
-
-    # ── Default Model & Data Paths ──────────────────────────────────────
-    MODELS_DIR = _ML_DIR / "models"
-    TRAINING_DATA_DIR = _ML_DIR / "slm-training" / "data"
+    # ── Models & Training Data ──────────────────────────────────────────
+    MODELS_DIR: Path = _ML_DIR / "models"
+    TRAINING_DATA_DIR: Path = _ML_DIR / "slm-training" / "data"
 
     @classmethod
     def ensure_reports_dir(cls) -> Path:
-        """Create and return the reports directory safely."""
+        """Ensures the reports directory exists with standard Linux permissions."""
         cls.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
         return cls.REPORTS_DIR
 
     @classmethod
-    def resolve_model_path(cls, model_arg: Optional[str], default_name: str) -> Path:
+    def resolve_model_path(cls, model_arg: Optional[Union[str, Path]], default_name: str) -> Path:
         """
-        Bulletproof model path resolution. 
-        Hierarchy: Absolute Path -> CWD Relative -> ML_DIR/models Relative -> Fallback.
+        Resolves model paths across Linux environments using multi-tier fallback.
+        
+        Args:
+            model_arg: User/CLI argument (e.g. '../models/audit-model-final' or 'audit-model-final')
+            default_name: Default subdirectory under ml/models/ if model_arg is None
         """
-        if model_arg:
-            p = Path(model_arg)
-            # 1. Check if it's a direct valid path (Absolute or relative to CWD)
-            if p.exists():
-                return p.resolve()
-            
-            # 2. Check if it's relative to the project root
-            pr = _PROJECT_ROOT / model_arg
-            if pr.exists():
-                return pr.resolve()
-                
-            # 3. Check if it's relative to the models directory
-            pm = cls.MODELS_DIR / model_arg
-            if pm.exists():
-                return pm.resolve()
+        target = str(model_arg).strip() if model_arg else default_name
 
-            return p  # Return as-is (will throw expected downstream error)
+        # If it's already an absolute path and exists, return immediately
+        p = Path(target)
+        if p.is_absolute() and p.exists():
+            return p.resolve()
 
-        # 4. Default resolution paths
-        candidates = [
-            cls.MODELS_DIR / default_name,
-            _PROJECT_ROOT.parent / "models" / default_name,  # legacy mapping support
+        # Search candidates in strict order of resolution
+        search_candidates = [
+            # 1. Relative to CWD
+            (Path.cwd() / target).resolve(),
+            # 2. Relative to ml/evals (supports legacy ../models/... calls)
+            (cls.EVALS_DIR / target).resolve(),
+            # 3. Relative to ml/ root
+            (cls.ML_DIR / target).resolve(),
+            # 4. Relative to project root
+            (cls.PROJECT_ROOT / target).resolve(),
+            # 5. Direct lookup in ml/models by target or basename
+            (cls.MODELS_DIR / target).resolve(),
+            (cls.MODELS_DIR / Path(target).name).resolve(),
         ]
-        for c in candidates:
-            if c.exists():
-                return c.resolve()
-                
-        return cls.MODELS_DIR / default_name
+
+        for candidate in search_candidates:
+            if candidate.exists():
+                return candidate
+
+        # Return default target under models dir if not found (downstream will report missing path)
+        return (cls.MODELS_DIR / Path(target).name).resolve()
 
     @classmethod
-    def resolve_gguf_path(cls, dir_or_file: str) -> Path:
+    def resolve_gguf_path(cls, dir_or_file: Union[str, Path]) -> Path:
         """
-        For llama.cpp backend: dynamically auto-discovers the optimal .gguf file.
-        Safely prioritizes Q4_K_M if multiple exist.
+        Auto-discovers .gguf quantized model files in Linux directories.
+        Prioritizes Q4_K_M if multiple quantization formats exist.
         """
-        p = Path(dir_or_file)
-        if p.is_file() and p.suffix == ".gguf":
-            return p.resolve()
-            
-        if p.is_dir():
-            ggufs = list(p.glob("*.gguf"))
+        resolved_path = cls.resolve_model_path(dir_or_file, "chatbot-model-final-gguf")
+
+        if resolved_path.is_file() and resolved_path.suffix.lower() == ".gguf":
+            return resolved_path
+
+        if resolved_path.is_dir():
+            ggufs = sorted(resolved_path.glob("*.gguf"))
             if not ggufs:
                 raise FileNotFoundError(
-                    f"❌ No .gguf files found in directory: {p}\n"
-                    f"Expected a quantized model file inside this directory."
+                    f"❌ No .gguf model files located in: {resolved_path}\n"
+                    f"Ensure model export completed successfully."
                 )
+
+            # Prioritize standard Q4_K_M quantization
+            q4_candidates = [g for g in ggufs if "Q4_K_M" in g.name.upper()]
+            if len(q4_candidates) == 1:
+                return q4_candidates[0].resolve()
+
             if len(ggufs) > 1:
-                # Prioritize Q4_K_M quantization if multiple exist
-                q4_candidates = [g for g in ggufs if "Q4_K_M" in g.name]
-                if len(q4_candidates) == 1:
-                    return q4_candidates[0].resolve()
-                    
                 names = [g.name for g in ggufs]
                 raise ValueError(
-                    f"⚠️ Multiple .gguf files found in {p}: {names}\n"
-                    f"Please specify the exact file path explicitly."
+                    f"⚠️ Multiple GGUF binaries found in {resolved_path}: {names}\n"
+                    f"Specify the exact file path."
                 )
+
             return ggufs[0].resolve()
-            
-        raise FileNotFoundError(f"❌ Model path does not exist: {p}")
+
+        raise FileNotFoundError(f"❌ Model path does not exist on Linux host: {resolved_path}")
 
     @classmethod
-    def read_model_label(cls, model_path: str, fallback: str = "Unknown Model") -> str:
-        """
-        Dynamically extracts the model's true architectural name from its config.json.
-        """
-        config_path = Path(model_path) / "config.json"
+    def read_model_label(cls, model_path: Union[str, Path], fallback: str = "Qwen2.5-7B-SLM") -> str:
+        """Extracts model metadata dynamically from HuggingFace config.json on Linux."""
+        target_dir = cls.resolve_model_path(model_path, "")
+        if target_dir.is_file():
+            target_dir = target_dir.parent
+
+        config_path = target_dir / "config.json"
         if config_path.exists():
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                
-                # Check standard HuggingFace config keys in order of precedence
+
                 for key in ["_name_or_path", "model_type", "architectures"]:
-                    if key in config:
+                    if key in config and config[key]:
                         val = config[key]
                         if isinstance(val, list) and len(val) > 0:
                             val = val[0]
-                        if val and isinstance(val, str):
-                            return val
+                        return str(val)
             except Exception:
                 pass
-                
-        return fallback
+
+        return Path(model_path).name if model_path else fallback
