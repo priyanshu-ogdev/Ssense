@@ -390,6 +390,19 @@ def check_schema_bleed(text: str) -> List[str]:
             found.append(term.replace(r'\b', '').replace('\\', ''))
     return found
 
+def check_forbidden_terms(text: str, forbidden_terms: List[str]) -> List[str]:
+    """Checks if the model output contains any forbidden hallucination terms from the benchmark."""
+    if not forbidden_terms:
+        return []
+    found = []
+    text_lower = text.lower()
+    for term in forbidden_terms:
+        if not term or not isinstance(term, str):
+            continue
+        if term.lower() in text_lower:
+            found.append(term)
+    return found
+
 def evaluate_key_points_coverage(response: str, expected_points: List[str]) -> float:
     """Estimates percentage coverage of legal keywords across expected statutory points."""
     if not expected_points:

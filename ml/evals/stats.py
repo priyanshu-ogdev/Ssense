@@ -45,6 +45,9 @@ def wilson_ci_from_pct(point_pct: float, total: int, confidence: float = 0.95) -
     successes = int((max(0.0, min(100.0, point_pct)) / 100.0) * total)
     return wilson_ci(successes, total, confidence)
 
+# Alias for backward compatibility (used by compare_sota_models.py)
+wilson_score_interval = wilson_ci
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SMART STATISTICAL GATING (Solving the Wilson Paradox)
 # ═══════════════════════════════════════════════════════════════════════════

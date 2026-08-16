@@ -244,6 +244,7 @@ def main():
     parser.add_argument("--baseline-path", type=str, default=str(DEFAULT_BASELINE_PATH))
     parser.add_argument("--benchmark-path", type=str, default=str(DEFAULT_BENCHMARK))
     parser.add_argument("--lora-name", type=str, default="chatbot")
+    parser.add_argument("--vllm-url", type=str, default="http://localhost:8000/v1/completions")
     parser.add_argument("--allow-simulated-baseline", action="store_true",
                         help="Allow using simulated baseline metrics when the baseline model is unavailable.")
     args = parser.parse_args()
@@ -266,7 +267,7 @@ def main():
     print(f"\n📦 [1/2] Loading Fine-Tuned Model from: {args.finetuned_path}...")
     ft_engine = None
     try:
-        ft_engine = BackendEngine(backend_type=args.backend, model_path=args.finetuned_path, lora_name=args.lora_name)
+        ft_engine = BackendEngine(backend_type=args.backend, model_path=args.finetuned_path, lora_name=args.lora_name, vllm_url=args.vllm_url)
         ft_results = evaluate_model_on_testset(ft_engine, queries, "RAFT-Trained DPDP Chatbot")
     finally:
         # Strict VRAM Airlock: Unload FT model before touching baseline
@@ -287,7 +288,7 @@ def main():
         base_engine = None
         try:
             print(f"\n📦 [2/2] Loading Vanilla Baseline Model from: {baseline_path}...")
-            base_engine = BackendEngine(backend_type=args.backend, model_path=str(baseline_path))
+            base_engine = BackendEngine(backend_type=args.backend, model_path=str(baseline_path), vllm_url=args.vllm_url)
             base_results = evaluate_model_on_testset(base_engine, queries, "Vanilla Qwen2.5 Baseline")
         except Exception as e:
             print(f"⚠️ Baseline evaluation failed to execute: {e}")

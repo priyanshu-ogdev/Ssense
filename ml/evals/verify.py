@@ -203,7 +203,8 @@ def main():
         ])
         run_script("compare_sota_models.py", [
             "--backend", args.backend, "--finetuned-path", args.chatbot_model_path,
-            "--lora-name", args.chatbot_lora_name, "--allow-simulated-baseline"
+            "--lora-name", args.chatbot_lora_name, "--vllm-url", args.vllm_url,
+            "--allow-simulated-baseline"
         ])
 
     # ═══════════════════════════════════════════════════════════════════

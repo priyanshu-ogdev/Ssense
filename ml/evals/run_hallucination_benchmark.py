@@ -121,7 +121,10 @@ def main():
             valid_rejection_phrases = [
                 "silent", "does not specify", "not specify", "neither the act nor", 
                 "not prescribe", "no explicit", "does not mention", "not mentioned", 
-                "no provision", "not address"
+                "no provision", "not address", "does not contain", "no such provision",
+                "does not state", "not covered", "does not provide for", "no requirement",
+                "not stipulated", "does not mandate", "no basis in the act", "not applicable",
+                "does not recognize", "not what the", "does not say", "has no provision"
             ]
             
             if is_silence_trap and not any(w in resp_lower for w in valid_rejection_phrases):

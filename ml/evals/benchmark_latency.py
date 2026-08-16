@@ -176,6 +176,7 @@ def main():
     parser.add_argument("--batch-sizes", nargs="+", type=int, default=BATCH_SIZES)
     parser.add_argument("--skip-32k", action="store_true", help="Skip 32k deep context OOM stress simulation")
     parser.add_argument("--lora-name", type=str, default="chatbot")
+    parser.add_argument("--vllm-url", type=str, default="http://localhost:8000/v1/completions")
     args = parser.parse_args()
 
     print("═══════════════════════════════════════════════════════════════════════")
@@ -189,6 +190,7 @@ def main():
         model_path=args.model_path,
         adapter_path=args.adapter_path,
         lora_name=args.lora_name,
+        vllm_url=args.vllm_url,
         max_seq_length=32768
     )
 
