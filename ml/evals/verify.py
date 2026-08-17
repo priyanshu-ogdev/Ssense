@@ -234,7 +234,7 @@ def run_script(script_name: str, args_list: List[str]) -> Tuple[bool, float]:
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Master Verification & Diagnostic Harness")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--audit-model-path", type=str, default="../models/audit-model-final")
     parser.add_argument("--chatbot-model-path", type=str, default="../models/chatbot-model-final")
     parser.add_argument("--audit-lora-name", type=str, default="audit")

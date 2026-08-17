@@ -215,7 +215,7 @@ def validate_json_structure(output: str, schema: Dict[str, Any]) -> Dict[str, An
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 1 & 5: JSON Schema & Grammar Compliance Evaluation")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(DEFAULT_MODEL_PATH))
     parser.add_argument("--adapter-path", type=str, default=None)
     parser.add_argument("--schema-path", type=str, default=str(DEFAULT_SCHEMA_PATH))

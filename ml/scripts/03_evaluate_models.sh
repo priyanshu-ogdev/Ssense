@@ -22,7 +22,7 @@ export TOKENIZERS_PARALLELISM=false
 export CUDA_DEVICE_ORDER="PCI_BUS_ID"
 
 # ─── DEFAULT CONFIGURATION ────────────────────────────────────────────────────
-BACKEND="unsloth"
+BACKEND="vllm"
 AUDIT_MODEL="../models/audit-model-final"
 CHATBOT_MODEL="../models/chatbot-model-final"
 AUDIT_LORA="audit"
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: bash ml/scripts/03_evaluate_models.sh [options]"
             echo "Options:"
-            echo "  --backend <unsloth|vllm|llamacpp>    Backend engine (default: unsloth)"
+            echo "  --backend <vllm|unsloth|llamacpp>    Backend engine (default: vllm)"
             echo "  --edge                               Auto-configures llama.cpp to test quantized GGUF Edge models"
             echo "  --audit-model <path>                 Path to Auditor model"
             echo "  --chatbot-model <path>               Path to Chatbot model"

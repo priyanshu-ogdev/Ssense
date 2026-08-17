@@ -150,7 +150,7 @@ def flush_gpu():
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillars 1-4: Adversarial Security & SLM Vulnerability Evals")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--audit-model-path", type=str, default=str(DEFAULT_AUDIT_PATH))
     parser.add_argument("--chatbot-model-path", type=str, default=str(DEFAULT_CHATBOT_PATH))
     parser.add_argument("--audit-lora-name", type=str, default="audit")

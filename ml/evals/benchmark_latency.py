@@ -177,7 +177,7 @@ def execute_single_request(engine: BackendEngine, prompt: str, max_tokens: int =
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 5: End-to-End Inference Latency & Load Resilience")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(DEFAULT_MODEL_PATH))
     parser.add_argument("--adapter-path", type=str, default=None)
     parser.add_argument("--batch-sizes", nargs="+", type=int, default=BATCH_SIZES)

@@ -120,7 +120,7 @@ VALID_REJECTION_PHRASES = [
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 4: Red-Team Statutory Hallucination Benchmark")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(DEFAULT_MODEL_PATH))
     parser.add_argument("--adapter-path", type=str, default=None)
     parser.add_argument("--benchmark-path", type=str, default=str(DEFAULT_BENCHMARK_PATH))

@@ -8,8 +8,8 @@ Supports three universal backends:
 3. `llamacpp`: Quantized local GGUF evaluation with native FlashAttention support.
 
 SOTA Enhancements:
-- vLLM Guided Decoding: Natively injects `guided_json` schemas into the C++ CUDA kernel for strict API contracts.
-- KV-Cache Scaling: Optimized `gpu_memory_utilization=0.95` to support full 32k token windows in production.
+- vLLM Guided Decoding API Sync: Uses `GuidedDecodingParams` to inject JSON schemas flawlessly on vLLM >=0.5.x.
+- KV-Cache Scaling: Optimized `gpu_memory_utilization=0.80` to prevent strict allocation crashes on 120GB+ cards.
 - Strict VRAM Airlock: Deep distributed state destruction for vLLM to prevent memory leaks.
 - Dynamic LoRA Routing: vLLM natively mounts `adapter_path` via `LoRARequest` on top of base model.
 - Indestructible Paths: Perfectly synchronized with `path_resolver.py`.
@@ -76,20 +76,6 @@ def format_chatml_prompt(
     prompt += f"<|im_start|>assistant\n{assistant_prefix}"
     return prompt
 
-def format_chatml_multi_turn(
-    messages: List[Dict[str, str]],
-    add_generation_prompt: bool = True
-) -> str:
-    """Formats an arbitrary conversation history into a unified ChatML string."""
-    prompt = ""
-    for msg in messages:
-        role = msg["role"]
-        content = msg["content"]
-        prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
-    if add_generation_prompt:
-        prompt += "<|im_start|>assistant\n"
-    return prompt
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # UNIVERSAL BACKEND ENGINE
@@ -97,7 +83,7 @@ def format_chatml_multi_turn(
 class BackendEngine:
     def __init__(
         self,
-        backend_type: str = "unsloth",
+        backend_type: str = "vllm",
         model_path: Optional[Union[str, Path]] = None,
         adapter_path: Optional[Union[str, Path]] = None,
         vllm_url: str = "http://localhost:8000/v1/completions",
@@ -129,7 +115,7 @@ class BackendEngine:
         elif self.backend_type == "mock":
             self._init_mock()
         else:
-            raise ValueError(f"Unknown backend type: {self.backend_type}. Supported: unsloth, vllm, llamacpp.")
+            raise ValueError(f"Unknown backend type: {self.backend_type}. Supported: vllm, unsloth, llamacpp.")
 
     def unload(self):
         """
@@ -252,7 +238,6 @@ class BackendEngine:
         print("[BackendEngine] llama_cpp GGUF model successfully loaded.")
 
     def _init_vllm(self):
-        print(f"[BackendEngine] Initializing vLLM Production Backend natively for: {self.model_path}...")
         try:
             import vllm
             from vllm import LLM
@@ -260,23 +245,45 @@ class BackendEngine:
         except ImportError:
             raise ImportError("vLLM is not installed in this environment. Use a dedicated vLLM env for serving.")
         
-        # Base Model Initialization with dynamic LoRA allocation support
-        enable_lora_flag = bool(self.adapter_path and os.path.exists(self.adapter_path))
+        load_path = self.adapter_path if (self.adapter_path and os.path.exists(self.adapter_path)) else self.model_path
+        if not load_path or not os.path.exists(load_path):
+            raise FileNotFoundError(f"Cannot locate model/adapter path for vllm backend: {load_path}")
+
+        is_local_dir = os.path.isdir(load_path) if (load_path and os.path.exists(load_path)) else False
+        is_adapter = is_local_dir and os.path.exists(os.path.join(load_path, "adapter_config.json"))
+        is_merged = is_local_dir and os.path.exists(os.path.join(load_path, "config.json")) and not is_adapter
+
+        if is_adapter:
+            base_model_abs = str(Paths.resolve_model_path(None, "Qwen2.5-7B-Instruct"))
+            effective_model = base_model_abs
+            effective_adapter = load_path
+            enable_lora_flag = True
+            print(f"[BackendEngine] Polymorphic detection: Loading ADAPTER from {load_path} onto base {base_model_abs} via vLLM LoRARequest")
+        elif self.adapter_path and os.path.exists(self.adapter_path):
+            effective_model = self.model_path
+            effective_adapter = self.adapter_path
+            enable_lora_flag = True
+            print(f"[BackendEngine] Loading base model {self.model_path} with adapter {self.adapter_path}")
+        else:
+            effective_model = load_path
+            effective_adapter = None
+            enable_lora_flag = False
+            print(f"[BackendEngine] Initializing vLLM Production Backend natively for: {effective_model}...")
         
-        # SOTA FIX: Pushed GPU utilization to 0.95 to safely fit full 32k KV Cache payloads
+        # GPU utilization tuned to 0.80 to safely fit full 32k KV Cache without strict allocation OS crashes
         self.llm = LLM(
-            model=self.model_path,
+            model=effective_model,
             tensor_parallel_size=1,
             trust_remote_code=True,
             enable_lora=enable_lora_flag,
             max_lora_rank=128 if enable_lora_flag else 16,
             max_model_len=self.max_seq_length,
-            gpu_memory_utilization=0.95
+            gpu_memory_utilization=0.80
         )
         
-        if enable_lora_flag:
-            print(f"[BackendEngine] Multi-LoRA vLLM Routing Enabled. Mounting {self.lora_name} -> {self.adapter_path}")
-            self.lora_request = LoRARequest(self.lora_name, 1, self.adapter_path)
+        if enable_lora_flag and effective_adapter:
+            print(f"[BackendEngine] Multi-LoRA vLLM Routing Enabled. Mounting {self.lora_name} -> {effective_adapter}")
+            self.lora_request = LoRARequest(self.lora_name, 1, effective_adapter)
             
         print("[BackendEngine] vLLM Engine successfully initialized.")
 
@@ -303,7 +310,7 @@ class BackendEngine:
         token_count = 0
 
         # ---------------------------------------------------------------------
-        # UNSLOTH INFERENCE (No Native Guided Decoding Support)
+        # UNSLOTH INFERENCE
         # ---------------------------------------------------------------------
         if self.backend_type == "unsloth":
             import torch
@@ -313,7 +320,7 @@ class BackendEngine:
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=max_tokens,
-                    max_length=None, # Prevents CUDA illegal memory access
+                    max_length=None, 
                     temperature=temperature if temperature > 0 else 0.01,
                     do_sample=True if temperature > 0 else False,
                     pad_token_id=self.tokenizer.pad_token_id,
@@ -323,7 +330,6 @@ class BackendEngine:
             end_time = time.perf_counter()
             gen_tokens = outputs[0][inputs["input_ids"].shape[1]:]
             
-            # Explicitly decode WITHOUT dropping special tokens to reliably split on stop words
             output_text = self.tokenizer.decode(gen_tokens, skip_special_tokens=False)
             for s in stop:
                 if s in output_text:
@@ -333,7 +339,7 @@ class BackendEngine:
             token_count = len(gen_tokens)
 
         # ---------------------------------------------------------------------
-        # LLAMACPP INFERENCE (Ignores JSON-schema grammar, uses GBNF internally)
+        # LLAMACPP INFERENCE
         # ---------------------------------------------------------------------
         elif self.backend_type == "llamacpp":
             kwargs = {
@@ -342,9 +348,6 @@ class BackendEngine:
                 "stop": stop,
                 "stream": True
             }
-            # Note: llama_cpp uses GBNF grammar, not JSON. We ignore the passed JSON schema here
-            # to prevent crashes, as Edge GGUF inference relies on fine-tuned alignment.
-                
             stream = self.llm(prompt, **kwargs)
             for chunk in stream:
                 if first_token_time is None and chunk['choices'][0].get('text', ''):
@@ -360,7 +363,12 @@ class BackendEngine:
         elif self.backend_type == "vllm":
             from vllm import SamplingParams
             
-            # SOTA FIX: Parse the stringified schema back into dict to inject into outlines guided_json
+            # SOTA FIX: vLLM >= 0.5.x moved structured outputs to GuidedDecodingParams
+            try:
+                from vllm.sampling_params import GuidedDecodingParams
+            except ImportError:
+                GuidedDecodingParams = None
+            
             parsed_guided_json = None
             if grammar is not None:
                 try:
@@ -371,12 +379,20 @@ class BackendEngine:
                 except Exception as e:
                     print(f"⚠️ [vLLM] Failed to parse grammar payload for guided decoding: {e}")
 
-            sampling_params = SamplingParams(
-                temperature=temperature if temperature > 0 else 0.0,
-                max_tokens=max_tokens,
-                stop=stop,
-                guided_json=parsed_guided_json
-            )
+            if parsed_guided_json and GuidedDecodingParams is not None:
+                guided_decoding = GuidedDecodingParams(json=parsed_guided_json)
+                sampling_params = SamplingParams(
+                    temperature=temperature if temperature > 0 else 0.0,
+                    max_tokens=max_tokens,
+                    stop=stop,
+                    guided_decoding=guided_decoding
+                )
+            else:
+                sampling_params = SamplingParams(
+                    temperature=temperature if temperature > 0 else 0.0,
+                    max_tokens=max_tokens,
+                    stop=stop
+                )
             
             kwargs = {"use_tqdm": False}
             if self.lora_request is not None:

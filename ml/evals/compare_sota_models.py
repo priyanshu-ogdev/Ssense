@@ -208,7 +208,7 @@ def compute_offline_metrics(responses: List[Dict[str, Any]], queries: List[Dict[
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 4: SOTA Legal Model Comparison Suite")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--finetuned-path", type=str, default=str(DEFAULT_FINETUNED_PATH))
     parser.add_argument("--baseline-path", type=str, default=str(DEFAULT_BASELINE_PATH))
     parser.add_argument("--judge-path", type=str, default=str(DEFAULT_JUDGE_PATH))
@@ -281,7 +281,7 @@ def main():
     if args.use_judge and Path(args.judge_path).exists():
         print(f"\n🏛️ [Pass 3/3] Initializing 72B Teacher Judge ({args.judge_path})...")
         try:
-            judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
+            judge_engine = BackendEngine(backend_type=args.backend, model_path=args.judge_path, max_seq_length=8192)
         except Exception as e:
             print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
 

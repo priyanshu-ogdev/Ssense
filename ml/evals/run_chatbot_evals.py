@@ -162,7 +162,7 @@ class DynamicRAGRetriever:
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 2 & 4: Conversational Chatbot Authenticity & RAG Evals")
-    parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
+    parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
     parser.add_argument("--model-path", type=str, default=str(Paths.resolve_model_path(None, "chatbot-model-final")))
     parser.add_argument("--adapter-path", type=str, default=None)
     parser.add_argument("--benchmark-path", type=str, default=str(Paths.CHATBOT_QA_BENCHMARK))
@@ -268,7 +268,7 @@ def main():
     if args.use_judge and Path(args.judge_path).exists():
         print(f"\n🏛️ [Stage 3/3] Initializing 72B Teacher Judge ({args.judge_path})...")
         try:
-            judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
+            judge_engine = BackendEngine(backend_type=args.backend, model_path=args.judge_path, max_seq_length=8192)
         except Exception as e:
             print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
 
