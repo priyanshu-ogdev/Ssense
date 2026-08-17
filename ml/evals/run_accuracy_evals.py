@@ -10,12 +10,11 @@ Measures Pillars 2, 3, and 4 (Diagnostic):
 5. Sector/Category Breakdown & Telemetry (Latency, TTFT, Throughput)
 
 SOTA Upgrades Implemented:
-1. Token Guillotine Fix: Raised `max_tokens` to 8192 to prevent truncated JSON arrays from destroying F1/Recall.
-2. Production Guided Decoding: Injects `grammar=json.dumps(schema)` to mirror production vLLM deployment.
-3. Strict VRAM Airlock: Unloads model via `engine.unload()` and deep purges CUDA caches.
-4. Dynamic Exit Codes: Passes success/failure state up to `03_evaluate_models.sh`.
-5. Indestructible Paths: Utilizes `path_resolver.py` for absolute CWD independence.
-6. Context Window Synchronization: Raised `max_seq_length` to 32768.
+1. Production Guided Decoding: Injects `grammar=json.dumps(schema)` for vLLM structured decoding.
+2. Token Window Balancing: Balanced 32k context envelope with 4096-token generation headroom.
+3. Strict VRAM Airlock: Unloads model via `engine.unload()` and purges CUDA allocator caches.
+4. Diagnostic Exit Codes: Concludes with return 0 for clean aggregation by `verify.py`.
+5. Indestructible Paths: Utilizes `path_resolver.py` for absolute working directory independence.
 """
 
 import os
@@ -202,10 +201,10 @@ def main():
 
             prompt = format_chatml_prompt(sys_msg, user_msg)
             
-            # SOTA FIX: max_tokens raised to 8192; schema grammar injected
+            # SOTA FIX: max_tokens set to 4096; schema grammar injected for vLLM structured decoding
             out = engine.generate(
                 prompt, 
-                max_tokens=8192, 
+                max_tokens=4096, 
                 temperature=0.0,
                 grammar=grammar_payload
             )
@@ -236,7 +235,7 @@ def main():
             if isinstance(pred_trust, (int, float)) and isinstance(gt_trust, (int, float)):
                 t_err = abs(pred_trust - gt_trust)
             else:
-                t_err = 50.0  # Maximum penalty for schema omission
+                t_err = 50.0  # Schema penalty
             trust_errors.append(t_err)
 
             pred_subt = parsed.get("subtlety_score", None) if json_valid else None
@@ -257,7 +256,7 @@ def main():
             total_citations += cit_metrics["total_citations"]
             valid_citations += cit_metrics["valid_citations"]
 
-            # Track Category Performance
+            # Track Sectoral/Category Performance
             cat = item["category"]
             if cat not in category_breakdown:
                 category_breakdown[cat] = {"count": 0, "f1_sum": 0.0, "trust_err_sum": 0.0, "halluc_quotes": 0, "quotes": 0}
@@ -312,14 +311,14 @@ def main():
     overall_cit_validity = (valid_citations / total_citations * 100.0) if total_citations > 0 else 100.0
     cit_low, cit_high = wilson_ci_from_pct(overall_cit_validity, total_citations) if total_citations > 0 else (100.0, 100.0)
 
-    # Sector summary
+    # Sector summary with division guards
     sector_summary = {}
     for cat, d in category_breakdown.items():
-        cnt = d["count"]
+        cnt = max(1, d["count"])
         q_tot = d["quotes"]
         h_rate = (d["halluc_quotes"] / q_tot * 100.0) if q_tot > 0 else 0.0
         sector_summary[cat] = {
-            "cases_evaluated": cnt,
+            "cases_evaluated": d["count"],
             "mean_weighted_f1": round(d["f1_sum"] / cnt, 4),
             "trust_mae": round(d["trust_err_sum"] / cnt, 2),
             "hallucination_rate": round(h_rate, 2)
@@ -376,9 +375,8 @@ def main():
     print(f"\n💾 Detailed report saved to: {report_path}")
     print("═"*75 + "\n")
 
-    # Exit code signaling for orchestrator (Hard-fail if basic model reasoning is entirely missing)
-    is_accurate = (avg_weighted_f1 >= 0.50)  # We use 0.50 as a terminal kill-switch, verify.py handles the strict 0.88 gating
-    return 0 if is_accurate else 1
+    # Diagnostic return code: Always returns 0 so verify.py handles threshold grading
+    return 0
 
 
 if __name__ == "__main__":

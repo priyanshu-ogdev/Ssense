@@ -4,13 +4,12 @@ compare_sota_models.py – Pillar 4: SOTA Legal Model Comparative Benchmark
 
 Executes the 50-query DPDP statutory test set against both the fine-tuned 
 conversational SLM and unadapted baseline LLMs.
-Validates domain superiority, citation fidelity, and eradication of Western legal bias.
 
 SOTA Upgrades Implemented:
-1. Context-Aware Prompting: Fixes the "Blind Context" bug. Dynamically injects RAG context if present.
-2. SOTA Path Resolution: Integrated with `path_resolver.py` for indestructible dynamic paths.
-3. Metric Standardization: Aligned with the updated `stats.wilson_ci` method signatures.
-4. Strict VRAM Airlock: Evaluates models sequentially with explicit PyTorch cache flushes.
+1. 3-Stage VRAM Airlock: Generates FT, Generates Baseline, then loads 72B Judge sequentially.
+2. The Blind Judge Fix: Correctly loads and passes the Qwen2-72B-Instruct engine to the CF evaluator.
+3. Context-Aware Prompting: Synchronized with the empathetic, explicit-citation persona.
+4. Scale Parity: Max sequence length 32768, max tokens 2048 to prevent truncation.
 5. Statistical Rigor: Exact McNemar/Permutation p-values for statistical significance.
 """
 
@@ -44,6 +43,7 @@ try:
     DEFAULT_BENCHMARK = Paths.RAG_TESTSET
     DEFAULT_FINETUNED_PATH = Paths.resolve_model_path(None, "chatbot-model-final")
     DEFAULT_BASELINE_PATH = Paths.resolve_model_path(None, "Qwen2.5-7B-Instruct")
+    DEFAULT_JUDGE_PATH = Paths.resolve_model_path(None, "Qwen2-72B-Instruct-FP8")
     REPORT_DIR = Paths.ensure_reports_dir()
     REPORT_PATH = REPORT_DIR / "sota_legal_comparison_report.json"
 except ImportError:
@@ -51,6 +51,7 @@ except ImportError:
     DEFAULT_BENCHMARK = _CURRENT_DIR / "benchmarks" / "dpdp_rag_testset.json"
     DEFAULT_FINETUNED_PATH = _ML_DIR / "models" / "chatbot-model-final"
     DEFAULT_BASELINE_PATH = _ML_DIR / "models" / "Qwen2.5-7B-Instruct"
+    DEFAULT_JUDGE_PATH = _ML_DIR / "models" / "Qwen2-72B-Instruct-FP8"
     REPORT_DIR = _CURRENT_DIR / "reports"
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     REPORT_PATH = REPORT_DIR / "sota_legal_comparison_report.json"
@@ -62,7 +63,7 @@ except ImportError as e:
     print(f"❌ Failed to import core evaluation modules: {e}")
     sys.exit(1)
 
-# Import standardized Wilson CI from SOTA stats.py
+# Import standardized Wilson CI
 try:
     from stats import wilson_ci
 except ImportError:
@@ -77,13 +78,13 @@ except ImportError:
         upper_bound = min(1.0, (centre_adjusted + adjusted_std) / denominator)
         return round(lower_bound * 100.0, 2), round(upper_bound * 100.0, 2)
 
+
 # ═══════════════════════════════════════════════════════════════════════════
 # STATISTICAL SIGNIFICANCE TESTING
 # ═══════════════════════════════════════════════════════════════════════════
 def compute_paired_mcnemar(b_correct: List[bool], a_correct: List[bool]) -> float:
-    """Computes exact McNemar p-value for binary paired classification (e.g. SCP success)."""
-    n01 = sum(1 for b, a in zip(b_correct, a_correct) if not b and a)  # Baseline wrong, FT correct
-    n10 = sum(1 for b, a in zip(b_correct, a_correct) if b and not a)  # Baseline correct, FT wrong
+    n01 = sum(1 for b, a in zip(b_correct, a_correct) if not b and a)
+    n10 = sum(1 for b, a in zip(b_correct, a_correct) if b and not a)
     
     total_discordant = n01 + n10
     if total_discordant == 0: return 1.0
@@ -98,7 +99,6 @@ def compute_paired_mcnemar(b_correct: List[bool], a_correct: List[bool]) -> floa
         return float(max(0.0, min(1.0, p_val)))
 
 def compute_paired_t_test(scores_a: List[float], scores_b: List[float]) -> Tuple[float, float]:
-    """Computes paired mean difference and two-sided p-value for continuous metrics (CF score)."""
     diffs = np.array(scores_a) - np.array(scores_b)
     n = len(diffs)
     if n < 2: return float(np.mean(diffs)), 1.0
@@ -111,42 +111,33 @@ def compute_paired_t_test(scores_a: List[float], scores_b: List[float]) -> Tuple
     p_val = math.erfc(abs(t_stat) / math.sqrt(2.0))
     return mean_diff, float(p_val)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# VRAM AIRLOCK & MODEL EVALUATION
-# ═══════════════════════════════════════════════════════════════════════════
 def flush_gpu_memory():
-    """Forces garbage collection and clears CUDA memory allocators."""
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
 
-def evaluate_model_on_testset(engine: BackendEngine, queries: List[Dict[str, Any]], model_label: str) -> Dict[str, Any]:
-    """Evaluates a single model engine across the benchmark dataset."""
-    scp_hits = 0
-    scp_mask = []
-    cf_scores = []
-    jcr_violations = 0
-    jcr_mask = []
-    latencies = []
-    per_query_traces = []
 
-    print(f"\n🚀 Evaluating [{model_label}] across {len(queries)} statutory scenarios...")
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATOR & EVALUATOR ABSTRACTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+def generate_model_responses(engine: BackendEngine, queries: List[Dict[str, Any]], model_label: str) -> List[Dict[str, Any]]:
+    print(f"\n🚀 Generating [{model_label}] responses across {len(queries)} scenarios...")
     
     system_prompt = (
-        "You are an expert legal assistant specialized exclusively in Indian Privacy Law "
-        "(Digital Personal Data Protection Act, 2023 and DPDP Rules, 2025). "
-        "Answer the query accurately, strictly citing the exact statutory section numbers "
-        "and applicable legal provisions. Do not cite foreign statutes (GDPR, CCPA, HIPAA)."
+        "You are an empathetic and expert Indian DPDP Legal Assistant. "
+        "Answer the user's query accurately according to the Digital Personal Data Protection Act 2023. "
+        "If statutory context is provided, you must ground your answer strictly within that context. "
+        "If the context does not contain the answer, or if the query falls outside the scope of the DPDP Act, "
+        "you must politely decline to answer or state that the Act is silent. "
+        "Crucially, you must explicitly cite applicable statutory section numbers. Do not cite foreign statutes (GDPR)."
     )
 
+    outputs = []
     for idx, item in enumerate(tqdm(queries, desc=f"Benchmarking {model_label}")):
         query = item.get("query", "")
-        target_sec = item.get("target_section", "")
-        target_kws = item.get("target_keywords", [])
         retrieved_context = item.get("context", "")
 
-        # SOTA Fix: Conditionally inject context to prevent Blind Context evaluations
         if retrieved_context.strip():
             user_msg = f"[STATUTORY CONTEXT]:\n{retrieved_context}\n\nStatutory Query: {query}\nProvide legal evaluation and cite applicable provisions:"
         else:
@@ -155,40 +146,44 @@ def evaluate_model_on_testset(engine: BackendEngine, queries: List[Dict[str, Any
         prompt = format_chatml_prompt(system_prompt, user_msg)
         
         t0 = time.perf_counter()
-        out = engine.generate(prompt, max_tokens=512, temperature=0.0)
+        out = engine.generate(prompt, max_tokens=2048, temperature=0.0)
         t1 = time.perf_counter()
         
-        resp = out.get("raw_output", "")
-        latency_ms = (t1 - t0) * 1000.0
-        latencies.append(latency_ms)
+        outputs.append({
+            "raw_output": out.get("raw_output", ""),
+            "latency_ms": (t1 - t0) * 1000.0
+        })
+    return outputs
 
-        # 1. Statute Citation Precision (SCP)
-        is_scp_hit = evaluate_scp(resp, target_sec)
+
+def compute_offline_metrics(responses: List[Dict[str, Any]], queries: List[Dict[str, Any]], model_label: str) -> Dict[str, Any]:
+    scp_hits = 0; scp_mask = []
+    jcr_violations = 0; jcr_mask = []
+    latencies = []
+    traces = []
+
+    for idx, (resp_data, item) in enumerate(zip(responses, queries)):
+        resp_text = resp_data["raw_output"]
+        latencies.append(resp_data["latency_ms"])
+        target_sec = item.get("target_section", "")
+
+        is_scp_hit = evaluate_scp(resp_text, target_sec)
         scp_mask.append(is_scp_hit)
         if is_scp_hit: scp_hits += 1
 
-        # 2. Context Faithfulness (CF) Score
-        # Provide the target context to the evaluator, defaulting to a synthetic string if absent
-        ground_truth_context = retrieved_context if retrieved_context.strip() else f"DPDP Act 2023 {target_sec}. Keywords: {', '.join(target_kws)}"
-        cf_score = evaluate_cf_judge(resp, ground_truth_context, target_kws, None)
-        cf_scores.append(cf_score)
-
-        # 3. Jurisdictional Contamination Rate (JCR)
-        is_jcr_contaminated, foreign_citations = evaluate_jcr(resp)
+        is_jcr_contaminated, foreign_citations = evaluate_jcr(resp_text)
         jcr_mask.append(is_jcr_contaminated)
         if is_jcr_contaminated: jcr_violations += 1
 
-        # Log item trace
-        per_query_traces.append({
+        traces.append({
             "query_id": idx + 1,
-            "query": query,
+            "query": item.get("query", ""),
             "target_section": target_sec,
-            "model_response": resp[:250] + "..." if len(resp) > 250 else resp,
+            "model_response": resp_text[:250] + "..." if len(resp_text) > 250 else resp_text,
             "scp_passed": is_scp_hit,
-            "cf_score": cf_score,
             "jcr_contaminated": is_jcr_contaminated,
             "foreign_citations": foreign_citations,
-            "latency_ms": latency_ms
+            "latency_ms": resp_data["latency_ms"]
         })
 
     total = len(queries)
@@ -201,29 +196,12 @@ def evaluate_model_on_testset(engine: BackendEngine, queries: List[Dict[str, Any
     return {
         "model_label": model_label,
         "total_queries": total,
-        "scp": {
-            "point_estimate": round(scp_point, 2),
-            "wilson_ci_95": [scp_ci_low, scp_ci_high],
-            "hits": scp_hits,
-            "boolean_mask": scp_mask
-        },
-        "cf_score": {
-            "mean": round(float(np.mean(cf_scores)), 4),
-            "std": round(float(np.std(cf_scores)), 4),
-            "raw_scores": cf_scores
-        },
-        "jcr": {
-            "point_estimate": round(jcr_point, 2),
-            "wilson_ci_95": [jcr_ci_low, jcr_ci_high],
-            "violations": jcr_violations,
-            "boolean_mask": jcr_mask
-        },
-        "latency": {
-            "avg_ms": round(float(np.mean(latencies)), 2),
-            "p95_ms": round(float(np.percentile(latencies, 95)), 2)
-        },
-        "traces": per_query_traces
+        "scp": {"point_estimate": round(scp_point, 2), "wilson_ci_95": [scp_ci_low, scp_ci_high], "hits": scp_hits, "boolean_mask": scp_mask},
+        "jcr": {"point_estimate": round(jcr_point, 2), "wilson_ci_95": [jcr_ci_low, jcr_ci_high], "violations": jcr_violations, "boolean_mask": jcr_mask},
+        "latency": {"avg_ms": round(float(np.mean(latencies)), 2), "p95_ms": round(float(np.percentile(latencies, 95)), 2)},
+        "traces": traces
     }
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN ORCHESTRATION PIPELINE
@@ -233,11 +211,12 @@ def main():
     parser.add_argument("--backend", type=str, default="unsloth", choices=["unsloth", "vllm", "llamacpp"])
     parser.add_argument("--finetuned-path", type=str, default=str(DEFAULT_FINETUNED_PATH))
     parser.add_argument("--baseline-path", type=str, default=str(DEFAULT_BASELINE_PATH))
+    parser.add_argument("--judge-path", type=str, default=str(DEFAULT_JUDGE_PATH))
     parser.add_argument("--benchmark-path", type=str, default=str(DEFAULT_BENCHMARK))
     parser.add_argument("--lora-name", type=str, default="chatbot")
     parser.add_argument("--vllm-url", type=str, default="http://localhost:8000/v1/completions")
-    parser.add_argument("--allow-simulated-baseline", action="store_true",
-                        help="Allow using simulated baseline metrics when the baseline model is unavailable.")
+    parser.add_argument("--use-judge", action="store_true", help="Explicitly enable the 72B Teacher Judge")
+    parser.add_argument("--allow-simulated-baseline", action="store_true", help="Allow using simulated baseline metrics")
     args = parser.parse_args()
 
     print("═══════════════════════════════════════════════════════════════════════")
@@ -255,24 +234,19 @@ def main():
     # -------------------------------------------------------------------------
     # STAGE 1: Evaluate Fine-Tuned Chatbot Model
     # -------------------------------------------------------------------------
-    print(f"\n📦 [1/2] Loading Fine-Tuned Model from: {args.finetuned_path}...")
-    ft_engine = None
-    try:
-        ft_engine = BackendEngine(backend_type=args.backend, model_path=args.finetuned_path, lora_name=args.lora_name, vllm_url=args.vllm_url, max_seq_length=4096)
-        ft_results = evaluate_model_on_testset(ft_engine, queries, "RAFT-Trained DPDP Chatbot")
-    finally:
-        # Strict VRAM Airlock
-        if ft_engine is not None and hasattr(ft_engine, "unload"):
-            ft_engine.unload()
-        del ft_engine
-        flush_gpu_memory()
-        print("🧹 [VRAM Airlock] Fine-Tuned model purged from GPU memory.")
+    print(f"\n📦 [Pass 1/3] Loading Fine-Tuned Model from: {args.finetuned_path}...")
+    ft_engine = BackendEngine(backend_type=args.backend, model_path=args.finetuned_path, lora_name=args.lora_name, vllm_url=args.vllm_url, max_seq_length=32768)
+    ft_raw_responses = generate_model_responses(ft_engine, queries, "RAFT-Trained DPDP Chatbot")
+    ft_engine.unload()
+    del ft_engine
+    flush_gpu_memory()
+    print("🧹 [VRAM Airlock] Fine-Tuned model purged from GPU memory.")
 
     # -------------------------------------------------------------------------
     # STAGE 2: Evaluate Vanilla Baseline Model
     # -------------------------------------------------------------------------
     baseline_is_simulated = False
-    base_results = None
+    base_raw_responses = []
     baseline_path = Path(args.baseline_path)
 
     if not baseline_path.exists() or not any(baseline_path.iterdir()):
@@ -281,72 +255,85 @@ def main():
             from huggingface_hub import snapshot_download
             snapshot_download(repo_id='unsloth/Qwen2.5-7B-Instruct', local_dir=str(baseline_path))
             print("✅ Baseline model downloaded successfully.")
-        except ImportError:
-            print("⚠️ huggingface_hub not installed. Cannot download baseline model.")
         except Exception as e:
             print(f"⚠️ Failed to download baseline model: {e}")
 
     if baseline_path.exists() and str(args.finetuned_path) != str(args.baseline_path):
-        base_engine = None
-        try:
-            print(f"\n📦 [2/2] Loading Vanilla Baseline Model from: {baseline_path}...")
-            base_engine = BackendEngine(backend_type=args.backend, model_path=str(baseline_path), vllm_url=args.vllm_url, max_seq_length=4096)
-            base_results = evaluate_model_on_testset(base_engine, queries, "Vanilla Qwen2.5 Baseline")
-        except Exception as e:
-            print(f"⚠️ Baseline evaluation failed to execute: {e}")
-        finally:
-            if base_engine is not None and hasattr(base_engine, "unload"):
-                base_engine.unload()
-            del base_engine
-            flush_gpu_memory()
-            print("🧹 [VRAM Airlock] Baseline model purged from GPU memory.")
-
-    # Fallback to empirical baseline simulation if requested
-    if base_results is None:
+        print(f"\n📦 [Pass 2/3] Loading Vanilla Baseline Model from: {baseline_path}...")
+        base_engine = BackendEngine(backend_type=args.backend, model_path=str(baseline_path), vllm_url=args.vllm_url, max_seq_length=32768)
+        base_raw_responses = generate_model_responses(base_engine, queries, "Vanilla Qwen2.5 Baseline")
+        base_engine.unload()
+        del base_engine
+        flush_gpu_memory()
+        print("🧹 [VRAM Airlock] Baseline model purged from GPU memory.")
+    else:
         if args.allow_simulated_baseline:
-            print("\n⚠️ NOTICE: Vanilla baseline weights not detected locally. Using simulated baseline metrics.")
-            print("   (Empirical reference: Unadapted Qwen2.5-7B-Instruct zero-shot DPDP performance)")
+            print("\n⚠️ NOTICE: Vanilla baseline weights not detected. Using simulated baseline metrics.")
             baseline_is_simulated = True
-            
-            base_total = len(queries)
-            sim_scp_hits = int(base_total * 0.42)
-            sim_jcr_hits = int(base_total * 0.28)
-            sim_scp_low, sim_scp_high = wilson_ci(sim_scp_hits, base_total)
-            sim_jcr_low, sim_jcr_high = wilson_ci(sim_jcr_hits, base_total)
-            
-            base_results = {
-                "model_label": "[SIMULATED] Vanilla Qwen2.5-7B",
-                "total_queries": base_total,
-                "scp": {
-                    "point_estimate": round((sim_scp_hits / base_total) * 100.0, 2),
-                    "wilson_ci_95": [sim_scp_low, sim_scp_high],
-                    "hits": sim_scp_hits,
-                    "boolean_mask": [i < sim_scp_hits for i in range(base_total)]
-                },
-                "cf_score": {
-                    "mean": 3.1200,
-                    "std": 0.6500,
-                    "raw_scores": [3.12] * base_total
-                },
-                "jcr": {
-                    "point_estimate": round((sim_jcr_hits / base_total) * 100.0, 2),
-                    "wilson_ci_95": [sim_jcr_low, sim_jcr_high],
-                    "violations": sim_jcr_hits,
-                    "boolean_mask": [i < sim_jcr_hits for i in range(base_total)]
-                },
-                "latency": {
-                    "avg_ms": round(ft_results["latency"]["avg_ms"] * 0.95, 2),
-                    "p95_ms": round(ft_results["latency"]["p95_ms"] * 0.95, 2)
-                },
-                "traces": []
-            }
         else:
-            print(f"❌ HARD-FAIL: Baseline model not found at {baseline_path} and --allow-simulated-baseline was not set.")
+            print(f"❌ HARD-FAIL: Baseline model not found at {baseline_path}.")
             return 1
 
     # -------------------------------------------------------------------------
-    # STAGE 3: Statistical Comparison & Win Condition Verification
+    # STAGE 3: Context Faithfulness Judging (72B Teacher)
     # -------------------------------------------------------------------------
+    judge_engine = None
+    if args.use_judge and Path(args.judge_path).exists():
+        print(f"\n🏛️ [Pass 3/3] Initializing 72B Teacher Judge ({args.judge_path})...")
+        try:
+            judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
+        except Exception as e:
+            print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
+
+    ft_cf_scores = []
+    base_cf_scores = []
+    
+    print("\n⚖️ Computing Context Faithfulness (CF) Scores...")
+    for idx, item in enumerate(tqdm(queries, desc="Judging CF")):
+        target_kws = item.get("target_keywords", [])
+        retrieved_context = item.get("context", "")
+        ground_truth_context = retrieved_context if retrieved_context.strip() else f"Keywords: {', '.join(target_kws)}"
+        
+        ft_cf = evaluate_cf_judge(ft_raw_responses[idx]["raw_output"], ground_truth_context, target_kws, judge_engine)
+        ft_cf_scores.append(ft_cf)
+        
+        if not baseline_is_simulated:
+            base_cf = evaluate_cf_judge(base_raw_responses[idx]["raw_output"], ground_truth_context, target_kws, judge_engine)
+            base_cf_scores.append(base_cf)
+
+    if judge_engine is not None:
+        judge_engine.unload()
+        del judge_engine
+        flush_gpu_memory()
+        print("🧹 [VRAM Airlock] Judge model purged from GPU memory.")
+
+    # -------------------------------------------------------------------------
+    # COMPILE FINAL METRICS
+    # -------------------------------------------------------------------------
+    ft_results = compute_offline_metrics(ft_raw_responses, queries, "RAFT-Trained DPDP Chatbot")
+    ft_results["cf_score"] = {"mean": round(float(np.mean(ft_cf_scores)), 4), "std": round(float(np.std(ft_cf_scores)), 4), "raw_scores": ft_cf_scores}
+
+    if baseline_is_simulated:
+        base_total = len(queries)
+        sim_scp_hits = int(base_total * 0.42)
+        sim_jcr_hits = int(base_total * 0.28)
+        sim_scp_low, sim_scp_high = wilson_ci(sim_scp_hits, base_total)
+        sim_jcr_low, sim_jcr_high = wilson_ci(sim_jcr_hits, base_total)
+        
+        base_results = {
+            "model_label": "[SIMULATED] Vanilla Qwen2.5-7B",
+            "total_queries": base_total,
+            "scp": {"point_estimate": round((sim_scp_hits / base_total) * 100.0, 2), "wilson_ci_95": [sim_scp_low, sim_scp_high], "hits": sim_scp_hits, "boolean_mask": [i < sim_scp_hits for i in range(base_total)]},
+            "cf_score": {"mean": 3.1200, "std": 0.6500, "raw_scores": [3.12] * base_total},
+            "jcr": {"point_estimate": round((sim_jcr_hits / base_total) * 100.0, 2), "wilson_ci_95": [sim_jcr_low, sim_jcr_high], "violations": sim_jcr_hits, "boolean_mask": [i < sim_jcr_hits for i in range(base_total)]},
+            "latency": {"avg_ms": round(ft_results["latency"]["avg_ms"] * 0.95, 2), "p95_ms": round(ft_results["latency"]["p95_ms"] * 0.95, 2)},
+            "traces": []
+        }
+    else:
+        base_results = compute_offline_metrics(base_raw_responses, queries, "Vanilla Qwen2.5 Baseline")
+        base_results["cf_score"] = {"mean": round(float(np.mean(base_cf_scores)), 4), "std": round(float(np.std(base_cf_scores)), 4), "raw_scores": base_cf_scores}
+
+    # Statistical Comparison & Win Condition Verification
     p_val_scp = compute_paired_mcnemar(base_results["scp"]["boolean_mask"], ft_results["scp"]["boolean_mask"])
     win_scp = (ft_results["scp"]["point_estimate"] >= 90.0) and (ft_results["scp"]["point_estimate"] > base_results["scp"]["point_estimate"])
 
@@ -358,9 +345,7 @@ def main():
 
     certified_sota = win_scp and win_cf and win_jcr
 
-    # -------------------------------------------------------------------------
-    # STAGE 4: Reporting & Output Generation
-    # -------------------------------------------------------------------------
+    # Terminal Output
     ft_label = ft_results["model_label"]
     base_label = base_results["model_label"]
 
@@ -426,6 +411,7 @@ def main():
         json.dump(report_payload, f, indent=2)
     print(f"💾 Master SOTA comparison report saved to: {REPORT_PATH}")
 
+    # Return 0 so verify.py completes its scorecard orchestration
     return 0
 
 if __name__ == "__main__":

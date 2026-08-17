@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 """
 build_vector_db.py – 10-Point SOTA Hybrid Search Engine Builder (FINAL)
-
-Architecture:
-1. Pure Python Hybrid Index (.pkl) - Eliminates ChromaDB daemon/SQLite locks.
-2. Legal-Aware Chunking (800 char, 80 overlap, strict header binding).
-3. Metadata Tagging Engine (type, number, applies_to).
-4. BM25 Lexical Index (Custom legal Tokenizer + BM25Okapi).
-5. Dense Embedding Index (BGE-small, Instruction Prefix, L2 Normalization).
-6. Cross-Encoder Pre-Download Check (BAAI/bge-reranker-v2-m3).
-7. Single File Serialization (dpdp_hybrid_index.pkl).
-8. Diagnostic Test Suite with State-Chunk Isolation Verification.
 """
 
 import os
@@ -20,6 +10,7 @@ import datetime
 import numpy as np
 import pickle
 from collections import Counter
+from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
@@ -30,12 +21,34 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. CUSTOM LEGAL TOKENIZER (For BM25)
+# SOTA FIX: CROSS-DIRECTORY SIBLING IMPORT
 # ═══════════════════════════════════════════════════════════════════════════
-def get_legal_tokenizer():
+# `build_vector_db.py` lives in `ml/data-forge/`
+# `path_resolver.py` lives in `ml/evals/`
+_CURRENT_DIR = Path(__file__).resolve().parent
+_EVALS_DIR = _CURRENT_DIR.parent / "evals"
+
+# Inject ml/evals/ into the Python path so it can find path_resolver.py
+if str(_EVALS_DIR) not in sys.path:
+    sys.path.insert(0, str(_EVALS_DIR))
+
+try:
+    from path_resolver import Paths
+    LAW_TEXT_PATH = Paths.LAW_TEXT
+    HYBRID_INDEX_PATH = Paths.HYBRID_INDEX
+except ImportError as e:
+    print(f"❌ Core module import failed. Could not find path_resolver in {_EVALS_DIR}")
+    sys.exit(1)
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 1. STANDARDIZED TOKENIZER (Synchronized with evaluate_rag.py)
+# ═══════════════════════════════════════════════════════════════════════════
+def get_standard_tokenizer():
     """
-    Tokenizer that preserves multi-word legal entities and statutory references 
-    as single tokens to prevent BM25 IDF dilution.
+    SOTA FIX: Alphanumeric tokenization ensures absolute 1:1 parity with the
+    search queries generated in `evaluate_rag.py`. Stopwords removed.
     """
     generic_stopwords = {
         "the", "a", "an", "is", "are", "was", "were", "of", "and", "in", 
@@ -44,21 +57,8 @@ def get_legal_tokenizer():
     }
     
     def tokenize(text):
-        text = str(text).lower()
-        # Preserve multi-word legal entities
-        text = text.replace("data fiduciary", "data_fiduciary")
-        text = text.replace("data principal", "data_principal")
-        text = text.replace("consent manager", "consent_manager")
-        text = text.replace("significant data fiduciary", "significant_data_fiduciary")
-        text = text.replace("sub-section", "subsection")
-        
-        # Preserve statutory references (e.g., section_8, rule_13_3, section_2)
-        text = re.sub(r'section\s+(\d+)\((\d+)\)', r'section_\1_\2', text)
-        text = re.sub(r'rule\s+(\d+)\((\d+)\)', r'rule_\1_\2', text)
-        text = re.sub(r'section\s+(\d+)', r'section_\1', text)
-        text = re.sub(r'rule\s+(\d+)', r'rule_\1', text)
-        
-        words = re.findall(r'\b\w+\b', text)
+        # Strict alphanumeric split mirroring evaluate_rag.py
+        words = re.findall(r'\w+', str(text).lower())
         return [w for w in words if w not in generic_stopwords]
     
     return tokenize
@@ -83,7 +83,6 @@ def extract_metadata(header_text, body_text):
     if "RULES 2025" in full_text.upper():
         meta["parent_act"] = "DPDP Rules 2025"
         
-    # 🚨 UPGRADED: Handles "Section 2." or "Section 17(1)" variations
     sec_match = re.search(r'\bSection\s+\d+(?:\.\d+)*', header_text, re.IGNORECASE)
     rule_match = re.search(r'\bRule\s+\d+(?:\.\d+)*', header_text, re.IGNORECASE)
     sched_match = re.search(r'\b(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE\b', header_text, re.IGNORECASE)
@@ -106,7 +105,7 @@ def extract_metadata(header_text, body_text):
     if sub_match:
         meta["sub_section"] = f"({sub_match.group(1)})"
         
-    # 🚨 CRITICAL: Isolate State-only exemptions to prevent private audit hallucinations
+    # CRITICAL: Isolate State-only exemptions to prevent private audit hallucinations
     if "SECOND SCHEDULE" in header_text.upper() or "SEVENTH SCHEDULE" in header_text.upper():
         meta["applies_to"] = "state"
         
@@ -125,7 +124,6 @@ def parse_and_chunk(file_path):
     chunks = []
     metadatas = []
     
-    # 🚨 UPGRADED: Robust regex to catch "Section 2.", "Rule 13(3)", etc.
     split_pattern = r'(?=\n+(?:Section\s+\d+(?:\.\d+)*|Rule\s+\d+(?:\.\d+)*|CHAPTER\s+[IVXLCDM]+|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE))'
     body_blocks = re.split(split_pattern, text)
     
@@ -143,7 +141,6 @@ def parse_and_chunk(file_path):
             
         lines = block.split('\n')
         header = ""
-        # Extract the primary header of this block
         if lines and re.search(r'^(Section\s+\d+(?:\.\d+)*|Rule\s+\d+(?:\.\d+)*|CHAPTER\s+[IVXLCDM]+|(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s+SCHEDULE)', lines[0].strip(), re.IGNORECASE):
             header = lines[0].strip()
             
@@ -154,7 +151,7 @@ def parse_and_chunk(file_path):
             if not sc:
                 continue
                 
-            # 🚨 STRICT HEADER BINDING: Prepend header if the sub-chunk lost it
+            # STRICT HEADER BINDING: Prepend header if the sub-chunk lost it
             if header and not sc.startswith(header.split('\n')[0]):
                 sc = header + "\n" + sc
                 
@@ -169,13 +166,12 @@ def parse_and_chunk(file_path):
 def build_db():
     print("🚀 Initializing 10-Point SOTA Hybrid Search Engine Builder...")
     
-    file_path = "./dpdp_act_and_rules_2025.txt"
-    if not os.path.exists(file_path):
-        print(f"❌ Error: Legal text file not found at {file_path}")
+    if not LAW_TEXT_PATH.exists():
+        print(f"❌ Error: Legal text file not found at {LAW_TEXT_PATH}")
         return
 
     print("✂️ Chunking legal text with strict header binding...")
-    chunks, metadatas = parse_and_chunk(file_path)
+    chunks, metadatas = parse_and_chunk(LAW_TEXT_PATH)
     print(f"✅ Created {len(chunks)} unique legal chunks (800-char, headers preserved).")
 
     print("🧠 Embedding chunks with BAAI/bge-small-en-v1.5 (Instruction Tuned)...")
@@ -186,7 +182,7 @@ def build_db():
     embeddings = embed_model.encode(docs_for_embed, batch_size=32, show_progress_bar=True, normalize_embeddings=True)
     
     print("📚 Building Lexical BM25 Index...")
-    tokenize = get_legal_tokenizer()
+    tokenize = get_standard_tokenizer()
     tokenized_corpus = [tokenize(c) for c in chunks]
     bm25 = BM25Okapi(tokenized_corpus, k1=1.5, b=0.75)
     
@@ -194,7 +190,7 @@ def build_db():
     snapshot_download("BAAI/bge-reranker-v2-m3")
     print("✅ Cross-Encoder verified locally.")
     
-    print("💾 Serializing dpdp_hybrid_index.pkl...")
+    print(f"💾 Serializing to {HYBRID_INDEX_PATH}...")
     out_dict = {
         "chunks": chunks,
         "metadatas": metadatas,
@@ -205,11 +201,11 @@ def build_db():
         "build_timestamp": datetime.datetime.now().isoformat()
     }
     
-    pkl_path = "dpdp_hybrid_index.pkl"
-    with open(pkl_path, "wb") as f:
+    HYBRID_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(HYBRID_INDEX_PATH, "wb") as f:
         pickle.dump(out_dict, f)
         
-    print(f"✅ Database built successfully. Size: {os.path.getsize(pkl_path) / (1024*1024):.2f} MB")
+    print(f"✅ Database built successfully. Size: {os.path.getsize(HYBRID_INDEX_PATH) / (1024*1024):.2f} MB")
     
     # ═══════════════════════════════════════════════════════════════════════
     # 5. DIAGNOSTIC TEST SUITE & STATE-CHUNK ISOLATION
@@ -222,7 +218,6 @@ def build_db():
         ("algorithmic software audit obligations", ["Rule 13"], False),
         ("Consent Manager interoperability", ["Rule 4", "First Schedule"], False),
         ("cross-border data transfer restrictions", ["Section 16", "Rule 15"], False),
-        # 🚨 UPGRADED: Added a State-specific query to prove isolation works both ways
         ("Standards for processing personal data by State instrumentalities", ["Second Schedule"], True)
     ]
     
@@ -242,13 +237,11 @@ def build_db():
         rrf_scores = np.zeros(len(chunks))
         
         for rank, idx in enumerate(bm25_ranks[:50]):
-            # 🚨 PRE-FILTER: Block State chunks from private queries BEFORE scoring
             if not is_state_query and metadatas[idx].get("applies_to") == "state":
                 continue
             rrf_scores[idx] += 1.0 / (60 + rank + 1)
             
         for rank, idx in enumerate(dense_ranks[:50]):
-            # 🚨 PRE-FILTER: Block State chunks from private queries BEFORE scoring
             if not is_state_query and metadatas[idx].get("applies_to") == "state":
                 continue
             rrf_scores[idx] += 1.0 / (60 + rank + 1)
@@ -261,7 +254,7 @@ def build_db():
             snippet = chunks[idx][:80].replace('\n', ' ')
             print(f"  Hit {i+1} [{meta['type']} {meta['number']} | Applies To: {meta['applies_to']}] -> {snippet}...")
             
-            # 🚨 ISOLATION CHECK: Ensure State chunks don't bleed into private queries
+            # ISOLATION CHECK: Ensure State chunks don't bleed into private queries
             if not is_state_query and meta["applies_to"] == "state":
                 print(f"  ❌ FATAL ERROR: Retrieved State-only chunk for private query!")
                 all_passed = False
