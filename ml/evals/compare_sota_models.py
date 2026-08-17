@@ -119,7 +119,7 @@ class DynamicRAGRetriever:
         words = re.findall(r'\w+', query.lower())
         return [w for w in words if w not in self.generic_stopwords]
 
-    def retrieve(self, query: str, top_k: int = 7, rrf_k: int = 60, rerank_depth: int = 25) -> str:
+    def retrieve(self, query: str, persona: str = "", top_k: int = 7, rrf_k: int = 60, rerank_depth: int = 25) -> str:
         q_tokens = self.tokenize_query(query)
         bm25_scores = self.bm25.get_scores(q_tokens)
         top_bm25_idx = np.argsort(bm25_scores)[::-1][:100]
@@ -129,10 +129,15 @@ class DynamicRAGRetriever:
         dense_scores = np.dot(self.dense_embeddings, q_emb)
         top_dense_idx = np.argsort(dense_scores)[::-1][:100]
 
+        is_state_query = "state" in persona.lower()
         rrf_scores = {}
         for rank, idx in enumerate(top_bm25_idx):
+            if not is_state_query and self.metadatas[idx].get("applies_to") == "state":
+                continue
             rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (rrf_k + rank + 1)
         for rank, idx in enumerate(top_dense_idx):
+            if not is_state_query and self.metadatas[idx].get("applies_to") == "state":
+                continue
             rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (rrf_k + rank + 1)
 
         top_rrf = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:rerank_depth]
@@ -316,7 +321,8 @@ def main():
                 if static_ctx.strip():
                     retrieved_contexts.append(static_ctx)
                 else:
-                    live_ctx = rag_engine.retrieve(query, top_k=7, rerank_depth=25)
+                    persona = item.get("persona", "")
+                    live_ctx = rag_engine.retrieve(query, persona=persona, top_k=7, rerank_depth=25)
                     retrieved_contexts.append(live_ctx)
         finally:
             if 'rag_engine' in locals():

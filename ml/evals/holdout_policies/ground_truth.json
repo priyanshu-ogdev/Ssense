@@ -3,85 +3,85 @@
     "case_id": "policy_0",
     "filename": "policy_0.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 0\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 0\n\n\n1. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n2. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n3. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
+      "global_legal_reasoning": "The policy strictly complies with the DPDP Act 2023. No statutory violations or improper data handling practices were detected.",
       "violations": [],
       "dpdp_trust_score": 100,
-      "subtlety_score": 5
+      "subtlety_score": 0
     }
   },
   {
     "case_id": "policy_1",
     "filename": "policy_1.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 1\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 1\n\n\n1. Clause: Your data is never sold to data brokers or unauthorized entities.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.",
     "expected_output": {
-      "violations": [
-        {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
-        }
-      ],
-      "dpdp_trust_score": 30,
-      "subtlety_score": 5
+      "global_legal_reasoning": "The policy strictly complies with the DPDP Act 2023. No statutory violations or improper data handling practices were detected.",
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 0
     }
   },
   {
     "case_id": "policy_2",
     "filename": "policy_2.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 2\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 2\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
-      "violations": [
-        {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
-        }
-      ],
-      "dpdp_trust_score": 30,
-      "subtlety_score": 5
+      "global_legal_reasoning": "The policy strictly complies with the DPDP Act 2023. No statutory violations or improper data handling practices were detected.",
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 0
     }
   },
   {
     "case_id": "policy_3",
     "filename": "policy_3.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 3\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 3\n\n\n1. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: Your data is never sold to data brokers or unauthorized entities.",
     "expected_output": {
+      "global_legal_reasoning": "The policy strictly complies with the DPDP Act 2023. No statutory violations or improper data handling practices were detected.",
       "violations": [],
       "dpdp_trust_score": 100,
-      "subtlety_score": 5
+      "subtlety_score": 0
     }
   },
   {
     "case_id": "policy_4",
     "filename": "policy_4.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 4\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 4\n\n\n1. Clause: We maintain state-of-the-art encryption and access controls for all personal data.\n\n2. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.",
     "expected_output": {
-      "violations": [
-        {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
-        }
-      ],
-      "dpdp_trust_score": 30,
-      "subtlety_score": 5
+      "global_legal_reasoning": "The policy strictly complies with the DPDP Act 2023. No statutory violations or improper data handling practices were detected.",
+      "violations": [],
+      "dpdp_trust_score": 100,
+      "subtlety_score": 0
     }
   },
   {
     "case_id": "policy_5",
     "filename": "policy_5.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 5\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 5\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: We collect all available data from your device, including contacts and location, indefinitely.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collect all available data from your device'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing goes beyond the originally specified and consented purpose.",
+          "statute_reference": "Section 8(1)",
+          "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+          "evidence_quote": "collect all available data from your device",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -89,10 +89,25 @@
     "case_id": "policy_6",
     "filename": "policy_6.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 6\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 6\n\n\n1. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -100,15 +115,25 @@
     "case_id": "policy_7",
     "filename": "policy_7.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 7\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 7\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n3. Clause: We may use your data for any legitimate business purposes without further notice or approval.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -116,15 +141,25 @@
     "case_id": "policy_8",
     "filename": "policy_8.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 8\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
+    "policy_text_snippet": "Privacy Policy 8\n\n\n1. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n2. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n3. Clause: Your personal data may be sold to advertisers without notification or explicit consent.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'sold to advertisers without notification'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the notice provided lacks required details about data collection and processing.",
+          "statute_reference": "Section 5(1)",
+          "violation_type": "NOTICE_INADEQUATE",
+          "evidence_quote": "sold to advertisers without notification",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -132,10 +167,25 @@
     "case_id": "policy_9",
     "filename": "policy_9.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 9\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 9\n\n\n1. Clause: Your data is never sold to data brokers or unauthorized entities.\n\n2. Clause: All user data is retained indefinitely on our servers even after account termination.\n\n3. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'retained indefinitely on our servers even after'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that personal data is retained beyond the required period for the specified purpose.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+          "evidence_quote": "retained indefinitely on our servers even after",
+          "network_action": "STRIP_TELEMETRY_HEADER",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -143,15 +193,25 @@
     "case_id": "policy_10",
     "filename": "policy_10.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 10\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 10\n\n\n1. Clause: Account deletion requests are ignored for a period of 5 years; data is kept for future marketing.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'deletion requests are ignored for a period of 5 years'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that erasure requests are ignored or delayed unlawfully by the fiduciary.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "ERASURE_NOTICE_PERIOD_VIOLATION",
+          "evidence_quote": "deletion requests are ignored for a period of 5 years",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -159,15 +219,25 @@
     "case_id": "policy_11",
     "filename": "policy_11.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 11\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 11\n\n\n1. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n2. Clause: We routinely delete access logs every 24 hours to preserve storage space.\n\n3. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'routinely delete access logs every 24 hours'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Rule 9(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that security or access logs are deleted prematurely in violation of rules.",
+          "statute_reference": "Rule 9(2)",
+          "violation_type": "LOG_RETENTION_MANDATE_VIOLATION",
+          "evidence_quote": "routinely delete access logs every 24 hours",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -175,10 +245,25 @@
     "case_id": "policy_12",
     "filename": "policy_12.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 12\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 12\n\n\n1. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n2. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n3. Clause: Children under 18 may use our service without verified parental consent.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without verified parental consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 9(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing child data without obtaining verifiable parental consent.",
+          "statute_reference": "Section 9(1)",
+          "violation_type": "CHILD_CONSENT_VIOLATION",
+          "evidence_quote": "without verified parental consent",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -186,15 +271,25 @@
     "case_id": "policy_13",
     "filename": "policy_13.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 13\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 13\n\n\n1. Clause: We maintain state-of-the-art encryption and access controls for all personal data.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: We store all passwords and personal identifiable information in plain text for easy retrieval.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'store all passwords and personal identifiable information in plain text'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(5).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that lack of reasonable security safeguards to prevent data breaches.",
+          "statute_reference": "Section 8(5)",
+          "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+          "evidence_quote": "store all passwords and personal identifiable information in plain text",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -202,15 +297,25 @@
     "case_id": "policy_14",
     "filename": "policy_14.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 14\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 14\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n3. Clause: We do not offer a grievance redressal mechanism; all support is handled by a community forum.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not offer a grievance redressal mechanism'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 13.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to provide a readily available and effective grievance redressal mechanism.",
+          "statute_reference": "Section 13",
+          "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+          "evidence_quote": "do not offer a grievance redressal mechanism",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -218,10 +323,25 @@
     "case_id": "policy_15",
     "filename": "policy_15.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 15\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 15\n\n\n1. Clause: In the event of a data breach, we reserve the right to not notify users if we deem it minor.\n\n2. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n3. Clause: We do not retain user data beyond the legally mandated period under any circumstances.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'reserve the right to not notify users if we deem it minor'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(6).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to notify the board and affected users of a personal data breach.",
+          "statute_reference": "Section 8(6)",
+          "violation_type": "BREACH_NOTIFICATION_FAILURE",
+          "evidence_quote": "reserve the right to not notify users if we deem it minor",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -229,15 +349,25 @@
     "case_id": "policy_16",
     "filename": "policy_16.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 16\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 16\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: Our data processors are exempt from DPDP compliance and assume full liability.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'data processors are exempt from DPDP compliance'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that fiduciary fails to ensure processor compliance through valid legal contracts.",
+          "statute_reference": "Section 8(2)",
+          "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+          "evidence_quote": "data processors are exempt from DPDP compliance",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -245,15 +375,25 @@
     "case_id": "policy_17",
     "filename": "policy_17.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 17\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We transfer your data to countries without restricting cross-border flow.",
+    "policy_text_snippet": "Privacy Policy 17\n\n\n1. Clause: As a Significant Data Fiduciary, we opt out of appointing a Data Protection Officer.\n\n2. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'opt out of appointing a Data Protection Officer'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that significant data fiduciary failed to appoint a dpo or independent auditor.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "SDF_OBLIGATIONS_MISSING",
+          "evidence_quote": "opt out of appointing a Data Protection Officer",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -261,10 +401,25 @@
     "case_id": "policy_18",
     "filename": "policy_18.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 18\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 18\n\n\n1. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: We process Indian citizen data exclusively on servers located outside of India.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'exclusively on servers located outside of India'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful storage of citizen data outside permitted geographical territories.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "SDF_DATA_LOCALIZATION_VIOLATION",
+          "evidence_quote": "exclusively on servers located outside of India",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -272,15 +427,25 @@
     "case_id": "policy_19",
     "filename": "policy_19.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 19\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 19\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: We transfer your data to countries without restricting cross-border flow or checking adequacy.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without restricting cross-border flow or checking'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that transferring personal data to restricted or non-adequate countries.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+          "evidence_quote": "without restricting cross-border flow or checking",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -288,15 +453,25 @@
     "case_id": "policy_20",
     "filename": "policy_20.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 20\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "policy_text_snippet": "Privacy Policy 20\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We block third-party consent managers and require direct consent through our app only.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'block third-party consent managers and require direct consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(8).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that preventing users from utilizing registered consent managers to manage consent.",
+          "statute_reference": "Section 6(8)",
+          "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+          "evidence_quote": "block third-party consent managers and require direct consent",
+          "network_action": "INJECT_GPC_SIGNAL",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -304,10 +479,25 @@
     "case_id": "policy_21",
     "filename": "policy_21.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 21\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 21\n\n\n1. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: Our privacy notices are available exclusively in English, regardless of user preference.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'available exclusively in English, regardless of user preference'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that consent notice is not provided in all scheduled languages as required.",
+          "statute_reference": "Section 5(3)",
+          "violation_type": "LANGUAGE_ACCESSIBILITY",
+          "evidence_quote": "available exclusively in English, regardless of user preference",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -315,15 +505,25 @@
     "case_id": "policy_22",
     "filename": "policy_22.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 22\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 22\n\n\n1. Clause: We perform automated behavioral profiling on all users, including minors, for advertising.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'perform automated behavioral profiling on all users'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful tracking, behavioral monitoring, or profiling of users or children.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "ALGORITHMIC_PROFILING_SDF",
+          "evidence_quote": "perform automated behavioral profiling on all users",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -331,15 +531,25 @@
     "case_id": "policy_23",
     "filename": "policy_23.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 23\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 23\n\n\n1. Clause: Your data is never sold to data brokers or unauthorized entities.\n\n2. Clause: Users cannot request to view the specific data we hold about them under any circumstances.\n\n3. Clause: We maintain state-of-the-art encryption and access controls for all personal data.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot request to view the specific data we hold'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 11.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that denying users the statutory right to access their personal data.",
+          "statute_reference": "Section 11",
+          "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+          "evidence_quote": "cannot request to view the specific data we hold",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -347,10 +557,25 @@
     "case_id": "policy_24",
     "filename": "policy_24.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 24\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 24\n\n\n1. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: We do not update user records when inaccuracies are reported.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -358,15 +583,25 @@
     "case_id": "policy_25",
     "filename": "policy_25.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 25\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 25\n\n\n1. Clause: We do not submit to audits by the Data Protection Board of India.\n\n2. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n3. Clause: We maintain state-of-the-art encryption and access controls for all personal data.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not submit to audits by the Data Protection Board'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 28.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that refusal or failure to comply with directions from the data protection board.",
+          "statute_reference": "Section 28",
+          "violation_type": "BOARD_COMPLIANCE_VIOLATION",
+          "evidence_quote": "do not submit to audits by the Data Protection Board",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -374,15 +609,25 @@
     "case_id": "policy_26",
     "filename": "policy_26.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 26\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
+    "policy_text_snippet": "Privacy Policy 26\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: By using this service, you agree to waive any statutory penalties provided by the DPDP Act.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'waive any statutory penalties provided by the DPDP Act'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 33.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that attempting to contractually waive or bypass statutory penalties.",
+          "statute_reference": "Section 33",
+          "violation_type": "PENALTY_AVOIDANCE",
+          "evidence_quote": "waive any statutory penalties provided by the DPDP Act",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -390,10 +635,25 @@
     "case_id": "policy_27",
     "filename": "policy_27.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 27\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 27\n\n\n1. Clause: All legal disputes are final and cannot be appealed to the Appellate Tribunal.\n\n2. Clause: We maintain state-of-the-art encryption and access controls for all personal data.\n\n3. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot be appealed to the Appellate Tribunal'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 29.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that obstructing or denying the right to appeal to the appellate tribunal.",
+          "statute_reference": "Section 29",
+          "violation_type": "APPEAL_PROCESS_VIOLATION",
+          "evidence_quote": "cannot be appealed to the Appellate Tribunal",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -401,15 +661,25 @@
     "case_id": "policy_28",
     "filename": "policy_28.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 28\n\n1. Data Collection: We collect all available data from your device, including contacts and location, indefinitely.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 28\n\n\n1. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n2. Clause: This policy supersedes the DPDP Act for all data collected prior to 2025.\n\n3. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'supersedes the DPDP Act for all data collected'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 3.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful attempt to evade the territorial scope and application of the act.",
+          "statute_reference": "Section 3",
+          "violation_type": "SCOPE_APPLICATION_EVASION",
+          "evidence_quote": "supersedes the DPDP Act for all data collected",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -417,15 +687,25 @@
     "case_id": "policy_29",
     "filename": "policy_29.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 29\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "policy_text_snippet": "Privacy Policy 29\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: We claim exemption from all privacy laws due to our status as a private analytics firm.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'claim exemption from all privacy laws due to our status'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 17.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that claiming exemptions under section 17 without a valid legal basis.",
+          "statute_reference": "Section 17",
+          "violation_type": "ILLEGAL_EXEMPTION_CLAIM",
+          "evidence_quote": "claim exemption from all privacy laws due to our status",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -433,10 +713,25 @@
     "case_id": "policy_30",
     "filename": "policy_30.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 30\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 30\n\n\n1. Clause: We maintain state-of-the-art encryption and access controls for all personal data.\n\n2. Clause: Consent is implied if you do not opt-out within 24 hours of creating an account.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 1 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'Consent is implied if you do not opt-out within 24 hours'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(4).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that using pre-checked boxes, implied consent, or dark patterns.",
+          "statute_reference": "Section 6(4)",
+          "violation_type": "CONSENT_MECHANICS_VIOLATION",
+          "evidence_quote": "Consent is implied if you do not opt-out within 24 hours",
+          "network_action": "INJECT_GPC_SIGNAL",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 65,
       "subtlety_score": 5
     }
   },
@@ -444,15 +739,51 @@
     "case_id": "policy_31",
     "filename": "policy_31.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 31\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We share your data with our partners, affiliates, and unknown third parties.",
+    "policy_text_snippet": "Privacy Policy 31\n\n\n1. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n2. Clause: We store all passwords and personal identifiable information in plain text for easy retrieval.\n\n3. Clause: We perform automated behavioral profiling on all users, including minors, for advertising.\n\n4. Clause: Our privacy notices are available exclusively in English, regardless of user preference.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'store all passwords and personal identifiable information in plain text'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(5).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that lack of reasonable security safeguards to prevent data breaches.",
+          "statute_reference": "Section 8(5)",
+          "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+          "evidence_quote": "store all passwords and personal identifiable information in plain text",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'perform automated behavioral profiling on all users'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful tracking, behavioral monitoring, or profiling of users or children.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "ALGORITHMIC_PROFILING_SDF",
+          "evidence_quote": "perform automated behavioral profiling on all users",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'available exclusively in English, regardless of user preference'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that consent notice is not provided in all scheduled languages as required.",
+          "statute_reference": "Section 5(3)",
+          "violation_type": "LANGUAGE_ACCESSIBILITY",
+          "evidence_quote": "available exclusively in English, regardless of user preference",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -460,15 +791,51 @@
     "case_id": "policy_32",
     "filename": "policy_32.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 32\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 32\n\n\n1. Clause: We process Indian citizen data exclusively on servers located outside of India.\n\n2. Clause: We do not offer a grievance redressal mechanism; all support is handled by a community forum.\n\n3. Clause: Your personal data may be sold to advertisers without notification or explicit consent.\n\n4. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'exclusively on servers located outside of India'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful storage of citizen data outside permitted geographical territories.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "SDF_DATA_LOCALIZATION_VIOLATION",
+          "evidence_quote": "exclusively on servers located outside of India",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not offer a grievance redressal mechanism'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 13.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to provide a readily available and effective grievance redressal mechanism.",
+          "statute_reference": "Section 13",
+          "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+          "evidence_quote": "do not offer a grievance redressal mechanism",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'sold to advertisers without notification'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the notice provided lacks required details about data collection and processing.",
+          "statute_reference": "Section 5(1)",
+          "violation_type": "NOTICE_INADEQUATE",
+          "evidence_quote": "sold to advertisers without notification",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -476,10 +843,38 @@
     "case_id": "policy_33",
     "filename": "policy_33.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 33\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 33\n\n\n1. Clause: Your data is never sold to data brokers or unauthorized entities.\n\n2. Clause: Our privacy notices are available exclusively in English, regardless of user preference.\n\n3. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n4. Clause: Your personal data may be sold to advertisers without notification or explicit consent.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'available exclusively in English, regardless of user preference'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that consent notice is not provided in all scheduled languages as required.",
+          "statute_reference": "Section 5(3)",
+          "violation_type": "LANGUAGE_ACCESSIBILITY",
+          "evidence_quote": "available exclusively in English, regardless of user preference",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'sold to advertisers without notification'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the notice provided lacks required details about data collection and processing.",
+          "statute_reference": "Section 5(1)",
+          "violation_type": "NOTICE_INADEQUATE",
+          "evidence_quote": "sold to advertisers without notification",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -487,12 +882,35 @@
     "case_id": "policy_34",
     "filename": "policy_34.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 34\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 34\n\n\n1. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n2. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n3. Clause: In the event of a data breach, we reserve the right to not notify users if we deem it minor.\n\n4. Clause: We do not update user records when inaccuracies are reported.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'reserve the right to not notify users if we deem it minor'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(6).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to notify the board and affected users of a personal data breach.",
+          "statute_reference": "Section 8(6)",
+          "violation_type": "BREACH_NOTIFICATION_FAILURE",
+          "evidence_quote": "reserve the right to not notify users if we deem it minor",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -503,12 +921,35 @@
     "case_id": "policy_35",
     "filename": "policy_35.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 35\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 35\n\n\n1. Clause: Children under 18 may use our service without verified parental consent.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.\n\n4. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without verified parental consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 9(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing child data without obtaining verifiable parental consent.",
+          "statute_reference": "Section 9(1)",
+          "violation_type": "CHILD_CONSENT_VIOLATION",
+          "evidence_quote": "without verified parental consent",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -519,10 +960,38 @@
     "case_id": "policy_36",
     "filename": "policy_36.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 36\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 36\n\n\n1. Clause: By using this service, you agree to waive any statutory penalties provided by the DPDP Act.\n\n2. Clause: We block third-party consent managers and require direct consent through our app only.\n\n3. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n4. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'waive any statutory penalties provided by the DPDP Act'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 33.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that attempting to contractually waive or bypass statutory penalties.",
+          "statute_reference": "Section 33",
+          "violation_type": "PENALTY_AVOIDANCE",
+          "evidence_quote": "waive any statutory penalties provided by the DPDP Act",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'block third-party consent managers and require direct consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(8).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that preventing users from utilizing registered consent managers to manage consent.",
+          "statute_reference": "Section 6(8)",
+          "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+          "evidence_quote": "block third-party consent managers and require direct consent",
+          "network_action": "INJECT_GPC_SIGNAL",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -530,12 +999,35 @@
     "case_id": "policy_37",
     "filename": "policy_37.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 37\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 37\n\n\n1. Clause: We perform automated behavioral profiling on all users, including minors, for advertising.\n\n2. Clause: We claim exemption from all privacy laws due to our status as a private analytics firm.\n\n3. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n4. Clause: Your data is never sold to data brokers or unauthorized entities.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'perform automated behavioral profiling on all users'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful tracking, behavioral monitoring, or profiling of users or children.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "ALGORITHMIC_PROFILING_SDF",
+          "evidence_quote": "perform automated behavioral profiling on all users",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'claim exemption from all privacy laws due to our status'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 17.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that claiming exemptions under section 17 without a valid legal basis.",
+          "statute_reference": "Section 17",
+          "violation_type": "ILLEGAL_EXEMPTION_CLAIM",
+          "evidence_quote": "claim exemption from all privacy laws due to our status",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -546,15 +1038,51 @@
     "case_id": "policy_38",
     "filename": "policy_38.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 38\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 38\n\n\n1. Clause: Your personal data may be sold to advertisers without notification or explicit consent.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: Our privacy notices are available exclusively in English, regardless of user preference.\n\n4. Clause: We transfer your data to countries without restricting cross-border flow or checking adequacy.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'sold to advertisers without notification'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the notice provided lacks required details about data collection and processing.",
+          "statute_reference": "Section 5(1)",
+          "violation_type": "NOTICE_INADEQUATE",
+          "evidence_quote": "sold to advertisers without notification",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'available exclusively in English, regardless of user preference'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that consent notice is not provided in all scheduled languages as required.",
+          "statute_reference": "Section 5(3)",
+          "violation_type": "LANGUAGE_ACCESSIBILITY",
+          "evidence_quote": "available exclusively in English, regardless of user preference",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without restricting cross-border flow or checking'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that transferring personal data to restricted or non-adequate countries.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+          "evidence_quote": "without restricting cross-border flow or checking",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -562,10 +1090,38 @@
     "case_id": "policy_39",
     "filename": "policy_39.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 39\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 39\n\n\n1. Clause: We perform automated behavioral profiling on all users, including minors, for advertising.\n\n2. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n3. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n4. Clause: Users cannot request to view the specific data we hold about them under any circumstances.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'perform automated behavioral profiling on all users'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful tracking, behavioral monitoring, or profiling of users or children.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "ALGORITHMIC_PROFILING_SDF",
+          "evidence_quote": "perform automated behavioral profiling on all users",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot request to view the specific data we hold'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 11.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that denying users the statutory right to access their personal data.",
+          "statute_reference": "Section 11",
+          "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+          "evidence_quote": "cannot request to view the specific data we hold",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -573,12 +1129,35 @@
     "case_id": "policy_40",
     "filename": "policy_40.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 40\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 40\n\n\n1. Clause: We may use your data for any legitimate business purposes without further notice or approval.\n\n2. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n4. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -589,12 +1168,35 @@
     "case_id": "policy_41",
     "filename": "policy_41.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 41\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Your personal data may be sold to advertisers without notification.",
+    "policy_text_snippet": "Privacy Policy 41\n\n\n1. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n2. Clause: We perform automated behavioral profiling on all users, including minors, for advertising.\n\n3. Clause: All user data is retained indefinitely on our servers even after account termination.\n\n4. Clause: We do not retain user data beyond the legally mandated period under any circumstances.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'perform automated behavioral profiling on all users'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful tracking, behavioral monitoring, or profiling of users or children.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "ALGORITHMIC_PROFILING_SDF",
+          "evidence_quote": "perform automated behavioral profiling on all users",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'retained indefinitely on our servers even after'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that personal data is retained beyond the required period for the specified purpose.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+          "evidence_quote": "retained indefinitely on our servers even after",
+          "network_action": "STRIP_TELEMETRY_HEADER",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -605,10 +1207,38 @@
     "case_id": "policy_42",
     "filename": "policy_42.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 42\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 42\n\n\n1. Clause: Your personal data may be sold to advertisers without notification or explicit consent.\n\n2. Clause: We maintain state-of-the-art encryption and access controls for all personal data.\n\n3. Clause: By using this service, you agree to waive any statutory penalties provided by the DPDP Act.\n\n4. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'sold to advertisers without notification'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 5(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the notice provided lacks required details about data collection and processing.",
+          "statute_reference": "Section 5(1)",
+          "violation_type": "NOTICE_INADEQUATE",
+          "evidence_quote": "sold to advertisers without notification",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'waive any statutory penalties provided by the DPDP Act'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 33.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that attempting to contractually waive or bypass statutory penalties.",
+          "statute_reference": "Section 33",
+          "violation_type": "PENALTY_AVOIDANCE",
+          "evidence_quote": "waive any statutory penalties provided by the DPDP Act",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -616,12 +1246,35 @@
     "case_id": "policy_43",
     "filename": "policy_43.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 43\n\n1. Data Collection: Data is collected automatically without explicit consent prompts.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 43\n\n\n1. Clause: By using this service, you agree to waive any statutory penalties provided by the DPDP Act.\n\n2. Clause: We do not submit to audits by the Data Protection Board of India.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n4. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'waive any statutory penalties provided by the DPDP Act'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 33.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that attempting to contractually waive or bypass statutory penalties.",
+          "statute_reference": "Section 33",
+          "violation_type": "PENALTY_AVOIDANCE",
+          "evidence_quote": "waive any statutory penalties provided by the DPDP Act",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not submit to audits by the Data Protection Board'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 28.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that refusal or failure to comply with directions from the data protection board.",
+          "statute_reference": "Section 28",
+          "violation_type": "BOARD_COMPLIANCE_VIOLATION",
+          "evidence_quote": "do not submit to audits by the Data Protection Board",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -632,12 +1285,35 @@
     "case_id": "policy_44",
     "filename": "policy_44.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 44\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 44\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: Children under 18 may use our service without verified parental consent.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n4. Clause: We routinely delete access logs every 24 hours to preserve storage space.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without verified parental consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 9(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing child data without obtaining verifiable parental consent.",
+          "statute_reference": "Section 9(1)",
+          "violation_type": "CHILD_CONSENT_VIOLATION",
+          "evidence_quote": "without verified parental consent",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'routinely delete access logs every 24 hours'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Rule 9(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that security or access logs are deleted prematurely in violation of rules.",
+          "statute_reference": "Rule 9(2)",
+          "violation_type": "LOG_RETENTION_MANDATE_VIOLATION",
+          "evidence_quote": "routinely delete access logs every 24 hours",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -648,10 +1324,51 @@
     "case_id": "policy_45",
     "filename": "policy_45.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 45\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 45\n\n\n1. Clause: Children under 18 may use our service without verified parental consent.\n\n2. Clause: We may use your data for any legitimate business purposes without further notice or approval.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n4. Clause: We transfer your data to countries without restricting cross-border flow or checking adequacy.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without verified parental consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 9(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing child data without obtaining verifiable parental consent.",
+          "statute_reference": "Section 9(1)",
+          "violation_type": "CHILD_CONSENT_VIOLATION",
+          "evidence_quote": "without verified parental consent",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without restricting cross-border flow or checking'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that transferring personal data to restricted or non-adequate countries.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+          "evidence_quote": "without restricting cross-border flow or checking",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -659,12 +1376,35 @@
     "case_id": "policy_46",
     "filename": "policy_46.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 46\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 46\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We claim exemption from all privacy laws due to our status as a private analytics firm.\n\n3. Clause: Children under 18 may use our service without verified parental consent.\n\n4. Clause: We maintain state-of-the-art encryption and access controls for all personal data.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'claim exemption from all privacy laws due to our status'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 17.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that claiming exemptions under section 17 without a valid legal basis.",
+          "statute_reference": "Section 17",
+          "violation_type": "ILLEGAL_EXEMPTION_CLAIM",
+          "evidence_quote": "claim exemption from all privacy laws due to our status",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without verified parental consent'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 9(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that processing child data without obtaining verifiable parental consent.",
+          "statute_reference": "Section 9(1)",
+          "violation_type": "CHILD_CONSENT_VIOLATION",
+          "evidence_quote": "without verified parental consent",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -675,15 +1415,51 @@
     "case_id": "policy_47",
     "filename": "policy_47.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 47\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 47\n\n\n1. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.\n\n2. Clause: As a Significant Data Fiduciary, we opt out of appointing a Data Protection Officer.\n\n3. Clause: Account deletion requests are ignored for a period of 5 years; data is kept for future marketing.\n\n4. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'opt out of appointing a Data Protection Officer'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that significant data fiduciary failed to appoint a dpo or independent auditor.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "SDF_OBLIGATIONS_MISSING",
+          "evidence_quote": "opt out of appointing a Data Protection Officer",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'deletion requests are ignored for a period of 5 years'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that erasure requests are ignored or delayed unlawfully by the fiduciary.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "ERASURE_NOTICE_PERIOD_VIOLATION",
+          "evidence_quote": "deletion requests are ignored for a period of 5 years",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -691,10 +1467,51 @@
     "case_id": "policy_48",
     "filename": "policy_48.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 48\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Your data is never sold to data brokers.",
+    "policy_text_snippet": "Privacy Policy 48\n\n\n1. Clause: All legal disputes are final and cannot be appealed to the Appellate Tribunal.\n\n2. Clause: This policy supersedes the DPDP Act for all data collected prior to 2025.\n\n3. Clause: We process Indian citizen data exclusively on servers located outside of India.\n\n4. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot be appealed to the Appellate Tribunal'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 29.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that obstructing or denying the right to appeal to the appellate tribunal.",
+          "statute_reference": "Section 29",
+          "violation_type": "APPEAL_PROCESS_VIOLATION",
+          "evidence_quote": "cannot be appealed to the Appellate Tribunal",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'supersedes the DPDP Act for all data collected'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 3.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful attempt to evade the territorial scope and application of the act.",
+          "statute_reference": "Section 3",
+          "violation_type": "SCOPE_APPLICATION_EVASION",
+          "evidence_quote": "supersedes the DPDP Act for all data collected",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'exclusively on servers located outside of India'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful storage of citizen data outside permitted geographical territories.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "SDF_DATA_LOCALIZATION_VIOLATION",
+          "evidence_quote": "exclusively on servers located outside of India",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -702,15 +1519,51 @@
     "case_id": "policy_49",
     "filename": "policy_49.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 49\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We transfer your data to countries without restricting cross-border flow.",
+    "policy_text_snippet": "Privacy Policy 49\n\n\n1. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n2. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.\n\n3. Clause: Users cannot request to view the specific data we hold about them under any circumstances.\n\n4. Clause: We routinely delete access logs every 24 hours to preserve storage space.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Unauthorized Sharing",
-          "severity": "CRITICAL"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot request to view the specific data we hold'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 11.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that denying users the statutory right to access their personal data.",
+          "statute_reference": "Section 11",
+          "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+          "evidence_quote": "cannot request to view the specific data we hold",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'routinely delete access logs every 24 hours'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Rule 9(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that security or access logs are deleted prematurely in violation of rules.",
+          "statute_reference": "Rule 9(2)",
+          "violation_type": "LOG_RETENTION_MANDATE_VIOLATION",
+          "evidence_quote": "routinely delete access logs every 24 hours",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -718,12 +1571,35 @@
     "case_id": "policy_50",
     "filename": "policy_50.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 50\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 50\n\n\n1. Clause: Users cannot request to view the specific data we hold about them under any circumstances.\n\n2. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n3. Clause: Users can easily withdraw consent via our dedicated Data Protection Officer portal.\n\n4. Clause: Data is collected automatically without explicit consent prompts as part of our core functionality.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot request to view the specific data we hold'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 11.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that denying users the statutory right to access their personal data.",
+          "statute_reference": "Section 11",
+          "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+          "evidence_quote": "cannot request to view the specific data we hold",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'collected automatically without explicit consent prompts'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that the consent mechanism is coercive, bundled, or overly broad.",
+          "statute_reference": "Section 6(1)",
+          "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+          "evidence_quote": "collected automatically without explicit consent prompts",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -734,10 +1610,38 @@
     "case_id": "policy_51",
     "filename": "policy_51.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 51\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 51\n\n\n1. Clause: We do not update user records when inaccuracies are reported.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: We may use your data for any legitimate business purposes without further notice or approval.\n\n4. Clause: We do not retain user data beyond the legally mandated period under any circumstances.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -745,12 +1649,35 @@
     "case_id": "policy_52",
     "filename": "policy_52.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 52\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 52\n\n\n1. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n2. Clause: We may use your data for any legitimate business purposes without further notice or approval.\n\n3. Clause: We do not update user records when inaccuracies are reported.\n\n4. Clause: We maintain state-of-the-art encryption and access controls for all personal data.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -761,12 +1688,35 @@
     "case_id": "policy_53",
     "filename": "policy_53.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 53\n\n1. Data Collection: Data collection is limited to name, email, and phone number as consented.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 53\n\n\n1. Clause: Data is retained only as long as strictly necessary to fulfill the specified purpose and is then erased.\n\n2. Clause: We store all passwords and personal identifiable information in plain text for easy retrieval.\n\n3. Clause: As a Significant Data Fiduciary, we opt out of appointing a Data Protection Officer.\n\n4. Clause: Your data is never sold to data brokers or unauthorized entities.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'store all passwords and personal identifiable information in plain text'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(5).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that lack of reasonable security safeguards to prevent data breaches.",
+          "statute_reference": "Section 8(5)",
+          "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+          "evidence_quote": "store all passwords and personal identifiable information in plain text",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'opt out of appointing a Data Protection Officer'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 10(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that significant data fiduciary failed to appoint a dpo or independent auditor.",
+          "statute_reference": "Section 10(2)",
+          "violation_type": "SDF_OBLIGATIONS_MISSING",
+          "evidence_quote": "opt out of appointing a Data Protection Officer",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -777,10 +1727,38 @@
     "case_id": "policy_54",
     "filename": "policy_54.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 54\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: Data is retained only as long as necessary to fulfill the specified purpose.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 54\n\n\n1. Clause: We transfer your data to countries without restricting cross-border flow or checking adequacy.\n\n2. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n3. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n4. Clause: We do not update user records when inaccuracies are reported.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without restricting cross-border flow or checking'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that transferring personal data to restricted or non-adequate countries.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+          "evidence_quote": "without restricting cross-border flow or checking",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -788,12 +1766,35 @@
     "case_id": "policy_55",
     "filename": "policy_55.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 55\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: All user data is retained indefinitely on our servers.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 55\n\n\n1. Clause: Data processors are bound by strict DPDP-compliant contracts and regular audits.\n\n2. Clause: We may use your data for any legitimate business purposes without further notice or approval.\n\n3. Clause: Our data processors are exempt from DPDP compliance and assume full liability.\n\n4. Clause: We do not retain user data beyond the legally mandated period under any circumstances.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'any legitimate business purposes without further notice'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 7.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that improper reliance on legitimate uses for processing without valid grounds.",
+          "statute_reference": "Section 7",
+          "violation_type": "LEGITIMATE_USES_ABUSE",
+          "evidence_quote": "any legitimate business purposes without further notice",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'data processors are exempt from DPDP compliance'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(2).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that fiduciary fails to ensure processor compliance through valid legal contracts.",
+          "statute_reference": "Section 8(2)",
+          "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+          "evidence_quote": "data processors are exempt from DPDP compliance",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -804,15 +1805,51 @@
     "case_id": "policy_56",
     "filename": "policy_56.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 56\n\n1. Data Collection: We specify the exact purpose for all data collected in our consent notices.\n\n2. Data Retention: We never delete data, even if you withdraw consent.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 56\n\n\n1. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n2. Clause: Consent is implied if you do not opt-out within 24 hours of creating an account.\n\n3. Clause: We do not submit to audits by the Data Protection Board of India.\n\n4. Clause: We do not update user records when inaccuracies are reported.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'Consent is implied if you do not opt-out within 24 hours'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 6(4).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that using pre-checked boxes, implied consent, or dark patterns.",
+          "statute_reference": "Section 6(4)",
+          "violation_type": "CONSENT_MECHANICS_VIOLATION",
+          "evidence_quote": "Consent is implied if you do not opt-out within 24 hours",
+          "network_action": "INJECT_GPC_SIGNAL",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not submit to audits by the Data Protection Board'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 28.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that refusal or failure to comply with directions from the data protection board.",
+          "statute_reference": "Section 28",
+          "violation_type": "BOARD_COMPLIANCE_VIOLATION",
+          "evidence_quote": "do not submit to audits by the Data Protection Board",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not update user records when inaccuracies are reported'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(3).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to ensure accuracy and completeness of processed personal data.",
+          "statute_reference": "Section 8(3)",
+          "violation_type": "DATA_ACCURACY_COMPLETENESS_VIOLATION",
+          "evidence_quote": "do not update user records when inaccuracies are reported",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
-      "dpdp_trust_score": 30,
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   },
@@ -820,10 +1857,38 @@
     "case_id": "policy_57",
     "filename": "policy_57.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 57\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: We do not retain user data beyond the legally mandated period.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 57\n\n\n1. Clause: All user data is retained indefinitely on our servers even after account termination.\n\n2. Clause: We specify the exact purpose for all data collected in our consent notices in 22 local languages.\n\n3. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.\n\n4. Clause: We store all passwords and personal identifiable information in plain text for easy retrieval.",
     "expected_output": {
-      "violations": [],
-      "dpdp_trust_score": 100,
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'retained indefinitely on our servers even after'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that personal data is retained beyond the required period for the specified purpose.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+          "evidence_quote": "retained indefinitely on our servers even after",
+          "network_action": "STRIP_TELEMETRY_HEADER",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'store all passwords and personal identifiable information in plain text'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(5).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that lack of reasonable security safeguards to prevent data breaches.",
+          "statute_reference": "Section 8(5)",
+          "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+          "evidence_quote": "store all passwords and personal identifiable information in plain text",
+          "network_action": "SPOOF_HARDWARE_API",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 30,
       "subtlety_score": 5
     }
   },
@@ -831,12 +1896,35 @@
     "case_id": "policy_58",
     "filename": "policy_58.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 58\n\n1. Data Collection: We scrape your social media profiles to build a comprehensive shadow profile.\n\n2. Data Retention: Upon account deletion, all personal data is erased within 30 days.\n\n3. Third-Party Sharing: We do not share your data with third parties without your explicit consent.",
+    "policy_text_snippet": "Privacy Policy 58\n\n\n1. Clause: We do not retain user data beyond the legally mandated period under any circumstances.\n\n2. Clause: All legal disputes are final and cannot be appealed to the Appellate Tribunal.\n\n3. Clause: In the event of a data breach, we reserve the right to not notify users if we deem it minor.\n\n4. Clause: Your data is never sold to data brokers or unauthorized entities.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Excessive Collection",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'cannot be appealed to the Appellate Tribunal'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 29.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that obstructing or denying the right to appeal to the appellate tribunal.",
+          "statute_reference": "Section 29",
+          "violation_type": "APPEAL_PROCESS_VIOLATION",
+          "evidence_quote": "cannot be appealed to the Appellate Tribunal",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'reserve the right to not notify users if we deem it minor'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(6).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that failure to notify the board and affected users of a personal data breach.",
+          "statute_reference": "Section 8(6)",
+          "violation_type": "BREACH_NOTIFICATION_FAILURE",
+          "evidence_quote": "reserve the right to not notify users if we deem it minor",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
@@ -847,15 +1935,90 @@
     "case_id": "policy_59",
     "filename": "policy_59.txt",
     "category": "Privacy Policy Evaluation",
-    "policy_text_snippet": "Privacy Policy 59\n\n1. Data Collection: We collect only the minimal data necessary for providing the service.\n\n2. Data Retention: Account deletion requests are ignored; data is kept for future marketing.\n\n3. Third-Party Sharing: Data processors are bound by strict DPDP-compliant contracts.",
+    "policy_text_snippet": "Privacy Policy 59\n\n\n1. Clause: Your data is never sold to data brokers or unauthorized entities.\n\n2. Clause: Data collection is limited to name, email, and phone number as explicitly consented by the user.\n\n3. Clause: We process Indian citizen data exclusively on servers located outside of India.\n\n4. Clause: We do not submit to audits by the Data Protection Board of India.",
     "expected_output": {
+      "global_legal_reasoning": "The policy contains 2 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
       "violations": [
         {
-          "type": "Indefinite Retention",
-          "severity": "HIGH"
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'exclusively on servers located outside of India'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful storage of citizen data outside permitted geographical territories.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "SDF_DATA_LOCALIZATION_VIOLATION",
+          "evidence_quote": "exclusively on servers located outside of India",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'do not submit to audits by the Data Protection Board'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 28.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that refusal or failure to comply with directions from the data protection board.",
+          "statute_reference": "Section 28",
+          "violation_type": "BOARD_COMPLIANCE_VIOLATION",
+          "evidence_quote": "do not submit to audits by the Data Protection Board",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
         }
       ],
       "dpdp_trust_score": 30,
+      "subtlety_score": 5
+    }
+  },
+  {
+    "case_id": "policy_60",
+    "filename": "policy_60.txt",
+    "category": "Privacy Policy Evaluation",
+    "policy_text_snippet": "Privacy Policy 60\n\n\n1. Clause: This policy supersedes the DPDP Act for all data collected prior to 2025.\n\n2. Clause: Account deletion requests are ignored for a period of 5 years; data is kept for future marketing.\n\n3. Clause: We transfer your data to countries without restricting cross-border flow or checking adequacy.\n\n4. Clause: We notify the Data Protection Board of any breaches within the 72-hour regulatory window.",
+    "expected_output": {
+      "global_legal_reasoning": "The policy contains 3 overt statutory violation(s) that contradict the DPDP Act 2023. Strict enforcement is required.",
+      "violations": [
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'supersedes the DPDP Act for all data collected'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 3.",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that unlawful attempt to evade the territorial scope and application of the act.",
+          "statute_reference": "Section 3",
+          "violation_type": "SCOPE_APPLICATION_EVASION",
+          "evidence_quote": "supersedes the DPDP Act for all data collected",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'deletion requests are ignored for a period of 5 years'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 8(7).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that erasure requests are ignored or delayed unlawfully by the fiduciary.",
+          "statute_reference": "Section 8(7)",
+          "violation_type": "ERASURE_NOTICE_PERIOD_VIOLATION",
+          "evidence_quote": "deletion requests are ignored for a period of 5 years",
+          "network_action": "WARN_USER_ONLY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        },
+        {
+          "step_1_active_claim_analysis": "The policy affirmatively states: 'without restricting cross-border flow or checking'. This is an active claim, not an omission.",
+          "step_2_statute_match": "This active claim directly contravenes the requirements of Section 16(1).",
+          "omission_check": false,
+          "step_3_semantic_justification": "The affirmative text confirms that transferring personal data to restricted or non-adequate countries.",
+          "statute_reference": "Section 16(1)",
+          "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+          "evidence_quote": "without restricting cross-border flow or checking",
+          "network_action": "BLOCK_THIRD_PARTY",
+          "offending_entities": [
+            "Data Fiduciary"
+          ]
+        }
+      ],
+      "dpdp_trust_score": 0,
       "subtlety_score": 5
     }
   }

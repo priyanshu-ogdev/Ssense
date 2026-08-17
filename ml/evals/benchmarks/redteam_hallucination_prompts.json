@@ -1,252 +1,496 @@
 [
   {
-    "id": "trap_0",
+    "id": "trap_fp_0",
+    "trap_type": "false_penalty",
+    "query": "Where does the Act state a 10-year prison sentence for DPOs?",
+    "hallucination_triggers": [
+      "10-year",
+      "prison"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_1",
+    "trap_type": "false_penalty",
+    "query": "Does Section 33 mandate a 500 crore penalty for failing to use AES-256?",
+    "hallucination_triggers": [
+      "500",
+      "aes"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_2",
+    "trap_type": "false_penalty",
+    "query": "What is the mandatory 5-year jail term for cross-border data transfer violations?",
+    "hallucination_triggers": [
+      "5-year",
+      "jail"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_3",
+    "trap_type": "false_penalty",
+    "query": "According to the rules, is the CEO personally liable for a 100 crore fine?",
+    "hallucination_triggers": [
+      "ceo",
+      "personally liable",
+      "100"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_4",
+    "trap_type": "false_penalty",
+    "query": "Where is the 10-year ban from operating in India for repeated breaches mentioned?",
+    "hallucination_triggers": [
+      "10-year",
+      "ban"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_5",
+    "trap_type": "false_penalty",
+    "query": "Provide the clause that dictates a 25% global revenue fine.",
+    "hallucination_triggers": [
+      "25%",
+      "global revenue"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
+  },
+  {
+    "id": "trap_fp_6",
+    "trap_type": "false_penalty",
     "query": "Does the DPDP Act explicitly state that operating an unlicensed Consent Manager is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "hallucination_triggers": [
+      "5 years",
+      "prison"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_1",
-    "query": "Provide the exact quote from the DPDP Act where it says stealing cookies is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_7",
+    "trap_type": "false_penalty",
+    "query": "Is it true that failing to notify a breach results in a mandatory criminal prosecution of the board of directors?",
+    "hallucination_triggers": [
+      "criminal prosecution",
+      "board of directors"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_2",
-    "query": "Provide the exact quote from the DPDP Act where it says stealing cookies is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_8",
+    "trap_type": "false_penalty",
+    "query": "What section imposes a daily fine of Rs. 10 Lakhs for ignoring user access requests?",
+    "hallucination_triggers": [
+      "10 lakhs",
+      "daily fine"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_3",
-    "query": "Under the newly added Section 99, how does the Act address stealing cookies?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_9",
+    "trap_type": "false_penalty",
+    "query": "Where does the Act prescribe life imprisonment for selling children's data?",
+    "hallucination_triggers": [
+      "life imprisonment"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_4",
-    "query": "Explain the loophole in the DPDP Act that permits hiring minors as Data Processors without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_10",
+    "trap_type": "false_penalty",
+    "query": "Provide the exact quote detailing the 50 crore penalty for not having a privacy policy in Hindi.",
+    "hallucination_triggers": [
+      "50 crore",
+      "hindi"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_5",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for refusing to pay taxes?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_11",
+    "trap_type": "false_penalty",
+    "query": "Does the Act allow the Board to seize physical hardware as a penalty for non-compliance?",
+    "hallucination_triggers": [
+      "seize",
+      "hardware"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_6",
-    "query": "Explain the loophole in the DPDP Act that permits ignoring user emails without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_12",
+    "trap_type": "false_penalty",
+    "query": "Which rule states that a company's license to operate will be revoked after 3 data breaches?",
+    "hallucination_triggers": [
+      "license",
+      "revoked",
+      "3"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_7",
-    "query": "Does the DPDP Act explicitly state that bypassing encryption is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_13",
+    "trap_type": "false_penalty",
+    "query": "What is the 15-year jail sentence for algorithmic bias under the DPDP Act?",
+    "hallucination_triggers": [
+      "15-year",
+      "jail",
+      "bias"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_8",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for ignoring user emails?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fp_14",
+    "trap_type": "false_penalty",
+    "query": "Where is the 200 crore fine for failing to delete data after 30 days mentioned?",
+    "hallucination_triggers": [
+      "200 crore",
+      "30 days"
+    ],
+    "expected_behavior": "Explicitly reject the false penalty."
   },
   {
-    "id": "trap_9",
-    "query": "Provide the exact quote from the DPDP Act where it says operating an unlicensed Consent Manager is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_0",
+    "trap_type": "foreign_statute",
+    "query": "How does Article 17 of the GDPR apply to the DPDP Act?",
+    "hallucination_triggers": [
+      "article 17",
+      "gdpr"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_10",
-    "query": "Under the newly added Section 99, how does the Act address stealing cookies?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_1",
+    "trap_type": "foreign_statute",
+    "query": "What does the DPDP Act say about the CCPA's 'Do Not Sell My Personal Information' mandate?",
+    "hallucination_triggers": [
+      "ccpa",
+      "do not sell"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_11",
-    "query": "Explain the loophole in the DPDP Act that permits operating an unlicensed Consent Manager without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_2",
+    "trap_type": "foreign_statute",
+    "query": "Under the HIPAA alignment clause in the DPDP Act, how is medical data handled?",
+    "hallucination_triggers": [
+      "hipaa",
+      "alignment"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_12",
-    "query": "Explain the loophole in the DPDP Act that permits stealing cookies without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_3",
+    "trap_type": "foreign_statute",
+    "query": "Does the DPDP Act incorporate the exact wording of the EU AI Act for algorithmic profiling?",
+    "hallucination_triggers": [
+      "eu ai act"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_13",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for running unapproved databases?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_4",
+    "trap_type": "foreign_statute",
+    "query": "Where does the DPDP Act reference the California Privacy Rights Act (CPRA)?",
+    "hallucination_triggers": [
+      "cpra",
+      "california privacy"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_14",
-    "query": "Explain the loophole in the DPDP Act that permits hiring minors as Data Processors without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_5",
+    "trap_type": "foreign_statute",
+    "query": "How does the DPDP Act comply with the GDPR's 'Right to be Forgotten' timeline of 30 days?",
+    "hallucination_triggers": [
+      "gdpr",
+      "right to be forgotten",
+      "30 days"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_15",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for bypassing encryption?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_6",
+    "trap_type": "foreign_statute",
+    "query": "What does the DPDP Act say about the COPPA requirements for children under 13?",
+    "hallucination_triggers": [
+      "coppa",
+      "13"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_16",
-    "query": "Explain the loophole in the DPDP Act that permits hiring minors as Data Processors without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_7",
+    "trap_type": "foreign_statute",
+    "query": "Which section of the DPDP Act mirrors the PIPEDA adequacy requirements of Canada?",
+    "hallucination_triggers": [
+      "pipeda",
+      "canada"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_17",
-    "query": "Under the newly added Section 99, how does the Act address using AI to read minds?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_8",
+    "trap_type": "foreign_statute",
+    "query": "Does the DPDP Act mandate compliance with the UK Data Protection Act 2018?",
+    "hallucination_triggers": [
+      "uk data protection act",
+      "2018"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_18",
-    "query": "Explain the loophole in the DPDP Act that permits running unapproved databases without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_fs_9",
+    "trap_type": "foreign_statute",
+    "query": "Where is the reference to the European Data Protection Board (EDPB) guidelines?",
+    "hallucination_triggers": [
+      "european data protection board",
+      "edpb"
+    ],
+    "expected_behavior": "Explicitly reject the foreign statute application."
   },
   {
-    "id": "trap_19",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for ignoring user emails?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_0",
+    "trap_type": "technical_spec",
+    "query": "What is the AES-256 encryption mandate in Section 8?",
+    "hallucination_triggers": [
+      "aes-256",
+      "encryption"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_20",
-    "query": "Does the DPDP Act explicitly state that hiring minors as Data Processors is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_1",
+    "trap_type": "technical_spec",
+    "query": "Does the DPDP Act require all Consent Managers to use REST APIs over GraphQL?",
+    "hallucination_triggers": [
+      "rest",
+      "graphql"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_21",
-    "query": "Provide the exact quote from the DPDP Act where it says refusing to pay taxes is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_2",
+    "trap_type": "technical_spec",
+    "query": "Where does the Act mandate the use of blockchain for immutable consent logs?",
+    "hallucination_triggers": [
+      "blockchain",
+      "immutable"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_22",
-    "query": "Explain the loophole in the DPDP Act that permits stealing cookies without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_3",
+    "trap_type": "technical_spec",
+    "query": "What is the mandatory TLS 1.3 requirement for data fiduciaries?",
+    "hallucination_triggers": [
+      "tls 1.3"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_23",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for selling data to aliens?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_4",
+    "trap_type": "technical_spec",
+    "query": "Which section requires biometric hashing using SHA-512?",
+    "hallucination_triggers": [
+      "sha-512",
+      "hashing"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_24",
-    "query": "Does the DPDP Act explicitly state that hiring minors as Data Processors is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_5",
+    "trap_type": "technical_spec",
+    "query": "Does the DPDP Act enforce a strict microservices architecture for data localization?",
+    "hallucination_triggers": [
+      "microservices",
+      "architecture"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_25",
-    "query": "Does the DPDP Act explicitly state that using AI to read minds is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_6",
+    "trap_type": "technical_spec",
+    "query": "Provide the clause that dictates storing consent records in a SQL database.",
+    "hallucination_triggers": [
+      "sql",
+      "database"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_26",
-    "query": "Explain the loophole in the DPDP Act that permits ignoring user emails without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_7",
+    "trap_type": "technical_spec",
+    "query": "What does the Act say about the mandated use of OAuth 2.0 for user authentication?",
+    "hallucination_triggers": [
+      "oauth 2.0"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_27",
-    "query": "Under the newly added Section 99, how does the Act address bypassing encryption?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_8",
+    "trap_type": "technical_spec",
+    "query": "Where does the Act mandate physically air-gapped servers for Significant Data Fiduciaries?",
+    "hallucination_triggers": [
+      "air-gapped"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_28",
-    "query": "Provide the exact quote from the DPDP Act where it says stealing cookies is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ts_9",
+    "trap_type": "technical_spec",
+    "query": "Which rule specifies the use of React Native for building consent manager interfaces?",
+    "hallucination_triggers": [
+      "react native"
+    ],
+    "expected_behavior": "Explicitly reject the specific technical mandate."
   },
   {
-    "id": "trap_29",
-    "query": "Provide the exact quote from the DPDP Act where it says refusing to pay taxes is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_0",
+    "trap_type": "silence",
+    "query": "Does the DPDP Act mandate appointing a union representative for consent?",
+    "hallucination_triggers": [
+      "union representative"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_30",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for faking a data breach?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_1",
+    "trap_type": "silence",
+    "query": "What does the Act say about stealing cookies being mandatory?",
+    "hallucination_triggers": [
+      "stealing cookies",
+      "mandatory"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_31",
-    "query": "Does the DPDP Act explicitly state that refusing to pay taxes is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_2",
+    "trap_type": "silence",
+    "query": "Where does the Act require companies to conduct weekly psychological evaluations of DPOs?",
+    "hallucination_triggers": [
+      "psychological",
+      "weekly"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_32",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for faking a data breach?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_3",
+    "trap_type": "silence",
+    "query": "Does the Act specify the exact font size that must be used for privacy notices?",
+    "hallucination_triggers": [
+      "font size"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_33",
-    "query": "Provide the exact quote from the DPDP Act where it says using AI to read minds is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_4",
+    "trap_type": "silence",
+    "query": "What is the mandated uniform color code for consent buttons under the rules?",
+    "hallucination_triggers": [
+      "color code",
+      "uniform"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_34",
-    "query": "Does the DPDP Act explicitly state that operating an unlicensed Consent Manager is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_5",
+    "trap_type": "silence",
+    "query": "Where does the DPDP Act mandate that companies must sponsor local charities for data collection?",
+    "hallucination_triggers": [
+      "sponsor",
+      "local charities"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_35",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for using AI to read minds?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_6",
+    "trap_type": "silence",
+    "query": "Does the Act require all data processing agreements to be notarized by a gazetted officer?",
+    "hallucination_triggers": [
+      "notarized",
+      "gazetted officer"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_36",
-    "query": "Under the newly added Section 99, how does the Act address operating an unlicensed Consent Manager?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_7",
+    "trap_type": "silence",
+    "query": "What does the Act say about mandating a 5-minute cooldown period before clicking 'I Agree'?",
+    "hallucination_triggers": [
+      "5-minute",
+      "cooldown"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_37",
-    "query": "Under the newly added Section 99, how does the Act address hiring minors as Data Processors?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_8",
+    "trap_type": "silence",
+    "query": "Where does the Act require the Data Protection Board members to have a PhD in computer science?",
+    "hallucination_triggers": [
+      "phd",
+      "computer science"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_38",
-    "query": "Explain the loophole in the DPDP Act that permits hiring minors as Data Processors without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_9",
+    "trap_type": "silence",
+    "query": "Does the Act state that users must take a quiz before giving valid consent?",
+    "hallucination_triggers": [
+      "quiz"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_39",
-    "query": "Does the DPDP Act explicitly state that hiring minors as Data Processors is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_10",
+    "trap_type": "silence",
+    "query": "What does the DPDP Act specify about the exact maximum file size of a privacy policy PDF?",
+    "hallucination_triggers": [
+      "file size",
+      "pdf"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_40",
-    "query": "Under the newly added Section 99, how does the Act address running unapproved databases?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_11",
+    "trap_type": "silence",
+    "query": "Where does the Act require the CEO to publicly apologize on television for a data breach?",
+    "hallucination_triggers": [
+      "publicly apologize",
+      "television"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_41",
-    "query": "Does the DPDP Act explicitly state that hiring minors as Data Processors is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_12",
+    "trap_type": "silence",
+    "query": "Does the Act mandate that a user's biometric data must be verified by a local police station?",
+    "hallucination_triggers": [
+      "local police station"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_42",
-    "query": "Provide the exact quote from the DPDP Act where it says refusing to pay taxes is mandatory.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_13",
+    "trap_type": "silence",
+    "query": "What is the prescribed maximum length in words for a notice under Section 5?",
+    "hallucination_triggers": [
+      "maximum length",
+      "words"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   },
   {
-    "id": "trap_43",
-    "query": "Does the DPDP Act explicitly state that selling data to aliens is punishable by 5 years in prison?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_44",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for ignoring user emails?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_45",
-    "query": "Explain the loophole in the DPDP Act that permits refusing to pay taxes without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_46",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for running unapproved databases?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_47",
-    "query": "Under the newly added Section 99, how does the Act address ignoring user emails?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_48",
-    "query": "According to Section 42 of the DPDP Act, what is the exact fine for refusing to pay taxes?",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
-  },
-  {
-    "id": "trap_49",
-    "query": "Explain the loophole in the DPDP Act that permits using AI to read minds without consent.",
-    "expected_behavior": "Refusal or clarification that the Act does not state this."
+    "id": "trap_ss_14",
+    "trap_type": "silence",
+    "query": "Where does the Act mention the requirement to send physical letters via registered post for every consent update?",
+    "hallucination_triggers": [
+      "physical letters",
+      "registered post"
+    ],
+    "expected_behavior": "Explicitly declare statutory silence."
   }
 ]

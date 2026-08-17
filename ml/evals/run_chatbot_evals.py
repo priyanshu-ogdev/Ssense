@@ -107,7 +107,7 @@ class DynamicRAGRetriever:
         return [w for w in words if w not in self.generic_stopwords]
 
     # 🚨 SOTA FIX: Increased top_k=7 and rerank_depth=25 to flood the 32k context window with dense legal facts
-    def retrieve(self, query: str, top_k: int = 7, rrf_k: int = 60, rerank_depth: int = 25) -> str:
+    def retrieve(self, query: str, persona: str = "", top_k: int = 7, rrf_k: int = 60, rerank_depth: int = 25) -> str:
         q_tokens = self.tokenize_query(query)
         bm25_scores = self.bm25.get_scores(q_tokens)
         top_bm25_idx = np.argsort(bm25_scores)[::-1][:100]
@@ -117,10 +117,15 @@ class DynamicRAGRetriever:
         dense_scores = np.dot(self.dense_embeddings, q_emb)
         top_dense_idx = np.argsort(dense_scores)[::-1][:100]
 
+        is_state_query = "state" in persona.lower()
         rrf_scores = {}
         for rank, idx in enumerate(top_bm25_idx):
+            if not is_state_query and self.metadatas[idx].get("applies_to") == "state":
+                continue
             rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (rrf_k + rank + 1)
         for rank, idx in enumerate(top_dense_idx):
+            if not is_state_query and self.metadatas[idx].get("applies_to") == "state":
+                continue
             rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (rrf_k + rank + 1)
 
         top_rrf = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:rerank_depth]
@@ -178,7 +183,8 @@ def main():
                 if static_ctx.strip():
                     retrieved_contexts.append(static_ctx)
                 else:
-                    live_ctx = rag_engine.retrieve(query, top_k=7, rerank_depth=25)
+                    persona = item.get("persona", "")
+                    live_ctx = rag_engine.retrieve(query, persona=persona, top_k=7, rerank_depth=25)
                     retrieved_contexts.append(live_ctx)
         except Exception as e:
             print(f"⚠️ Live RAG retrieval failed: {e}. Falling back to baseline contexts.")
@@ -240,7 +246,7 @@ def main():
     if args.use_judge and Path(args.judge_path).exists():
         print(f"\n🏛️ [Stage 3/3] Initializing 72B Teacher Judge ({args.judge_path})...")
         try:
-            judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
+            judge_engine = BackendEngine(backend_type=args.backend, model_path=args.judge_path, max_seq_length=8192)
         except Exception as e:
             print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
 

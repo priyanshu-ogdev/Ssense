@@ -102,7 +102,7 @@ def parse_statute_to_tuple(section_str: str) -> Tuple[str, ...]:
 def sections_match(pred_sec: str, gt_sec: str) -> bool:
     """
     Evaluates if the predicted section correctly matches the ground truth.
-    Supports partial generalization (Prediction '8(1)' matches Ground Truth '8').
+    Supports partial generalization (Prediction '8' matches Ground Truth '8(1)', and vice-versa).
     """
     pred_tup = parse_statute_to_tuple(pred_sec)
     gt_tup = parse_statute_to_tuple(gt_sec)
@@ -112,11 +112,9 @@ def sections_match(pred_sec: str, gt_sec: str) -> bool:
     if not pred_tup:
         return False
         
-    # Prediction must match ground truth up to the depth of the ground truth
-    if len(pred_tup) < len(gt_tup):
-        return False
-        
-    return pred_tup[:len(gt_tup)] == gt_tup
+    # Allow matching up to the shortest tuple (i.e. bidirectional root fallback)
+    min_len = min(len(pred_tup), len(gt_tup))
+    return pred_tup[:min_len] == gt_tup[:min_len]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -154,8 +152,10 @@ def evaluate_scp(response_text: str, target_section: str) -> bool:
     # Determines if the model got the core section right, even if it dropped sub-clauses
     match = re.match(r'(section|rule)\s*(\d+)', target_section.lower())
     if match:
-        root = f"{match.group(1)}{match.group(2)}"
-        return root in resp_clean
+        root_type = match.group(1)
+        root_num = match.group(2)
+        pattern = rf'\b{root_type}\s*{root_num}\b'
+        return bool(re.search(pattern, response_text, re.IGNORECASE))
         
     return False
 

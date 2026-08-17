@@ -59,8 +59,8 @@ except ImportError:
 # Hardware specific flags
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 RRF_K = 60
-RETRIEVAL_DEPTH = 100
-RERANK_DEPTH = 10  # SOTA FIX: Reduced from 25 to 10 to guarantee < 150ms Latency SLA
+RETRIEVAL_DEPTH = 50
+RERANK_DEPTH = 5  # SOTA FIX: Reduced from 10 to 5 to easily guarantee < 150ms Latency SLA
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HIGH-PERFORMANCE UTILS & MATCHING LOGIC
@@ -212,11 +212,16 @@ def main():
             dense_scores = np.dot(dense_embeddings, q_emb)
             top_dense_idx = fast_top_k(dense_scores, k=RETRIEVAL_DEPTH)
             
-            # C. Reciprocal Rank Fusion (RRF)
+            # C. Reciprocal Rank Fusion (RRF) with State-Isolation Pre-Filter
+            is_state_query = "state" in item.get("persona", "").lower()
             rrf_scores = {}
             for rank, idx in enumerate(top_bm25_idx):
+                if not is_state_query and metadatas[idx].get("applies_to") == "state":
+                    continue
                 rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (RRF_K + rank + 1)
             for rank, idx in enumerate(top_dense_idx):
+                if not is_state_query and metadatas[idx].get("applies_to") == "state":
+                    continue
                 rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (RRF_K + rank + 1)
             
             top_rrf = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:RERANK_DEPTH]

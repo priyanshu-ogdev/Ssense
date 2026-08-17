@@ -87,12 +87,13 @@ def calculate_percentiles(values: List[float]) -> Dict[str, float]:
 # ═══════════════════════════════════════════════════════════════════════════
 # BENCHMARK ENGINE
 # ═══════════════════════════════════════════════════════════════════════════
-def warmup_engine(engine: BackendEngine, num_passes: int = 2):
-    """Executes warm-up passes to prime GPU kernels and JIT caches."""
-    print("🔥 Warming up GPU inference kernels...")
-    warmup_prompt = format_chatml_prompt("You are a legal assistant.", "Ping.")
-    for _ in range(num_passes):
-        _ = engine.generate(warmup_prompt, max_tokens=16, temperature=0.0)
+def warmup_engine(engine: BackendEngine, num_passes: int = 1):
+    """Executes warm-up passes to prime GPU kernels and JIT caches for ALL batch sizes."""
+    print("🔥 Warming up GPU inference kernels across all batch sizes to compile CUDA graphs...")
+    for bs in BATCH_SIZES:
+        warmup_prompts = [format_chatml_prompt("You are a legal assistant.", "Ping.")] * bs
+        for _ in range(num_passes):
+            _ = engine.generate(warmup_prompts, max_tokens=128, temperature=0.0)
 
 
 def generate_32k_stress_prompt() -> str:
