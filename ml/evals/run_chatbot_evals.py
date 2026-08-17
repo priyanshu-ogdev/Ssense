@@ -11,11 +11,10 @@ Measures Chatbot SLM performance across:
 6. Context Faithfulness (CF) using Heuristics or 72B Teacher Judge
 
 SOTA Upgrades Implemented:
-1. Live Hybrid RAG Integration: Queries `dpdp_hybrid_index.pkl` dynamically if context is needed.
-2. 3-Stage VRAM Airlock: Sequentially runs (1) RAG Retriever -> (2) 7B Chatbot -> (3) 72B Judge.
-3. Full Context Window: Synchronized with 32k context envelope.
-4. Prompt & Persona Alignment: Grounded in empathetic legal assistant constraints.
-5. Diagnostic Exit Codes: Always returns 0 for clean aggregation in `verify.py`.
+1. Wide-Net RAG Expansion: Increased `top_k=7` and `rerank_depth=25` to leverage the 32k context envelope.
+2. High-Throughput Vectorized Batching: Sends 100+ prompts concurrently, dropping eval time.
+3. Live Hybrid RAG Integration: Queries `dpdp_hybrid_index.pkl` dynamically if context is needed.
+4. 3-Stage VRAM Airlock: Sequentially runs (1) RAG Retriever -> (2) 7B Chatbot -> (3) 72B Judge.
 """
 
 import os
@@ -34,13 +33,11 @@ from tqdm import tqdm
 
 import torch
 
-# Ensure terminal stdout/stderr uses UTF-8 encoding
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Dynamic path resolution
 _CURRENT_DIR = Path(__file__).resolve().parent
 if str(_CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(_CURRENT_DIR))
@@ -68,21 +65,13 @@ try:
 except ImportError:
     HAS_RAG_DEPS = False
 
-
 def flush_gpu():
-    """Forces garbage collection and clears CUDA allocator caches."""
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SOTA HYBRID RAG RETRIEVER MODULE
-# ═══════════════════════════════════════════════════════════════════════════
 class DynamicRAGRetriever:
-    """Encapsulates the SOTA BM25 + Dense BGE + Cross-Encoder Reranking pipeline."""
-
     def __init__(self, index_path: Path, device: str = "cuda"):
         if not index_path.exists():
             raise FileNotFoundError(f"Hybrid index not found at {index_path}. Run build_vector_db.py first.")
@@ -94,7 +83,6 @@ class DynamicRAGRetriever:
         self.metadatas = index_data["metadatas"]
         self.bm25 = index_data["bm25_index"]
         
-        # Ensure L2 normalization for exact cosine similarity
         raw_dense = index_data["dense_embeddings"]
         self.dense_embeddings = raw_dense / np.linalg.norm(raw_dense, axis=1, keepdims=True)
 
@@ -118,20 +106,17 @@ class DynamicRAGRetriever:
         words = re.findall(r'\w+', query.lower())
         return [w for w in words if w not in self.generic_stopwords]
 
-    def retrieve(self, query: str, top_k: int = 3, rrf_k: int = 60, rerank_depth: int = 10) -> str:
-        """Executes Hybrid Search with Cross-Encoder Reranking and returns formatted context."""
-        # 1. Sparse Lexical BM25
+    # 🚨 SOTA FIX: Increased top_k=7 and rerank_depth=25 to flood the 32k context window with dense legal facts
+    def retrieve(self, query: str, top_k: int = 7, rrf_k: int = 60, rerank_depth: int = 25) -> str:
         q_tokens = self.tokenize_query(query)
         bm25_scores = self.bm25.get_scores(q_tokens)
         top_bm25_idx = np.argsort(bm25_scores)[::-1][:100]
 
-        # 2. Dense Semantic Search
         dense_q = f"Represent this sentence for searching relevant passages: {query}"
         q_emb = self.embed_model.encode([dense_q], normalize_embeddings=True, show_progress_bar=False)[0]
         dense_scores = np.dot(self.dense_embeddings, q_emb)
         top_dense_idx = np.argsort(dense_scores)[::-1][:100]
 
-        # 3. Reciprocal Rank Fusion (RRF)
         rrf_scores = {}
         for rank, idx in enumerate(top_bm25_idx):
             rrf_scores[idx] = rrf_scores.get(idx, 0.0) + 1.0 / (rrf_k + rank + 1)
@@ -140,7 +125,6 @@ class DynamicRAGRetriever:
 
         top_rrf = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:rerank_depth]
 
-        # 4. Cross-Encoder Batch Reranking
         cross_pairs = [[query, self.chunks[idx]] for idx in top_rrf]
         cross_scores = self.reranker_model.predict(cross_pairs, batch_size=len(cross_pairs), show_progress_bar=False)
 
@@ -151,15 +135,11 @@ class DynamicRAGRetriever:
         return "\n\n".join(retrieved_texts)
 
     def unload(self):
-        """Purges RAG embedding models from GPU memory."""
         del self.embed_model
         del self.reranker_model
         flush_gpu()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# MAIN ORCHESTRATOR
-# ═══════════════════════════════════════════════════════════════════════════
 def main():
     parser = argparse.ArgumentParser(description="Pillar 2 & 4: Conversational Chatbot Authenticity & RAG Evals")
     parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "unsloth", "llamacpp"])
@@ -169,7 +149,7 @@ def main():
     parser.add_argument("--index-path", type=str, default=str(Paths.HYBRID_INDEX))
     parser.add_argument("--vllm-url", type=str, default="http://localhost:8000/v1/completions")
     parser.add_argument("--lora-name", type=str, default="chatbot")
-    parser.add_argument("--use-judge", action="store_true", help="Load 72B teacher model into VRAM for CF scoring")
+    parser.add_argument("--use-judge", action="store_true")
     parser.add_argument("--judge-path", type=str, default=str(Paths.resolve_model_path(None, "Qwen2-72B-Instruct-FP8")))
     args = parser.parse_args()
 
@@ -185,9 +165,6 @@ def main():
     print(f"🚀 [PILLAR 2 & 4]: CHATBOT AUTHENTICITY, FLUIDITY & LIVE RAG ({args.backend.upper()})")
     print("═══════════════════════════════════════════════════════════════════════")
 
-    # -------------------------------------------------------------------------
-    # STAGE 1: Live SOTA Hybrid RAG Retrieval (Pre-fetching Context)
-    # -------------------------------------------------------------------------
     retrieved_contexts: List[str] = []
     index_file = Path(args.index_path)
 
@@ -197,12 +174,11 @@ def main():
             rag_engine = DynamicRAGRetriever(index_path=index_file)
             for item in tqdm(test_data, desc="RAG Pre-fetching"):
                 query = item.get("query", item.get("question", ""))
-                # If static context already exists in the test item, respect it; otherwise retrieve live
                 static_ctx = item.get("context", "")
                 if static_ctx.strip():
                     retrieved_contexts.append(static_ctx)
                 else:
-                    live_ctx = rag_engine.retrieve(query, top_k=3)
+                    live_ctx = rag_engine.retrieve(query, top_k=7, rerank_depth=25)
                     retrieved_contexts.append(live_ctx)
         except Exception as e:
             print(f"⚠️ Live RAG retrieval failed: {e}. Falling back to baseline contexts.")
@@ -216,9 +192,6 @@ def main():
         print("\nℹ️ [Stage 1/3] Using bundled statutory contexts (RAG index not active).")
         retrieved_contexts = [item.get("context", "") for item in test_data]
 
-    # -------------------------------------------------------------------------
-    # STAGE 2: Chatbot SLM Response Generation
-    # -------------------------------------------------------------------------
     print(f"\n🧠 [Stage 2/3] Initializing Chatbot SLM Engine (Backend: {args.backend})...")
     chatbot_engine = BackendEngine(
         backend_type=args.backend,
@@ -229,46 +202,45 @@ def main():
         max_seq_length=32768
     )
 
-    generated_responses = []
     try:
-        print(f"Generating completions for {len(test_data)} conversational scenarios...")
-        for i, item in enumerate(tqdm(test_data, desc="Chatbot Generation")):
+        sys_msg = (
+            "You are an empathetic and expert Indian DPDP Legal Assistant. "
+            "Answer the user's query accurately according to the Digital Personal Data Protection Act 2023. "
+            "If statutory context is provided, you must ground your answer strictly within that context. "
+            "If the context does not contain the answer, or if the query falls outside the scope of the DPDP Act, "
+            "you must politely decline to answer or state that the Act is silent. "
+            "Crucially, you must explicitly cite applicable statutory section numbers. Do not cite foreign statutes (GDPR)."
+        )
+        
+        prompts = []
+        for i, item in enumerate(test_data):
             query = item.get("query", item.get("question", ""))
             ctx = retrieved_contexts[i]
-
-            sys_msg = (
-                "You are an empathetic and expert Indian DPDP Legal Assistant. "
-                "Answer the user's query accurately according to the Digital Personal Data Protection Act 2023. "
-                "If statutory context is provided, you must ground your answer strictly within that context. "
-                "If the context does not contain the answer, or if the query falls outside the scope of the DPDP Act, "
-                "you must politely decline to answer or state that the Act is silent. "
-                "Crucially, you must explicitly cite applicable statutory section numbers. Do not cite foreign statutes (GDPR)."
-            )
-
             if ctx.strip():
                 user_msg = f"[STATUTORY CONTEXT]:\n{ctx}\n\nQuery: {query}"
             else:
                 user_msg = f"Query: {query}"
+            prompts.append(format_chatml_prompt(sys_msg, user_msg))
 
-            prompt = format_chatml_prompt(sys_msg, user_msg)
-            out = chatbot_engine.generate(prompt, max_tokens=2048, temperature=0.0)
-            generated_responses.append(out.get("raw_output", ""))
+        print(f"⚡ Dispatching {len(prompts)} conversational queries to vLLM PagedAttention engine...")
+        inference_outs = chatbot_engine.generate(prompts, max_tokens=2048, temperature=0.0)
+        
+        if not isinstance(inference_outs, list):
+            inference_outs = [inference_outs]
+            
+        generated_responses = [out.get("raw_output", "") for out in inference_outs]
 
     finally:
-        # Strict VRAM Airlock Stage 2
         chatbot_engine.unload()
         del chatbot_engine
         flush_gpu()
         print("🧹 [VRAM Airlock] Chatbot model purged from GPU memory.")
 
-    # -------------------------------------------------------------------------
-    # STAGE 3: Optional 72B Teacher Judging & Metrics Scoring
-    # -------------------------------------------------------------------------
     judge_engine = None
     if args.use_judge and Path(args.judge_path).exists():
         print(f"\n🏛️ [Stage 3/3] Initializing 72B Teacher Judge ({args.judge_path})...")
         try:
-            judge_engine = BackendEngine(backend_type=args.backend, model_path=args.judge_path, max_seq_length=8192)
+            judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
         except Exception as e:
             print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
 
@@ -289,28 +261,23 @@ def main():
             target_keywords = item.get("target_keywords", item.get("expected_key_points", []))
             ctx = retrieved_contexts[i]
 
-            # 1. Statute Citation Precision (SCP)
             is_precise = evaluate_scp(resp, target_section)
             if is_precise: scp_hits += 1
 
-            # 2. Context Faithfulness (CF 1-5)
             if ctx.strip():
                 cf_score = evaluate_cf_judge(resp, ctx, target_keywords, judge_engine)
             else:
                 cf_score = 5.0
             cf_scores.append(cf_score)
 
-            # 3. Jurisdictional Contamination Rate (JCR)
             is_contaminated, found_contaminants = evaluate_jcr(resp)
             if is_contaminated: jcr_violations += 1
 
-            # 4. Accuracy & Coverage
             coverage = evaluate_key_points_coverage(resp, target_keywords)
             forbidden_hits = check_forbidden_terms(resp, item.get("forbidden_hallucination_terms", []))
             accuracy_score = max(0.0, coverage - (0.5 * len(forbidden_hits)))
             total_accuracies.append(accuracy_score)
 
-            # 5. Schema Bleed & Fluidity (MTLD)
             bleed_hits = check_schema_bleed(resp)
             if bleed_hits: bleed_violations += 1
                 
@@ -338,12 +305,8 @@ def main():
             flush_gpu()
             print("🧹 [VRAM Airlock] Judge model purged from GPU memory.")
 
-    # -------------------------------------------------------------------------
-    # AGGREGATION & REPORT COMPILATION
-    # -------------------------------------------------------------------------
     total = max(1, len(test_data))
     
-    # Point Estimates
     scp_rate = (scp_hits / total) * 100.0
     jcr_rate = (jcr_violations / total) * 100.0
     bleed_rate = (bleed_violations / total) * 100.0
@@ -351,7 +314,6 @@ def main():
     avg_cf = float(np.mean(cf_scores)) if cf_scores else 5.0
     avg_mtld = float(np.mean(total_mtlds)) if total_mtlds else 0.0
 
-    # Wilson 95% CI Bounds
     scp_low, scp_high = wilson_ci_from_pct(scp_rate, total)
     jcr_low, jcr_high = wilson_ci_from_pct(jcr_rate, total)
     bleed_low, bleed_high = wilson_ci_from_pct(bleed_rate, total)
@@ -408,9 +370,7 @@ def main():
         
     print(f"💾 Chatbot evaluation report saved to: {report_path}")
 
-    # Return 0 so verify.py handles diagnostic scorecards cleanly
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

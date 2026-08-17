@@ -6,13 +6,11 @@ Benchmarks fine-tuned DPDP SLM inference across multiple concurrency batch sizes
 and tests maximum 32k context window stress resistance without Out-Of-Memory (OOM) failure.
 
 SOTA Upgrades Implemented:
-1. True CUDA Hardware Synchronization: Calls `torch.cuda.synchronize()` to eliminate async GPU dispatch skew.
-2. GPU Warm-Up Phase: Eliminates CUDA driver initialization and Triton JIT compilation overhead.
-3. Percentile Telemetry: Computes Mean, P50, P90, P95, and P99 for TTFT and Latency.
-4. Live VRAM Telemetry: Tracks peak CUDA memory allocation across concurrency runs.
-5. Robust 32k Token Stress: Accurately synthesizes 30,000–32,000 token legal context payloads.
-6. Strict VRAM Airlock: Guarantees engine destruction and CUDA cache release in `finally:`.
-7. Diagnostic Alignment: Synchronized keys and exit code for `verify.py`.
+1. Native Vectorized Batching: Replaced `ThreadPoolExecutor` with native vLLM `generate([prompts])`.
+2. PyTorch Allocator Decoupling: Removed `sync_cuda()` and `reset_peak_memory_stats()` to prevent vLLM memory collisions.
+3. Percentile Telemetry: Computes Mean, P50, P90, P95, and P99 for TTFT and Latency directly from vLLM output metadata.
+4. Robust 32k Token Stress: Accurately synthesizes 30,000–32,000 token legal context payloads.
+5. Strict VRAM Airlock: Guarantees engine destruction and CUDA cache release in `finally:`.
 """
 
 import os
@@ -21,7 +19,6 @@ import gc
 import json
 import time
 import argparse
-import concurrent.futures
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any
@@ -65,27 +62,11 @@ STANDARD_USER_MSG = "Summarize the primary obligations of a Data Fiduciary regar
 # ═══════════════════════════════════════════════════════════════════════════
 # TELEMETRY & STATISTICAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
-def sync_cuda():
-    """Ensures all queued GPU operations are completed for exact wall-clock timing."""
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-
-
 def get_vram_usage_mb() -> float:
-    """Returns current peak allocated CUDA VRAM in Megabytes."""
+    """Returns current reserved CUDA VRAM in Megabytes."""
     if torch.cuda.is_available():
-        return float(torch.cuda.max_memory_allocated() / (1024 * 1024))
+        return float(torch.cuda.memory_reserved() / (1024 * 1024))
     return 0.0
-
-
-def reset_vram_tracker():
-    """Resets peak memory allocation stats and flushes caches."""
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.reset_peak_memory_stats()
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-
 
 def calculate_percentiles(values: List[float]) -> Dict[str, float]:
     """Computes distribution percentiles for latency measurements."""
@@ -111,10 +92,7 @@ def warmup_engine(engine: BackendEngine, num_passes: int = 2):
     print("🔥 Warming up GPU inference kernels...")
     warmup_prompt = format_chatml_prompt("You are a legal assistant.", "Ping.")
     for _ in range(num_passes):
-        sync_cuda()
         _ = engine.generate(warmup_prompt, max_tokens=16, temperature=0.0)
-        sync_cuda()
-    reset_vram_tracker()
 
 
 def generate_32k_stress_prompt() -> str:
@@ -141,35 +119,6 @@ def generate_32k_stress_prompt() -> str:
         "and duties imposed on a Data Fiduciary and detail the penalty framework under the Act."
     )
     return format_chatml_prompt(STANDARD_SYS_MSG, user_msg)
-
-
-def execute_single_request(engine: BackendEngine, prompt: str, max_tokens: int = 128) -> Dict[str, Any]:
-    """Executes a single timed generation request with hardware-level synchronization."""
-    sync_cuda()
-    t0 = time.perf_counter()
-    out = engine.generate(prompt, max_tokens=max_tokens, temperature=0.1)
-    sync_cuda()
-    t1 = time.perf_counter()
-    total_time_ms = (t1 - t0) * 1000.0
-
-    raw_output = out.get("raw_output", "")
-    latency_ms = out.get("latency_ms", total_time_ms)
-    
-    # Accurate TTFT derivation
-    ttft_ms = out.get("ttft_ms", None)
-    if ttft_ms is None or ttft_ms <= 0:
-        ttft_ms = latency_ms * 0.15  # Empirical prefill ratio estimate
-
-    tokens_gen = out.get("tokens_generated", max(1, len(raw_output.split())))
-    tps = out.get("tokens_per_sec", (tokens_gen / (latency_ms / 1000.0)) if latency_ms > 0 else 0.0)
-
-    return {
-        "latency_ms": latency_ms,
-        "ttft_ms": ttft_ms,
-        "tokens_generated": tokens_gen,
-        "throughput_tps": tps,
-        "raw_output_len": len(raw_output)
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -215,38 +164,27 @@ def main():
         print("\n🚀 Executing Multi-Batch Concurrency Throughput Benchmarks...")
         for bs in args.batch_sizes:
             print(f"   ⏱️ Evaluating Concurrency Batch Size = {bs}...")
-            reset_vram_tracker()
             
-            sync_cuda()
+            # SOTA FIX: Vectorized batching replaces ThreadPoolExecutor
+            prompts = [built_prompt] * bs
+            
             t_batch_start = time.perf_counter()
-            results = []
-
-            # In-process execution handling:
-            # Unsloth is serialized single-stream CUDA.
-            # vLLM / REST endpoints handle asynchronous continuous batching.
-            max_workers = bs if engine.backend_type != "unsloth" else 1
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(execute_single_request, engine, built_prompt, 128) for _ in range(bs)]
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        results.append(future.result())
-                    except Exception as e:
-                        print(f"   ⚠️ Worker task failed: {e}")
-                        results.append({
-                            "latency_ms": 0.0, "ttft_ms": 0.0, "tokens_generated": 0,
-                            "throughput_tps": 0.0, "raw_output_len": 0
-                        })
-
-            sync_cuda()
+            outputs = engine.generate(prompts, max_tokens=128, temperature=0.0)
             t_batch_end = time.perf_counter()
+            
             total_duration_sec = max(1e-5, t_batch_end - t_batch_start)
 
+            if not isinstance(outputs, list):
+                outputs = [outputs]
+
+            ttfts = [o.get("ttft_ms", 0.0) for o in outputs if o.get("ttft_ms", 0.0) > 0]
+            lats = [o.get("latency_ms", 0.0) for o in outputs if o.get("latency_ms", 0.0) > 0]
+            total_tokens = sum(o.get("tokens_generated", 0) for o in outputs)
+
             # Statistical Aggregations
-            ttft_stats = calculate_percentiles([r["ttft_ms"] for r in results if r["ttft_ms"] > 0])
-            latency_stats = calculate_percentiles([r["latency_ms"] for r in results if r["latency_ms"] > 0])
+            ttft_stats = calculate_percentiles(ttfts)
+            latency_stats = calculate_percentiles(lats)
             
-            total_tokens = sum(r["tokens_generated"] for r in results)
             system_throughput = total_tokens / total_duration_sec
             peak_vram_mb = get_vram_usage_mb()
 
@@ -264,19 +202,21 @@ def main():
         # 3. Deep 32k Context Window OOM Stress Simulation
         if not args.skip_32k:
             print("\n🌊 Initiating 32k Maximum Context Window Stress Simulation...")
-            reset_vram_tracker()
             try:
                 stress_prompt = generate_32k_stress_prompt()
                 prompt_char_len = len(stress_prompt)
                 print(f"   📏 Synthesized context payload: {prompt_char_len:,} chars (~30,000–32,000 tokens)")
                 
-                sync_cuda()
                 t_s0 = time.perf_counter()
                 out_32k = engine.generate(stress_prompt, max_tokens=64, temperature=0.0)
-                sync_cuda()
                 t_s1 = time.perf_counter()
 
                 stress_dur_ms = (t_s1 - t_s0) * 1000.0
+                
+                # Handle batch abstraction wrapper just in case
+                if isinstance(out_32k, list):
+                    out_32k = out_32k[0]
+                    
                 resp_32k = out_32k.get("raw_output", "").strip()
                 
                 # Non-empty response indicates successful full KV-cache prefill without OOM
@@ -306,7 +246,7 @@ def main():
         # 4. Strict VRAM Airlock
         engine.unload()
         del engine
-        reset_vram_tracker()
+        gc.collect()
         print("\n🧹 [VRAM Airlock] Model purged from GPU memory.")
 
     # 5. Certification Verification & Terminal Report
@@ -332,7 +272,6 @@ def main():
     print(f"| 32k Context Stress Simulation Resistance: {stress_status:<51} |")
     print("═══════════════════════════════════════════════════════════════════════════════════════════════\n")
 
-    # Top-level metric flattening for verify.py extraction compatibility
     b1_data = batch_results.get("batch_1", {})
     certified_efficient = (
         all(b["ttft_ms"]["mean"] < 1200.0 for b in batch_results.values()) and 
@@ -343,13 +282,11 @@ def main():
         "evaluation_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "backend": args.backend,
         "model_path": str(args.model_path),
-        # Flattened keys for master orchestrator verify.py
         "avg_latency_ms": b1_data.get("latency_ms", {}).get("mean", 0.0),
         "avg_ttft_ms": b1_data.get("ttft_ms", {}).get("mean", 0.0),
         "system_throughput_tps": b1_data.get("system_throughput_tps", 0.0),
         "p95_latency_ms": b1_data.get("latency_ms", {}).get("p95", 0.0),
         "p95_ttft_ms": b1_data.get("ttft_ms", {}).get("p95", 0.0),
-        # Granular nested payload
         "concurrency_benchmarks": batch_results,
         "stress_32k_simulation": stress_metrics,
         "certified_efficient": certified_efficient
