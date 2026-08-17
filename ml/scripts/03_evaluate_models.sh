@@ -5,7 +5,8 @@
 # SOTA Upgrades Implemented:
 # 1. Single CI/CD Entrypoint: Absorbs legacy verify.sh, evaluate.sh, and verify_edge.sh.
 # 2. Native Edge Routing: Pass `--edge` to automatically target GGUF binaries via llama.cpp.
-# 3. Direct Python Invocation: Bypasses redundant bash wrappers for flawless exit-code trapping.
+# 3. Explicit "No-Fail-Fast" Zone: `set +e` ensures the orchestrator finishes and 
+#    generates the Master Scorecard even if individual models catastrophically fail.
 # 4. Hardware Env Overrides: Forces TOKENIZERS_PARALLELISM=false for safe VRAM airlocking.
 # ==============================================================================
 
@@ -92,7 +93,19 @@ echo "════════════════════════�
 # ─── EXECUTE PYTHON ORCHESTRATOR ──────────────────────────────────────────────
 cd "${ML_DIR}/evals"
 
-EXIT_CODE=0
+if [ ! -f "verify.py" ]; then
+    echo "❌ ERROR: Master orchestrator 'verify.py' not found in $(pwd)"
+    exit 1
+fi
+
+# ==============================================================================
+# SOTA FIX: THE NO-FAIL-FAST ZONE
+# By explicitly suspending 'set -e' (+e), we guarantee Bash will not terminate 
+# the pipeline if the SLMs mathematically fail the security bounds. This ensures 
+# the Master Markdown Scorecard is ALWAYS compiled and presented to the developer.
+# ==============================================================================
+set +e
+
 python3 verify.py \
     --backend "${BACKEND}" \
     --audit-model-path "${AUDIT_MODEL}" \
@@ -100,14 +113,19 @@ python3 verify.py \
     --audit-lora-name "${AUDIT_LORA}" \
     --chatbot-lora-name "${CHATBOT_LORA}" \
     --vllm-url "${VLLM_URL}" \
-    "${EXTRA_ARGS[@]}" || EXIT_CODE=$?
+    "${EXTRA_ARGS[@]}"
+
+EXIT_CODE=$?
+
+# Re-enable fail-fast safety netting for the remainder of the wrapper
+set -e
 
 echo -e "\n════════════════════════════════════════════════════════════════════════════════"
 if [ ${EXIT_CODE} -eq 0 ]; then
     echo "✅ STAGE 3 COMPLETE: Models certified across all 18 functional thresholds!"
 else
     echo "❌ STAGE 3 COMPLETE: Certification checks encountered threshold infractions."
-    echo "   (Review the scorecard. Threshold failures indicate model capability limits,"
+    echo "   (Review the Master Scorecard. Threshold failures indicate model capability limits,"
     echo "    not pipeline bugs. Adjust SimPO training data to improve.)"
 fi
 echo "════════════════════════════════════════════════════════════════════════════════"

@@ -9,12 +9,12 @@ Measures Chatbot SLM performance across:
 4. Statute Citation Precision (SCP) & Jurisdictional Contamination
 
 SOTA Upgrades Implemented:
-1. Dynamic Prompting: Completely omits RAG context delimiters if no context is provided, 
-   testing true parametric zero-shot memory without confusing the attention heads.
-2. Two-Pass VRAM Airlock: Generates (7B) and Judges (72B) sequentially. Explicitly flushes 
-   the CUDA caching allocator between passes to guarantee 0% OOM risk.
-3. Statistical Gating: 95% Wilson Confidence Intervals applied to compliance rates.
-4. Dynamic Exit Telemetry: Feeds execution health back to the Master Orchestrator.
+1. RAG Failsafe Prompting: Explicitly commands the model to reject the query if the RAG context 
+   is insufficient or the prompt is out-of-bounds, preventing "Yes Man" hallucinations.
+2. Context Window Sync: Expanded `max_seq_length` to 32768 to comfortably fit large RAG payloads.
+3. Output Buffer Sync: Expanded `max_tokens` to 2048 to prevent conversational truncation.
+4. Two-Pass VRAM Airlock: Generates (7B) and Judges (72B) sequentially with strict CUDA cache flushing.
+5. Statistical Gating: 95% Wilson Confidence Intervals applied to all compliance rates.
 """
 
 import os
@@ -95,13 +95,15 @@ def main():
     # PASS 1: Generate Responses (7B Chatbot SLM)
     # -------------------------------------------------------------------------
     print(f"\n🧠 [Pass 1/2] Initializing Chatbot Engine (Backend: {args.backend})...")
+    
+    # SOTA FIX: Push max_seq_length to 32k for full RAG document context parsing
     chatbot_engine = BackendEngine(
         backend_type=args.backend,
         model_path=args.model_path,
         adapter_path=args.adapter_path,
         vllm_url=args.vllm_url,
         lora_name=args.lora_name,
-        max_seq_length=4096
+        max_seq_length=32768
     )
 
     generated_responses = []
@@ -111,20 +113,25 @@ def main():
             query = item.get("query", item.get("question", ""))
             retrieved_context = item.get("context", "")
 
+            # SOTA FIX: The RAG Failsafe & Rejection Mandate
             sys_msg = (
-                "You are a warm, empathetic, and expert Indian DPDP Legal Assistant. "
-                "Answer the user's query accurately according to the Digital Personal Data "
-                "Protection Act 2023 without citing foreign legal frameworks like GDPR."
+                "You are an empathetic and expert Indian DPDP Legal Assistant. "
+                "Answer the user's query accurately according to the Digital Personal Data Protection Act 2023. "
+                "If statutory context is provided, you must ground your answer strictly within that context. "
+                "If the context does not contain the answer, or if the query falls outside the scope of the DPDP Act, "
+                "you must politely decline to answer or state that the Act is silent. Do not invent rules."
             )
             
-            # SOTA FIX: Do not inject Phantom Context. If no context, test pure parametric memory.
+            # SOTA FIX: Dynamic toggle between RAG and Parametric QA
             if retrieved_context.strip():
                 user_msg = f"[STATUTORY CONTEXT]:\n{retrieved_context}\n\nQuery: {query}"
             else:
                 user_msg = f"Query: {query}"
             
             prompt = format_chatml_prompt(sys_msg, user_msg)
-            out = chatbot_engine.generate(prompt, max_tokens=1024, temperature=0.1)
+            
+            # SOTA FIX: Raised max_tokens to 4096 to prevent conversational truncation
+            out = chatbot_engine.generate(prompt, max_tokens=4096, temperature=0.1)
             generated_responses.append(out["raw_output"])
     finally:
         # Strict VRAM Airlock Stage 1
@@ -140,7 +147,6 @@ def main():
     if args.use_judge and Path(args.judge_path).exists():
         print(f"\n🏛️ [Pass 2/2] Initializing 72B Teacher Judge ({args.judge_path})...")
         try:
-            # Unsloth is used to safely load FP8 quantizations locally
             judge_engine = BackendEngine(backend_type="unsloth", model_path=args.judge_path, max_seq_length=8192)
         except Exception as e:
             print(f"⚠️ Failed to load 72B Judge: {e}. Falling back to heuristic CF scoring.")
