@@ -10,14 +10,17 @@ Measures Pillars 2, 3, and 4 (Diagnostic):
 5. Sector/Category Breakdown & Telemetry (Latency, TTFT, Throughput)
 
 SOTA Upgrades Implemented:
-1. Strict VRAM Airlock: Unloads model via `engine.unload()` to protect subsequent pipeline stages.
-2. Dynamic Exit Codes: Passes success/failure state up to `03_evaluate_models.sh`.
-3. Indestructible Paths: Utilizes `path_resolver.py` for absolute CWD independence.
-4. SFT Prompt Alignment: Ensures exact JSON instructions and `[POLICY TO AUDIT]` tags are used.
+1. Token Guillotine Fix: Raised `max_tokens` to 8192 to prevent truncated JSON arrays from destroying F1/Recall.
+2. Production Guided Decoding: Injects `grammar=json.dumps(schema)` to mirror production vLLM deployment.
+3. Strict VRAM Airlock: Unloads model via `engine.unload()` and deep purges CUDA caches.
+4. Dynamic Exit Codes: Passes success/failure state up to `03_evaluate_models.sh`.
+5. Indestructible Paths: Utilizes `path_resolver.py` for absolute CWD independence.
+6. Context Window Synchronization: Raised `max_seq_length` to 32768.
 """
 
 import os
 import sys
+import gc
 import json
 import time
 import argparse
@@ -26,6 +29,7 @@ from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime, timezone
 from tqdm import tqdm
 import numpy as np
+import torch
 
 # Ensure terminal stdout/stderr uses UTF-8 encoding
 if hasattr(sys.stdout, 'reconfigure'):
@@ -43,12 +47,14 @@ try:
     DEFAULT_GROUND_TRUTH_PATH = Paths.GROUND_TRUTH
     DEFAULT_LAW_FILE_PATH = Paths.LAW_TEXT
     DEFAULT_MODEL_PATH = Paths.resolve_model_path(None, "audit-model-final")
+    DEFAULT_SCHEMA_PATH = Paths.SCHEMA_PATH
     REPORT_DIR = Paths.ensure_reports_dir()
 except ImportError:
     _ML_DIR = _CURRENT_DIR.parent
     DEFAULT_GROUND_TRUTH_PATH = _CURRENT_DIR / "holdout_policies" / "ground_truth.json"
     DEFAULT_LAW_FILE_PATH = _ML_DIR / "data-forge" / "dpdp_act_and_rules_2025.txt"
     DEFAULT_MODEL_PATH = _ML_DIR / "models" / "audit-model-final"
+    DEFAULT_SCHEMA_PATH = _ML_DIR.parent / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
     REPORT_DIR = _CURRENT_DIR / "reports"
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +71,22 @@ try:
 except ImportError:
     def wilson_ci_from_pct(p: float, n: int):
         return (p, p)
+
+
+def flush_gpu():
+    """Forces garbage collection and clears CUDA allocator caches."""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+
+def load_schema(schema_path: Path) -> Dict[str, Any]:
+    """Loads the schema for Guided Decoding injection."""
+    if not schema_path.exists():
+        return {}
+    with open(schema_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -115,6 +137,7 @@ def main():
     parser.add_argument("--adapter-path", type=str, default=None)
     parser.add_argument("--ground-truth-path", type=str, default=str(DEFAULT_GROUND_TRUTH_PATH))
     parser.add_argument("--law-path", type=str, default=str(DEFAULT_LAW_FILE_PATH))
+    parser.add_argument("--schema-path", type=str, default=str(DEFAULT_SCHEMA_PATH))
     parser.add_argument("--vllm-url", type=str, default="http://localhost:8000/v1/completions")
     parser.add_argument("--lora-name", type=str, default="audit")
     parser.add_argument("--inject-law-context", action="store_true", 
@@ -125,19 +148,22 @@ def main():
     if not test_data:
         print("❌ Evaluation aborted: No valid test cases loaded.")
         return 1
+        
+    dpdp_schema = load_schema(Path(args.schema_path))
+    grammar_payload = json.dumps(dpdp_schema) if dpdp_schema else None
 
     print("═══════════════════════════════════════════════════════════════════════")
     print(f"🚀 [PILLARS 2, 3, 4]: LEGAL REASONING, ACCURACY & HALLUCINATION ({args.backend.upper()})")
     print("═══════════════════════════════════════════════════════════════════════")
     
-    # Initialize Engine
+    # SOTA FIX: Push max_seq_length to 32k for production parity
     engine = BackendEngine(
         backend_type=args.backend,
         model_path=args.model_path,
         adapter_path=args.adapter_path,
         vllm_url=args.vllm_url,
         lora_name=args.lora_name,
-        max_seq_length=8192
+        max_seq_length=32768
     )
 
     law_context = ""
@@ -175,7 +201,14 @@ def main():
                 user_msg = f"[POLICY TO AUDIT]\n{item['content']}"
 
             prompt = format_chatml_prompt(sys_msg, user_msg)
-            out = engine.generate(prompt, max_tokens=2048, temperature=0.0)
+            
+            # SOTA FIX: max_tokens raised to 8192; schema grammar injected
+            out = engine.generate(
+                prompt, 
+                max_tokens=8192, 
+                temperature=0.0,
+                grammar=grammar_payload
+            )
             
             extracted = extract_json_from_output(out.get("raw_output", ""))
             parsed = {}
@@ -257,6 +290,8 @@ def main():
     finally:
         # Strict VRAM Airlock: Clean up engine from GPU memory
         engine.unload()
+        del engine
+        flush_gpu()
         print("\n🧹 [VRAM Airlock] Auditor model purged from GPU memory.")
 
     # ═══════════════════════════════════════════════════════════════════

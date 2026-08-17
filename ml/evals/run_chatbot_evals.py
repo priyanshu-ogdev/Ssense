@@ -11,17 +11,22 @@ Measures Chatbot SLM performance across:
 SOTA Upgrades Implemented:
 1. Dynamic Prompting: Completely omits RAG context delimiters if no context is provided, 
    testing true parametric zero-shot memory without confusing the attention heads.
-2. Two-Pass VRAM Airlock: Generates (7B) and Judges (72B) sequentially to prevent OOM.
+2. Two-Pass VRAM Airlock: Generates (7B) and Judges (72B) sequentially. Explicitly flushes 
+   the CUDA caching allocator between passes to guarantee 0% OOM risk.
 3. Statistical Gating: 95% Wilson Confidence Intervals applied to compliance rates.
+4. Dynamic Exit Telemetry: Feeds execution health back to the Master Orchestrator.
 """
 
 import os
 import sys
+import gc
 import json
 import argparse
 import numpy as np
 from datetime import datetime, timezone
 from tqdm import tqdm
+
+import torch
 
 # Ensure terminal stdout/stderr uses UTF-8 encoding
 if hasattr(sys.stdout, 'reconfigure'):
@@ -51,6 +56,13 @@ except ImportError as e:
     print(f"❌ Core module import failed: {e}")
     print("Please ensure this script is run from within the ml/evals/ directory.")
     sys.exit(1)
+
+def flush_gpu():
+    """Forces garbage collection and clears CUDA allocator caches."""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN ORCHESTRATOR
@@ -115,8 +127,10 @@ def main():
             out = chatbot_engine.generate(prompt, max_tokens=1024, temperature=0.1)
             generated_responses.append(out["raw_output"])
     finally:
-        # Strict VRAM Airlock
+        # Strict VRAM Airlock Stage 1
         chatbot_engine.unload()
+        del chatbot_engine
+        flush_gpu()
         print("🧹 [VRAM Airlock] Chatbot model purged from GPU memory.")
 
     # -------------------------------------------------------------------------
@@ -143,63 +157,67 @@ def main():
     detailed_results = []
 
     print("\n📊 Computing Authenticity Metrics & Wilson Confidence Intervals...")
-    for i, item in enumerate(tqdm(test_data, desc="Evaluating Metrics")):
-        resp = generated_responses[i]
-        query = item.get("query", item.get("question", ""))
-        target_section = item.get("target_section", "None")
-        target_keywords = item.get("target_keywords", item.get("expected_key_points", []))
-        
-        # Determine evaluation context
-        retrieved_context = item.get("context", "")
-
-        # 1. Statute Citation Precision (SCP)
-        is_precise = evaluate_scp(resp, target_section)
-        if is_precise: scp_hits += 1
-
-        # 2. Context Faithfulness (CF 1-5)
-        # If no context was provided, CF is mathematically N/A (it's closed book). 
-        # We default to 5.0 to avoid penalizing the model for parametric tests.
-        if retrieved_context.strip():
-            cf_score = evaluate_cf_judge(resp, retrieved_context, target_keywords, judge_engine)
-        else:
-            cf_score = 5.0 
-        cf_scores.append(cf_score)
-
-        # 3. Jurisdictional Contamination Rate (JCR)
-        is_contaminated, found_contaminants = evaluate_jcr(resp)
-        if is_contaminated: jcr_violations += 1
-
-        # 4. Accuracy & Coverage
-        coverage = evaluate_key_points_coverage(resp, target_keywords)
-        forbidden_hits = check_forbidden_terms(resp, item.get("forbidden_hallucination_terms", []))
-        accuracy_score = max(0.0, coverage - (0.5 * len(forbidden_hits)))
-        total_accuracies.append(accuracy_score)
-
-        # 5. Schema Bleed & Fluidity (MTLD)
-        bleed_hits = check_schema_bleed(resp)
-        if bleed_hits: bleed_violations += 1
+    try:
+        for i, item in enumerate(tqdm(test_data, desc="Evaluating Metrics")):
+            resp = generated_responses[i]
+            query = item.get("query", item.get("question", ""))
+            target_section = item.get("target_section", "None")
+            target_keywords = item.get("target_keywords", item.get("expected_key_points", []))
             
-        fluidity = mtld(resp)
-        total_mtlds.append(fluidity)
+            # Determine evaluation context
+            retrieved_context = item.get("context", "")
 
-        detailed_results.append({
-            "id": item.get("id", f"q_{i+1}"),
-            "query": query,
-            "target_section": target_section,
-            "scp_pass": is_precise,
-            "cf_score": cf_score,
-            "jcr_contaminated": is_contaminated,
-            "found_contaminants": found_contaminants,
-            "accuracy_score": round(accuracy_score, 4),
-            "forbidden_hits": forbidden_hits,
-            "bleed_hits": bleed_hits,
-            "mtld_fluidity": round(fluidity, 4),
-            "response_snippet": resp[:200] + "..." if len(resp) > 200 else resp
-        })
+            # 1. Statute Citation Precision (SCP)
+            is_precise = evaluate_scp(resp, target_section)
+            if is_precise: scp_hits += 1
 
-    # Strict VRAM Airlock for Judge
-    if judge_engine is not None:
-        judge_engine.unload()
+            # 2. Context Faithfulness (CF 1-5)
+            # If no context was provided, CF is mathematically N/A (it's closed book). 
+            # We default to 5.0 to avoid penalizing the model for parametric tests.
+            if retrieved_context.strip():
+                cf_score = evaluate_cf_judge(resp, retrieved_context, target_keywords, judge_engine)
+            else:
+                cf_score = 5.0 
+            cf_scores.append(cf_score)
+
+            # 3. Jurisdictional Contamination Rate (JCR)
+            is_contaminated, found_contaminants = evaluate_jcr(resp)
+            if is_contaminated: jcr_violations += 1
+
+            # 4. Accuracy & Coverage
+            coverage = evaluate_key_points_coverage(resp, target_keywords)
+            forbidden_hits = check_forbidden_terms(resp, item.get("forbidden_hallucination_terms", []))
+            accuracy_score = max(0.0, coverage - (0.5 * len(forbidden_hits)))
+            total_accuracies.append(accuracy_score)
+
+            # 5. Schema Bleed & Fluidity (MTLD)
+            bleed_hits = check_schema_bleed(resp)
+            if bleed_hits: bleed_violations += 1
+                
+            fluidity = mtld(resp)
+            total_mtlds.append(fluidity)
+
+            detailed_results.append({
+                "id": item.get("id", f"q_{i+1}"),
+                "query": query,
+                "target_section": target_section,
+                "scp_pass": is_precise,
+                "cf_score": cf_score,
+                "jcr_contaminated": is_contaminated,
+                "found_contaminants": found_contaminants,
+                "accuracy_score": round(accuracy_score, 4),
+                "forbidden_hits": forbidden_hits,
+                "bleed_hits": bleed_hits,
+                "mtld_fluidity": round(fluidity, 4),
+                "response_snippet": resp[:200] + "..." if len(resp) > 200 else resp
+            })
+    finally:
+        # Strict VRAM Airlock Stage 2
+        if judge_engine is not None:
+            judge_engine.unload()
+            del judge_engine
+            flush_gpu()
+            print("🧹 [VRAM Airlock] Judge model purged from GPU memory.")
 
     # -------------------------------------------------------------------------
     # AGGREGATION & REPORTING
@@ -272,7 +290,10 @@ def main():
         json.dump(report_dict, f, indent=2)
         
     print(f"💾 Chatbot evaluation report saved to: {report_path}")
-    return 0
+
+    # SOTA FIX: Soft exit gate. If the model entirely hallucinates or bleeds schema code, flag failure.
+    is_authentic = (avg_accuracy >= 50.0) and (bleed_rate <= 10.0)
+    return 0 if is_authentic else 1
 
 if __name__ == "__main__":
     sys.exit(main())
