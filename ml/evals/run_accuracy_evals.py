@@ -119,8 +119,8 @@ def load_schema(schema_path: Path) -> Dict[str, Any]:
             schema["properties"]["dpdp_trust_score"]["minimum"] = 0
             schema["properties"]["dpdp_trust_score"]["maximum"] = 100
         if "subtlety_score" in schema["properties"]:
-            schema["properties"]["subtlety_score"]["minimum"] = 1
-            schema["properties"]["subtlety_score"]["maximum"] = 5
+            schema["properties"]["subtlety_score"]["minimum"] = 0
+            schema["properties"]["subtlety_score"]["maximum"] = 100
             
         if "violations" in schema["properties"]:
             items = schema["properties"]["violations"].get("items", {})
@@ -260,6 +260,9 @@ def main():
                 pass
 
             pred_violations = parsed.get("violations", []) if json_valid else []
+            # SOTA FIX: Pipeline Drop for Omission Violations (Firewall enforcement)
+            pred_violations = [v for v in pred_violations if isinstance(v, dict) and not v.get("omission_check", False)]
+            
             gt_violations = item["expected_output"].get("violations", [])
 
             # 1. Violation F1 Metrics

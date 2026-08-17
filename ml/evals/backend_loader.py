@@ -361,8 +361,9 @@ class BackendEngine:
                 if hasattr(out, "metrics") and out.metrics is not None and getattr(out.metrics, "first_token_time", None) and getattr(out.metrics, "arrival_time", None):
                     actual_ttft_ms = (out.metrics.first_token_time - out.metrics.arrival_time) * 1000.0
                 else:
-                    # Fallback heuristic: TTFT is prefill time + 1 token decode
-                    actual_ttft_ms = actual_latency_ms * 0.3
+                    # Fallback heuristic: TTFT is realistically prefill time + 1 decode step.
+                    # Since total latency is dominated by decoding (128 tokens), TTFT should scale by time-per-token, not total latency.
+                    actual_ttft_ms = (actual_latency_ms / max(1, token_count)) * 1.5
 
                 results.append({
                     "raw_output": text.strip(),
@@ -406,7 +407,7 @@ class BackendEngine:
                 results.append({
                     "raw_output": output_text,
                     "latency_ms": lat_ms,
-                    "ttft_ms": lat_ms * 0.5,
+                    "ttft_ms": (lat_ms / max(1, len(gen_tokens))) * 1.5,
                     "tokens_generated": len(gen_tokens),
                     "tokens_per_sec": len(gen_tokens) / (lat_ms / 1000.0) if lat_ms > 0 else 0.0
                 })
@@ -430,7 +431,7 @@ class BackendEngine:
                 results.append({
                     "raw_output": out_text.strip(),
                     "latency_ms": lat_ms,
-                    "ttft_ms": lat_ms * 0.2,
+                    "ttft_ms": (lat_ms / max(1, tok_cnt)) * 1.5,
                     "tokens_generated": tok_cnt,
                     "tokens_per_sec": tok_cnt / (lat_ms / 1000.0) if lat_ms > 0 else 0.0
                 })

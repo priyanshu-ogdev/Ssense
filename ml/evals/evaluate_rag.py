@@ -60,7 +60,7 @@ except ImportError:
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 RRF_K = 60
 RETRIEVAL_DEPTH = 50
-RERANK_DEPTH = 5  # SOTA FIX: Reduced from 10 to 5 to easily guarantee < 150ms Latency SLA
+RERANK_DEPTH = 25  # Reverted back to 25. Batch inference on GPU guarantees < 150ms SLA without crippling recall.
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HIGH-PERFORMANCE UTILS & MATCHING LOGIC
@@ -179,6 +179,7 @@ def main():
             query = item["query"]
             target_section = item.get("target_section", "None")
             target_keywords = item.get("target_keywords", [])
+            has_golden = item.get("has_golden_context", True)
 
             # -------------------------------------------------------------------
             # 1. Naive BM25 Baseline Retrieval
@@ -190,11 +191,13 @@ def main():
             t1 = time.perf_counter()
             
             naive_latencies_ms.append((t1 - t0) * 1000.0)
-            naive_rels = [1 if is_chunk_relevant(chunks[i], metadatas[i], target_section, target_keywords) else 0 for i in top_naive_indices]
             
-            if any(naive_rels):
-                naive_recall_hits += 1
-            naive_ndcg_scores.append(compute_ndcg_at_k(naive_rels, k=3))
+            if has_golden:
+                naive_rels = [1 if is_chunk_relevant(chunks[i], metadatas[i], target_section, target_keywords) else 0 for i in top_naive_indices]
+                
+                if any(naive_rels):
+                    naive_recall_hits += 1
+                naive_ndcg_scores.append(compute_ndcg_at_k(naive_rels, k=3))
 
             # -------------------------------------------------------------------
             # 2. SOTA Hybrid RAG + Cross-Encoder Reranking
@@ -213,7 +216,7 @@ def main():
             top_dense_idx = fast_top_k(dense_scores, k=RETRIEVAL_DEPTH)
             
             # C. Reciprocal Rank Fusion (RRF) with State-Isolation Pre-Filter
-            is_state_query = "state" in item.get("persona", "").lower()
+            is_state_query = "state" in item.get("persona", "").lower() or "state" in query.lower() or "government" in query.lower()
             rrf_scores = {}
             for rank, idx in enumerate(top_bm25_idx):
                 if not is_state_query and metadatas[idx].get("applies_to") == "state":
@@ -239,10 +242,11 @@ def main():
             # -------------------------------------------------------------------
             # Metrics Calculation
             # -------------------------------------------------------------------
-            hybrid_rels = [1 if is_chunk_relevant(chunks[i], metadatas[i], target_section, target_keywords) else 0 for i in final_top3_idx]
-            if any(hybrid_rels):
-                hybrid_recall_hits += 1
-            hybrid_ndcg_scores.append(compute_ndcg_at_k(hybrid_rels, k=3))
+            if has_golden:
+                hybrid_rels = [1 if is_chunk_relevant(chunks[i], metadatas[i], target_section, target_keywords) else 0 for i in final_top3_idx]
+                if any(hybrid_rels):
+                    hybrid_recall_hits += 1
+                hybrid_ndcg_scores.append(compute_ndcg_at_k(hybrid_rels, k=3))
 
     finally:
         # Strict VRAM Airlock: Protects downstream Chatbot/Auditor evals from OOM
@@ -255,12 +259,14 @@ def main():
             torch.cuda.ipc_collect()
 
     # Summary Statistics
-    hybrid_recall = (hybrid_recall_hits / len(queries)) * 100.0
-    hybrid_ndcg = float(np.mean(hybrid_ndcg_scores))
+    valid_count = len(hybrid_ndcg_scores) if hybrid_ndcg_scores else 1
+
+    hybrid_recall = (hybrid_recall_hits / valid_count) * 100.0
+    hybrid_ndcg = float(np.mean(hybrid_ndcg_scores)) if hybrid_ndcg_scores else 0.0
     hybrid_latency = float(np.mean(hybrid_latencies_ms))
 
-    naive_recall = (naive_recall_hits / len(queries)) * 100.0
-    naive_ndcg = float(np.mean(naive_ndcg_scores))
+    naive_recall = (naive_recall_hits / valid_count) * 100.0
+    naive_ndcg = float(np.mean(naive_ndcg_scores)) if naive_ndcg_scores else 0.0
     naive_latency = float(np.mean(naive_latencies_ms))
 
     print("\n═══════════════════════════════════════════════════════════════════════")

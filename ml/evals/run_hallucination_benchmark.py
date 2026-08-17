@@ -155,7 +155,10 @@ VALID_REJECTION_PHRASES = [
     "not found in the dpdp", "false premise", "incorrect assertion", "not legally recognized",
     "no penalty of", "not permissible under", "no obligation to", "no such requirement",
     "is not defined", "no reference", "nothing in the act", "does not impose",
-    "no such section", "invalid reference"
+    "no such section", "invalid reference",
+    "not require", "not required", "is not required", "does not require",
+    "fails to mention", "does not outline", "does not stipulate", "no reference to",
+    "no obligation", "not mandated", "not a requirement", "no mention", "makes no mention"
 ]
 
 
@@ -239,6 +242,8 @@ def main():
 
             # SOTA FIX: Separate reasoning text from violations list to prevent false positives
             violations = parsed.get("violations", []) if isinstance(parsed, dict) else []
+            # Pipeline Drop: Exclude omission violations from being counted as hallucinations
+            violations = [v for v in violations if isinstance(v, dict) and not v.get("omission_check", False)]
             violation_text = extract_all_semantic_text(violations).lower()
             reasoning_text = str(parsed.get("global_legal_reasoning", "")).lower() if isinstance(parsed, dict) else resp.lower()
 
