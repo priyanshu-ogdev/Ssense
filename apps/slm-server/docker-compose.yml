@@ -1,78 +1,79 @@
 version: '3.8'
 
 services:
-  slm-gateway:
+  # ─────────────────────────────────────────────────────────────
+  # 1. UNIFIED SLM INFERENCE & RAG SERVER (FastAPI + Async vLLM)
+  # ─────────────────────────────────────────────────────────────
+  slm-server:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ssense-edge-slm-gateway
-    ports:
-      - "8080:8080"
-    environment:
-      - SSENSE_BACKEND=vllm
-      - SSENSE_VLLM_URL=http://vllm-engine:8000/v1/completions
-      - REDIS_URL=redis://redis-queue:6379/0
-      - QDRANT_URL=http://qdrant-db:6333
-      - SSENSE_AUDIT_LORA=audit_lora
-      - SSENSE_CHAT_LORA=chat_lora
-      - SSENSE_MAX_QUEUE_DEPTH=5000
-      - SSENSE_API_KEYS=ssense_dev_key_2026,ssense_prod_key_2026
-    volumes:
-      - ../../ml/models:/app/ml/models:ro
-      - ../../libs/contracts/schemas:/app/libs/contracts/schemas:ro
-    depends_on:
-      - vllm-engine
-      - redis-queue
-      - qdrant-db
+    container_name: ssense-slm-server
     restart: unless-stopped
+    
+    # SOTA FIX: Shared memory is absolutely critical for vLLM/PyTorch tensor operations.
+    # Default Docker shm_size is 64MB, which causes vLLM to instantly "Bus error (core dumped)".
+    shm_size: '8gb'
+    
+    # Internal network only: Nginx proxies public traffic to port 8000
+    expose:
+      - "8000"
+      
+    env_file:
+      - .env
+      
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - VLLM_WORKER_MULTIPROCESS_METHOD=spawn
+      - RAY_DISABLE_MEMORY_MONITOR=1
+      # Fallbacks in case .env is missing/incomplete
+      - SSENSE_SERVER_KEY=${SSENSE_SERVER_KEY:-ssense_prod_secret_token_2026}
+      - SSENSE_MAX_QUEUE_DEPTH=${SSENSE_MAX_QUEUE_DEPTH:-5000}
+      - MODELS_DIR=/app/models
+      
+    volumes:
+      # Read-only mounts for certified model weights, adapters, and RAG index
+      - ../../ml/models:/app/models:ro
+      - ../../libs/contracts/schemas:/app/schemas:ro
+      # HuggingFace cache mount prevents redownloading base weights across container restarts
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      
+    deploy:
+      # SOTA FIX: Modern Docker GPU Passthrough (Replaces deprecated 'runtime: nvidia')
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+              
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. EDGE GATEWAY REVERSE PROXY (TLS Termination & Non-Buffered SSE)
+  # ─────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ssense-nginx-proxy
+    restart: unless-stopped
+    depends_on:
+      slm-server:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/nginx-health"]
+      interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 15s
-
-  vllm-engine:
-    image: vllm/vllm-openai:v0.4.2
-    container_name: ssense-vllm-multi-lora-engine
-    runtime: nvidia
-    ports:
-      - "8000:8000"
-    environment:
-      - CUDA_VISIBLE_DEVICES=0
-      - VLLM_ATTENTION_BACKEND=FLASH_ATTN
-    volumes:
-      - ../../ml/models:/app/ml/models:ro
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    command: >
-      --model Qwen/Qwen3.5-9B
-      --quantization fp8
-      --gpu-memory-utilization 0.85
-      --max-model-len 8192
-      --max-num-seqs 128
-      --enable-chunked-prefill
-      --enable-prefix-caching
-      --prefix-caching-hash-algorithm murmur3
-      --enable-lora
-      --max-loras 2
-      --max-lora-rank 128
-      --lora-modules audit_lora=/app/ml/models/audit-model-final-adapter chat_lora=/app/ml/models/chatbot-model-final-adapter
-      --port 8000
-    restart: unless-stopped
-
-  redis-queue:
-    image: redis:7.2-alpine
-    container_name: ssense-redis-priority-queue
-    ports:
-      - "6379:6379"
-    command: redis-server --save 60 1 --loglevel warning
-    restart: unless-stopped
-
-  qdrant-db:
-    image: qdrant/qdrant:v1.9.0
-    container_name: ssense-qdrant-edge-vector-db
-    ports:
-      - "6333:6333"
-    environment:
-      - QDRANT__SERVICE__MEMCPY_THREAD_POOL_SIZE=4
-    restart: unless-stopped
+      start_period: 10s

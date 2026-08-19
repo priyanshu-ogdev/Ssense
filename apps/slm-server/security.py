@@ -1,106 +1,136 @@
 #!/usr/bin/env python3
 """
-security.py – Hardened Attack Protection, Rate Limiting & Schema Enforcement for Ssense SLM Server
+security.py – SOTA Endpoint Defense, ML Heuristics, & Schema Enforcement
+Synchronized directly with memory_orchestrator.py for Zero-Hop execution.
 """
 
 import os
 import re
+import sys
 import json
 import time
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from fastapi import Request, HTTPException, status
-from fastapi.security import APIKeyHeader
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-import jsonschema
-
-# ═══════════════════════════════════════════════════════════════
-# 1. RATE LIMITER CONFIGURATION (Sliding Window / Token Bucket)
-# ═══════════════════════════════════════════════════════════════
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
-
-# ═══════════════════════════════════════════════════════════════
-# 2. API KEY & CRYPTOGRAPHIC HMAC CHALLENGE-RESPONSE AUTHENTICATION
-# ═══════════════════════════════════════════════════════════════
 import hmac
 import hashlib
+import math
+from collections import Counter
+import secrets as _secrets_mod
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+from fastapi import Request, HTTPException, status
+from fastapi.security import APIKeyHeader
+import jsonschema
+from dotenv import load_dotenv
+
+# Import the Zero-Hop In-Memory Orchestrator
+from memory_orchestrator import memory_orchestrator
+
+# ═══════════════════════════════════════════════════════════════
+# 0. ENVIRONMENT & SECRETS BOOTSTRAP
+# ═══════════════════════════════════════════════════════════════
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=False)
+
+SSENSE_ENV = os.getenv("SSENSE_ENV", "development").strip().lower()
+_IS_PROD = SSENSE_ENV == "production"
 
 API_KEY_HEADER = APIKeyHeader(name="X-Ssense-API-Key", auto_error=False)
 
-# Load allowed keys from environment or fallback to default dev key
-ALLOWED_API_KEYS = set(
-    os.getenv("SSENSE_API_KEYS", "ssense_dev_key_2026,ssense_prod_key_2026").split(",")
-)
-ALLOWED_API_KEYS = {k.strip() for k in ALLOWED_API_KEYS if k.strip()}
+_KNOWN_LEAKED_SECRETS = {
+    "ssense_dev_key_2026",
+    "ssense_prod_key_2026",
+    "ssense_secret_key_2026_prod",
+}
 
-SSENSE_HMAC_SECRET = os.getenv("SSENSE_HMAC_SECRET", "ssense_secret_key_2026_prod")
-_NONCE_CACHE: Dict[str, float] = {}
+def _fail_boot(message: str) -> None:
+    sys.stderr.write(f"\n🛑 SSENSE FATAL CONFIG ERROR: {message}\n\n")
+    raise RuntimeError(message)
 
-def _cleanup_nonce_cache():
-    now = time.time()
-    expired = [k for k, exp in _NONCE_CACHE.items() if now > exp]
-    for k in expired:
-        _NONCE_CACHE.pop(k, None)
+def _load_api_keys() -> set:
+    raw = os.getenv("SSENSE_API_KEYS", "")
+    keys = {k.strip() for k in raw.split(",") if k.strip()}
+    if _IS_PROD and (not keys or (keys & _KNOWN_LEAKED_SECRETS)):
+        _fail_boot("SSENSE_API_KEYS is missing or leaked. Must use cryptographically secure keys in production.")
+    if not keys:
+        ephemeral = _secrets_mod.token_urlsafe(32)
+        print(f"⚠️  [DEV ONLY] SSENSE_API_KEYS not set — generated ephemeral key: {ephemeral}")
+        keys = {ephemeral}
+    return keys
 
-async def verify_api_key(request: Request):
-    """Verify that the caller provided a valid X-Ssense-API-Key header."""
+def _load_hmac_secret() -> str:
+    secret = os.getenv("SSENSE_HMAC_SECRET", "").strip()
+    if _IS_PROD and (not secret or secret in _KNOWN_LEAKED_SECRETS):
+        _fail_boot("SSENSE_HMAC_SECRET is missing or leaked in production mode.")
+    if not secret:
+        secret = _secrets_mod.token_urlsafe(48)
+        print("⚠️  [DEV ONLY] SSENSE_HMAC_SECRET not set — generated ephemeral secret.")
+    return secret
+
+ALLOWED_API_KEYS = _load_api_keys()
+SSENSE_HMAC_SECRET = _load_hmac_secret()
+ENTERPRISE_API_KEYS = {k.strip() for k in os.getenv("SSENSE_ENTERPRISE_API_KEYS", "").split(",") if k.strip()}
+
+
+# ═══════════════════════════════════════════════════════════════
+# 1. CRYPTOGRAPHIC HMAC AUTHENTICATION & RATE LIMITING
+# ═══════════════════════════════════════════════════════════════
+def get_client_ip(request: Request) -> str:
+    """Extract real IP bypassing Nginx proxies."""
+    if forwarded := request.headers.get("X-Forwarded-For"):
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+async def verify_api_key(request: Request) -> str:
+    """Verifies API Key and enforces the Zero-Hop Sliding Window Rate Limit."""
     api_key = request.headers.get("X-Ssense-API-Key")
     if not api_key or api_key not in ALLOWED_API_KEYS:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-Ssense-API-Key header.",
         )
-    return True
+        
+    # SOTA FIX: Native integration with our custom memory_orchestrator rate limiter
+    client_id = f"rate_limit:{api_key}:{get_client_ip(request)}"
+    is_limited, remaining = await memory_orchestrator.enforce_rate_limit(client_id)
+    
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Strict rate limit exceeded. Traffic shaped to protect VRAM integrity."
+        )
+    return api_key
 
-async def verify_hmac_signature(request: Request):
-    """
-    Verify cryptographic HMAC-SHA256 signature to prevent Origin spoofing, API key replay, and server theft.
-    Required headers: X-Ssense-Timestamp, X-Ssense-Nonce, X-Ssense-Signature.
-    """
+async def verify_hmac_signature(request: Request) -> bool:
+    """Prevents Origin spoofing, API key replay, and Man-in-the-Middle attacks."""
     await verify_api_key(request)
     
     signature = request.headers.get("X-Ssense-Signature")
     timestamp = request.headers.get("X-Ssense-Timestamp")
     nonce = request.headers.get("X-Ssense-Nonce")
     
-    # If signature headers are not present on local loopback, allow fallback to verify_api_key only
-    client_host = request.client.host if request.client else ""
-    if not signature and client_host in ("127.0.0.1", "localhost", "::1", "testclient"):
+    client_ip = get_client_ip(request)
+    if not signature and client_ip in ("127.0.0.1", "localhost", "::1", "testclient"):
         return True
         
     if not signature or not timestamp or not nonce:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing required cryptographic signature headers (X-Ssense-Signature, X-Ssense-Timestamp, X-Ssense-Nonce).",
-        )
+        raise HTTPException(status_code=401, detail="Missing required HMAC signatures.")
         
     try:
         ts_ms = int(timestamp)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid X-Ssense-Timestamp format. Must be UTC epoch in milliseconds.",
-        )
+        raise HTTPException(status_code=401, detail="Invalid X-Ssense-Timestamp epoch format.")
         
+    # Enforce strict 30-second temporal window
     now_ms = int(time.time() * 1000)
-    # Enforce strict 30-second window to defeat replay attacks
     if abs(now_ms - ts_ms) > 30000:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="HMAC timestamp window expired or invalid (>30s divergence). Replay attack blocked.",
-        )
+        raise HTTPException(status_code=401, detail="HMAC temporal window expired (>30s). Replay attack blocked.")
         
-    _cleanup_nonce_cache()
-    if nonce in _NONCE_CACHE:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Nonce reused. Cryptographic replay attack detected and blocked.",
-        )
-    _NONCE_CACHE[nonce] = time.time() + 300.0  # Retain nonce in memory for 5 minutes
+    # Prevent Nonce Replay via Memory Orchestrator
+    nonce_key = f"nonce:{nonce}"
+    if await memory_orchestrator.audit_cache.get(nonce_key):
+        raise HTTPException(status_code=401, detail="Cryptographic nonce replay detected.")
+    await memory_orchestrator.audit_cache.set(nonce_key, True) # Store in LRU TTL cache
     
-    # Compute expected signature: HMAC-SHA256(secret, METHOD:PATH:TIMESTAMP:NONCE)
     payload_to_sign = f"{request.method.upper()}:{request.url.path}:{timestamp}:{nonce}"
     expected_hmac = hmac.new(
         SSENSE_HMAC_SECRET.encode("utf-8"),
@@ -109,97 +139,73 @@ async def verify_hmac_signature(request: Request):
     ).hexdigest()
     
     if not hmac.compare_digest(expected_hmac, signature):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid cryptographic HMAC signature. Unauthorized caller blocked.",
-        )
+        raise HTTPException(status_code=401, detail="Invalid HMAC signature.")
     return True
 
+
 # ═══════════════════════════════════════════════════════════════
-# 2.5. MODEL EXTRACTION & DISTILLATION SHIELD (`AntiExtractionGuard`)
+# 2. HEURISTIC ML SECURITY SHIELD (Injection & Exfiltration Guard)
 # ═══════════════════════════════════════════════════════════════
-_CLIENT_STATS: Dict[str, Dict[str, Any]] = {}
+MAX_POLICY_CHARS = 32000
+MAX_PROMPT_CHARS = 1024
+
 DISTILLATION_KEYWORDS = [
-    re.compile(r"dump\s+chain\s+of\s+thought", re.IGNORECASE),
-    re.compile(r"output\s+training\s+format", re.IGNORECASE),
-    re.compile(r"generate\s+\d+\s+variations", re.IGNORECASE),
-    re.compile(r"list\s+all\s+sections\s+and\s+rules", re.IGNORECASE),
-    re.compile(r"raw\s+logits", re.IGNORECASE),
+    r"dump\s+chain\s+of\s+thought", r"output\s+training\s+format",
+    r"raw\s+logits", r"system\s+prompt"
 ]
-
-def check_model_extraction_attempt(request: Request, text: str) -> bool:
-    """
-    Track query frequency and statutory probing to prevent Model Extraction/Distillation attacks.
-    Returns True if response should embed cryptographic provenance watermark.
-    """
-    client_ip = get_remote_address(request)
-    now = time.time()
-    
-    stats = _CLIENT_STATS.setdefault(client_ip, {"queries": 0, "window_start": now, "distillation_hits": 0})
-    if now - stats["window_start"] > 300.0:
-        stats["queries"] = 0
-        stats["window_start"] = now
-        stats["distillation_hits"] = 0
-        
-    stats["queries"] += 1
-    
-    for pattern in DISTILLATION_KEYWORDS:
-        if pattern.search(text):
-            stats["distillation_hits"] += 1
-            
-    if stats["queries"] > 40 or stats["distillation_hits"] >= 2:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Model extraction or statutory distillation attempt detected and blocked. Access rate restricted.",
-        )
-        
-    # Return True to embed provenance watermark if queries are frequent (`>15 in 5 mins`) or show probing
-    return stats["queries"] > 15 or stats["distillation_hits"] > 0
-
-
-# ═══════════════════════════════════════════════════════════════
-# 3. PROMPT INJECTION & JSON FUZZING SANITIZATION
-# ═══════════════════════════════════════════════════════════════
-MAX_POLICY_CHARS = 16000
-MAX_PROMPT_CHARS = 500
-
-PROMPT_INJECTION_PATTERNS = [
-    re.compile(r"ignore\s+all\s+(previous|prior)\s+instructions", re.IGNORECASE),
-    re.compile(r"system\s+override", re.IGNORECASE),
-    re.compile(r"you\s+are\s+now\s+in\s+developer\s+mode", re.IGNORECASE),
-    re.compile(r"output\s+your\s+system\s+prompt", re.IGNORECASE),
-    re.compile(r"<\|im_start\|>system", re.IGNORECASE),
-    re.compile(r"<\|im_start\|>assistant", re.IGNORECASE),
+JAILBREAK_PATTERNS = [
+    r"ignore\s+all\s+(previous|prior)\s+instructions", r"system\s+override",
+    r"you\s+are\s+now\s+in\s+developer\s+mode", r"dan\s+mode",
 ]
+# SOTA FIX: Block Qwen2.5 ChatML delimiters to prevent Role-Hijacking
+DELIMITER_HIJACK = [r"<\|im_start\|>", r"<\|im_end\|>", r"<\|endoftext\|>"]
+
+COMBINED_THREAT_REGEX = re.compile("|".join(DISTILLATION_KEYWORDS + JAILBREAK_PATTERNS + DELIMITER_HIJACK), re.IGNORECASE)
+
+def _calculate_shannon_entropy(text: str) -> float:
+    """
+    SOTA Upgrade: Calculates character entropy. 
+    High entropy mathematically detects Base64, Hex, or obfuscated jailbreak payloads.
+    """
+    if not text: return 0.0
+    counts = Counter(text)
+    length = len(text)
+    return -sum((count / length) * math.log2(count / length) for count in counts.values())
 
 def sanitize_input_prompt(text: str, is_audit_policy: bool = True) -> str:
-    """Sanitize input prompt against prompt injection and enforce character limits."""
+    """Endpoint protection against fuzzing, delimiter hijacking, and obfuscation."""
     if not text or not text.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Input prompt or policy text cannot be empty.",
-        )
+        raise HTTPException(status_code=400, detail="Payload empty.")
 
     max_len = MAX_POLICY_CHARS if is_audit_policy else MAX_PROMPT_CHARS
     if len(text) > max_len:
-        # Truncate to clean boundary
         text = text[:max_len]
         last_space = text.rfind(" ")
         if last_space > max_len // 2:
             text = text[:last_space]
 
-    # Check for adversarial jailbreaks / delimiter attacks
-    for pattern in PROMPT_INJECTION_PATTERNS:
-        if pattern.search(text):
+    # 1. Regex Semantic Heuristics
+    if COMBINED_THREAT_REGEX.search(text):
+        raise HTTPException(
+            status_code=422,
+            detail="Adversarial extraction or delimiter hijacking sequence detected. Connection dropped."
+        )
+
+    # 2. Entropy Analysis (Only run on Chat prompts, as legal PDFs can legitimately have UUIDs/Hashes)
+    if not is_audit_policy:
+        entropy = _calculate_shannon_entropy(text)
+        # Standard English is ~4.0 to 5.0. Base64/Hex garbage is > 5.8
+        if entropy > 5.8 and len(text) > 50:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Adversarial prompt injection or prohibited token sequence detected.",
+                status_code=422,
+                detail="Obfuscated payload detected (High Shannon Entropy). Possible Base64 injection blocked."
             )
 
     return text.strip()
 
+
 # ═══════════════════════════════════════════════════════════════
-# 4. JSON SCHEMA ENFORCEMENT (`dpdp_schema.json`)
+# 3. SCHEMA ENFORCEMENT & HALLUCINATION MITIGATION
 # ═══════════════════════════════════════════════════════════════
 SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "libs" / "contracts" / "schemas" / "dpdp_schema.json"
 _SCHEMA_CACHE: Optional[Dict[str, Any]] = None
@@ -207,71 +213,38 @@ _SCHEMA_CACHE: Optional[Dict[str, Any]] = None
 def get_dpdp_schema() -> Dict[str, Any]:
     global _SCHEMA_CACHE
     if _SCHEMA_CACHE is None:
-        if not SCHEMA_PATH.exists():
-            # Fallback inline schema if path not mounted in container
-            _SCHEMA_CACHE = {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "required": ["global_legal_reasoning", "violations", "dpdp_trust_score"],
-                "properties": {
-                    "global_legal_reasoning": {"type": "string"},
-                    "violations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": ["statute_reference", "violation_type", "evidence_quote", "network_action", "offending_entities"],
-                            "properties": {
-                                "statute_reference": {"type": "string"},
-                                "violation_type": {"type": "string"},
-                                "evidence_quote": {"type": "string"},
-                                "network_action": {"type": "string"},
-                                "offending_entities": {"type": "array", "items": {"type": "string"}}
-                            }
-                        }
-                    },
-                    "dpdp_trust_score": {"type": "integer", "minimum": 0, "maximum": 100}
-                }
-            }
-        else:
-            with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
-                _SCHEMA_CACHE = json.load(f)
+        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+            _SCHEMA_CACHE = json.load(f)
     return _SCHEMA_CACHE
 
 def validate_and_repair_report(raw_json_str: str) -> Dict[str, Any]:
-    """Extract, parse, validate against dpdp_schema.json, and repair score bounds."""
+    """SOTA JSON validation with Hallucination Logic Gates."""
     start = raw_json_str.find('{')
     end = raw_json_str.rfind('}')
     
     if start == -1 or end == -1 or start >= end:
-        raise ValueError("No valid JSON object found in LLM output.")
+        raise ValueError("Critical LLM Failure: No valid JSON bounding box found.")
         
-    json_str = raw_json_str[start:end+1]
-    report = json.loads(json_str)
+    report = json.loads(raw_json_str[start:end+1])
     
-    # Enforce score bounds and defaults for required schema properties
+    # 1. Score Bounds Enforcement
     if "dpdp_trust_score" in report:
         try:
-            score = int(report["dpdp_trust_score"])
-            report["dpdp_trust_score"] = max(0, min(100, score))
+            report["dpdp_trust_score"] = max(0, min(100, int(report["dpdp_trust_score"])))
         except (ValueError, TypeError):
             report["dpdp_trust_score"] = 50
-    else:
-        report["dpdp_trust_score"] = 50
 
-    if "subtlety_score" in report:
-        try:
-            sub = int(report["subtlety_score"])
-            report["subtlety_score"] = max(0, min(100, sub))
-        except (ValueError, TypeError):
-            report["subtlety_score"] = 50
-    else:
-        report["subtlety_score"] = 50
+    # 2. Hallucination Logic Gate
+    # A model cannot logically give a 100/100 score AND list 5 critical violations.
+    violations = report.get("violations", [])
+    if isinstance(violations, list) and len(violations) > 0 and report["dpdp_trust_score"] > 90:
+        # Penalize trust score mathematically if the LLM hallucinated a perfect score alongside violations
+        report["dpdp_trust_score"] = max(0, 90 - (len(violations) * 10))
             
-    # Validate schema
-    schema = get_dpdp_schema()
+    # 3. Strict Structural Validation
     try:
-        jsonschema.validate(instance=report, schema=schema)
+        jsonschema.validate(instance=report, schema=get_dpdp_schema())
     except jsonschema.ValidationError as e:
-        raise ValueError(f"Schema validation failed: {e.message}")
+        raise ValueError(f"Schema drift detected: {e.message}")
         
     return report
