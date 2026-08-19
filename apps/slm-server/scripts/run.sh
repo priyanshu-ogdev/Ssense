@@ -22,27 +22,56 @@ echo -e "${BLUE}======================================================${NC}\n"
 cd "$(dirname "$0")/.."
 
 # ------------------------------------------------------------------------------
-# STEP 1: SAFE ENVIRONMENT SEEDING
+# STEP 1: SAFE ENVIRONMENT SEEDING & KEY ROTATION
 # ------------------------------------------------------------------------------
-if [ ! -f ".env" ]; then
-    echo -e "${YELLOW}[!] .env file missing. Generating secure cryptographic keys for first-time setup...${NC}"
-    python3 -c "
-import secrets
-api_key = secrets.token_urlsafe(32)
-hmac_secret = secrets.token_urlsafe(48)
-env_content = f'''SSENSE_ENV=production
+echo -e "${BLUE}[i] Auditing Cryptographic Keys (.env)...${NC}"
+
+# Python handles cross-platform file age checking (10 months ~ 300 days)
+PYTHON_LOGIC=$(cat << 'EOF'
+import os, time, secrets
+
+ENV_FILE = '.env'
+TEN_MONTHS_SEC = 300 * 24 * 60 * 60
+
+def generate_keys():
+    api_key = secrets.token_urlsafe(32)
+    hmac_secret = secrets.token_urlsafe(48)
+    env_content = f"""SSENSE_ENV=production
 SSENSE_API_KEYS={api_key}
 SSENSE_ENTERPRISE_API_KEYS={api_key}
 SSENSE_HMAC_SECRET={hmac_secret}
 SSENSE_ALLOWED_ORIGINS=*
 SSENSE_MAX_QUEUE_DEPTH=5000
-'''
-with open('.env', 'w') as f: f.write(env_content)
-print(f'✅ Generated .env!')
-print(f'⚠️  IMPORTANT: Copy this API_KEY to use in your Edge Extension: {api_key}')
-"
+"""
+    with open(ENV_FILE, 'w') as f:
+        f.write(env_content)
+    return api_key
+
+if not os.path.exists(ENV_FILE):
+    print("MISSING|" + generate_keys())
+elif (time.time() - os.path.getmtime(ENV_FILE)) > TEN_MONTHS_SEC:
+    print("EXPIRED|" + generate_keys())
 else:
-    echo -e "${GREEN}[✓] Existing .env file found. Preserving cryptographic keys.${NC}"
+    print("VALID|NONE")
+EOF
+)
+
+# Execute Python logic and parse the returned state
+KEY_STATE=$(python3 -c "$PYTHON_LOGIC")
+STATUS=$(echo "$KEY_STATE" | cut -d'|' -f1)
+NEW_API_KEY=$(echo "$KEY_STATE" | cut -d'|' -f2)
+
+if [ "$STATUS" == "MISSING" ]; then
+    echo -e "${YELLOW}[!] .env file missing. Generating secure cryptographic keys for first-time setup...${NC}"
+    echo -e "${GREEN}✅ Generated .env!${NC}"
+    echo -e "${RED}⚠️  IMPORTANT: Copy this API_KEY to use in your Edge Extension: ${NEW_API_KEY}${NC}\n"
+elif [ "$STATUS" == "EXPIRED" ]; then
+    echo -e "${YELLOW}[!] SECURITY ALERT: Cryptographic keys are older than 10 months.${NC}"
+    echo -e "${YELLOW}[!] Executing mandatory Automated Key Rotation...${NC}"
+    echo -e "${GREEN}✅ Regenerated .env with fresh keys!${NC}"
+    echo -e "${RED}⚠️  IMPORTANT: Your API Key changed! Update your Edge Extension: ${NEW_API_KEY}${NC}\n"
+else
+    echo -e "${GREEN}[✓] Existing .env file found and is within the 10-month validity period.${NC}\n"
 fi
 
 # ------------------------------------------------------------------------------
@@ -63,16 +92,19 @@ fi
 # ------------------------------------------------------------------------------
 CONTAINER_NAME="ssense-slm-server"
 
-echo -e "\n${BLUE}[i] Assessing container state...${NC}"
+echo -e "${BLUE}[i] Assessing container state...${NC}"
 
-# Check if container exists in any state
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
-    
-    # Check if it is actively running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
-        echo -e "${GREEN}[✓] Container '${CONTAINER_NAME}' is already ONLINE and serving traffic.${NC}"
-        echo -e "    View real-time logs with: ${YELLOW}docker logs -f ${CONTAINER_NAME}${NC}"
-        exit 0
+        # If the keys rotated while the container was running, Docker Compose needs to recreate it
+        if [ "$STATUS" == "EXPIRED" ]; then
+            echo -e "${YELLOW}[i] Keys were rotated. Forcing container recreation to ingest new secrets...${NC}"
+            docker compose up -d
+        else
+            echo -e "${GREEN}[✓] Container '${CONTAINER_NAME}' is already ONLINE and serving traffic.${NC}"
+            echo -e "    View real-time logs with: ${YELLOW}docker compose logs -f${NC}"
+            exit 0
+        fi
     else
         echo -e "${YELLOW}[i] Container exists but is STOPPED. Attempting standard startup...${NC}"
         if docker compose up -d; then
