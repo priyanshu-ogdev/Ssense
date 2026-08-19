@@ -148,6 +148,12 @@ vLLM is the **production-grade inference engine** that solves the "data generati
 
 ## 🚀 Deployment & Runtime Architecture
 
+> **⚠️ Outdated.** This section (through the hardware requirements table
+> below) describes a dual-mode `LOCAL_DAEMON`/`CLOUD_SERVER` architecture
+> that has since been removed — the deployed system is SLM-server-only.
+> See `docs/DEPLOYMENT.md` and `docs/SLM_Server_Architecture.md` for the
+> current, accurate architecture. Kept below for historical context.
+
 Ssense bridges sandboxed browser runtime execution with bare-metal OS speed and enterprise cloud scalability via a **Dual-Mode AI Engine Selector (`AUTO` / `LOCAL_DAEMON` / `CLOUD_SERVER`)**:
 
 ```mermaid

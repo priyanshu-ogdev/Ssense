@@ -83,9 +83,7 @@
           },
           "offending_entities": {
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "description": "Specific targets for the network action. Empty array if none exist."
           }
         },

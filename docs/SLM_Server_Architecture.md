@@ -1,8 +1,10 @@
-# Ssense Virtual SLM Server: 48GB Edge-Optimized Architecture
+# Ssense Virtual SLM Server: Edge-Optimized Architecture
 
 > **A high-concurrency, low-latency, and heavily hardened Inference Gateway engineered specifically for the Digital Personal Data Protection (DPDP) Act 2023 Enforcement.**
+>
+> **Current deployment target: 32GB VRAM.** See `docker-compose.yml` → `vllm-engine.command` for the live flags (`--gpu-memory-utilization 0.80`, `--kv-cache-dtype fp8_e5m2`, `--max-num-seqs 64`, `--swap-space 4`). Any "48GB" figure elsewhere in this document describes a **planned future profile** (kept as a commented block in the same compose file for a one-line swap later) — not the current deployment.
 
-This document details the exact features, scaling optimizations, and security layers implemented in the `apps/slm-server/` stack. The architecture is mathematically optimized to handle **10,000+ concurrent user connections** while strictly bound to a **48GB VRAM constraint**.
+This document details the exact features, scaling optimizations, and security layers implemented in the `apps/slm-server/` stack. The architecture is mathematically optimized to handle **10,000+ concurrent user *connections*** (queued via Redis; only a bounded batch holds live KV cache at once — see "Circuit Breaker" below) while strictly bound to the VRAM constraint above.
 
 ---
 

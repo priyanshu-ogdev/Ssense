@@ -1,45 +1,45 @@
 [package]
-name = "ssense-daemon"
-version = "0.1.0"
+name = "ssense-native-daemon"
+version = "3.0.0"
 edition = "2021"
+authors = ["Ssense Engineering <admin@ssense.local>"]
+description = "SOTA Zero-Hop Native Messaging Daemon for DPDP Edge Inference"
 
 [dependencies]
-# 🚀 SOTA FIX: Link the shared workspace utilities
-ssense-utils = { path = "../../libs/rust-utils" }
-
-# Async Runtime & IO
+# 1. Async Runtime & Native Messaging IO
 tokio = { version = "1.38", features = ["full", "fs"] }
 futures-util = "0.3"
 
-# Serialization & Binary Framing
+# 2. Chrome IPC & Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-byteorder = "1.5"
+byteorder = "1.5" # Crucial for 32-bit Chrome messaging prefixes
 
-# Logging
+# 3. Telemetry & OS Paths
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-appender = "0.2"
-
-# Error Handling & OS Paths
+tracing-appender = "0.2" # Non-blocking file logging
 thiserror = "1.0"
 anyhow = "1.0"
 directories = "5.0"
 
-# Database & Hashing (Note: sha2 is now handled by ssense-utils, but kept here for model_manager)
+# 4. Local Caching & Hardware State
 rusqlite = { version = "0.31", features = ["bundled"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.24"
-sha2 = "0.10"
+sysinfo = "0.30" # Hardware profiling for VRAM Airlock
 
-# Hardware Profiling
-sysinfo = "0.30"
+# 5. Model Sync (HuggingFace Auto-Downloader)
+reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
+hf-hub = { version = "0.3.2", features = ["tokio"] }
 
-# Network (Model Download)
-reqwest = { version = "0.11", features = ["stream", "rustls-tls"] }
-
-# Edge AI Engine
-llama_cpp_rs = "0.1" 
+# 6. SOTA Edge ML & RAG Engines
+llama-cpp-2 = "0.1.154"  # The modern, active Rust binding for GGUF/llama.cpp
+fastembed = "3.2"        # Blazing fast ONNX wrapper for BGE text embeddings
+safetensors = "0.4"
+memmap2 = "0.9"          # Forces OS to page vectors to SSD
+rayon = "1.10"           # CPU SIMD parallelization for vector math
+bytemuck = "1.15"        # Zero-copy raw pointer casting for memory mapped tensors
 
 [profile.release]
 opt-level = 3

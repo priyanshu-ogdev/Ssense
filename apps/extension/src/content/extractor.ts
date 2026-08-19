@@ -22,6 +22,36 @@ function resolveUrl(path: string): string | null {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SSRF GUARD
+// ═══════════════════════════════════════════════════════════════
+// A malicious page could publish a "privacy policy" link pointing at
+// localhost, a private LAN address, or a cloud metadata endpoint
+// (169.254.169.254). The service worker would then fetch it with the
+// extension's network privileges. Block anything that resolves to a
+// non-public host BEFORE it's ever sent to the background PROXY_FETCH.
+const BLOCKED_HOSTNAME_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,                    // loopback
+  /^0\.0\.0\.0$/,
+  /^10\./,                     // RFC1918
+  /^172\.(1[6-9]|2\d|3[01])\./,// RFC1918
+  /^192\.168\./,                // RFC1918
+  /^169\.254\./,                // link-local / cloud metadata (AWS/GCP/Azure)
+  /^\[?::1\]?$/,                 // IPv6 loopback
+  /^\[?fe80:/i,                  // IPv6 link-local
+  /^\[?fc[0-9a-f]{2}:/i,         // IPv6 unique local
+];
+
+function isSafePublicUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return !BLOCKED_HOSTNAME_PATTERNS.some((p) => p.test(parsed.hostname));
+  } catch {
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // AUTHORITATIVE DISCOVERY (Check <head> first)
 // ═══════════════════════════════════════════════════════════════
 function findAuthoritativePolicyUrl(): string | null {
@@ -59,18 +89,45 @@ const PRIVACY_LINK_SELECTORS = [
   '[class*="footer"] a',
 ];
 
+// OPTIMIZATION: the previous version ran a separate document.querySelectorAll()
+// per selector (up to 5 full-DOM traversals), and 'footer a' /
+// '[class*="footer"] a' overlap heavily on most sites, so the same anchors
+// were frequently walked twice. A single combined querySelectorAll() does
+// one DOM traversal instead of up to five, and a Set dedupes anchors that
+// match more than one selector. Priority order (specific-href selectors
+// before generic footer selectors) is preserved by sorting matches back
+// into the original PRIVACY_LINK_SELECTORS order before scanning.
+const COMBINED_PRIVACY_LINK_SELECTOR = PRIVACY_LINK_SELECTORS.join(', ');
+
 function findFallbackPolicyUrl(): string | null {
-  for (const selector of PRIVACY_LINK_SELECTORS) {
-    const links = document.querySelectorAll(selector);
-    for (const link of links) {
-      const anchor = link as HTMLAnchorElement;
-      const href = anchor.getAttribute('href'); 
+  const allMatches = document.querySelectorAll<HTMLAnchorElement>(COMBINED_PRIVACY_LINK_SELECTOR);
+  if (allMatches.length === 0) return null;
+
+  // Bucket each matched anchor under the highest-priority selector it
+  // satisfies, so we still prefer a[href*="privacy"] over a bare footer link.
+  const seen = new Set<HTMLAnchorElement>();
+  const buckets: HTMLAnchorElement[][] = PRIVACY_LINK_SELECTORS.map(() => []);
+
+  allMatches.forEach(anchor => {
+    if (seen.has(anchor)) return;
+    seen.add(anchor);
+    for (let i = 0; i < PRIVACY_LINK_SELECTORS.length; i++) {
+      if (anchor.matches(PRIVACY_LINK_SELECTORS[i])) {
+        buckets[i].push(anchor);
+        break; // only its highest-priority bucket
+      }
+    }
+  });
+
+  for (const bucket of buckets) {
+    for (const anchor of bucket) {
+      const href = anchor.getAttribute('href');
       const text = anchor.textContent?.toLowerCase() || '';
-      
+
       if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
         const absoluteUrl = resolveUrl(href);
         if (absoluteUrl) {
-          if (PRIVACY_LINK_PATTERNS.some(pattern => pattern.test(absoluteUrl)) || 
+          if (PRIVACY_LINK_PATTERNS.some(pattern => pattern.test(absoluteUrl)) ||
               text.includes('privacy') || text.includes('data protection')) {
             return absoluteUrl;
           }
@@ -106,15 +163,16 @@ async function extractPolicyText(url: string): Promise<string | null> {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const noiseSelectors = [
-      'script', 'style', 'nav', 'header', 'aside', 
+    // OPTIMIZATION: combined into one querySelectorAll (single DOM pass)
+    // instead of one pass per selector — order doesn't matter for removal,
+    // so this is a pure win on the noisiest pages (many cookie/banner nodes).
+    const NOISE_SELECTOR = [
+      'script', 'style', 'nav', 'header', 'aside',
       '[class*="cookie"]', '[class*="banner"]',
       '[id*="cookie"]', '[id*="banner"]', 'footer', 'form'
-    ];
-    
-    noiseSelectors.forEach(selector => {
-      doc.querySelectorAll(selector).forEach(el => el.remove());
-    });
+    ].join(', ');
+
+    doc.querySelectorAll(NOISE_SELECTOR).forEach(el => el.remove());
 
     const contentSelectors = [
       'main', 'article', '[role="main"]',
@@ -168,6 +226,11 @@ async function extractPolicyText(url: string): Promise<string | null> {
 
   console.log(`[Ssense] Found privacy policy: ${policyUrl}`);
 
+  if (!isSafePublicUrl(policyUrl)) {
+    console.warn('[Ssense] Policy URL resolves to a private/internal host. Blocked (SSRF guard).');
+    return;
+  }
+
   const policyText = await extractPolicyText(policyUrl);
 
   if (!policyText) {
@@ -175,10 +238,9 @@ async function extractPolicyText(url: string): Promise<string | null> {
     return;
   }
 
-  // 🚀 SOTA FIX: IPC Bandwidth Alignment
-  // We truncate to exactly 16,000 characters to perfectly match the Rust daemon's 
-  // MAX_POLICY_CHARS constant. This reduces the IPC payload from 900KB to ~64KB,
-  // eliminating serialization overhead while safely fitting inside the 8192 token context window.
+  // Truncate to the SLM server's supported policy-text budget. This keeps
+  // the payload small (network + JSON overhead) and safely inside the
+  // model's context window on the single SLM server (no local daemon mode).
   const MAX_CHARS = 16000;
   let safeText = policyText;
   if (safeText.length > MAX_CHARS) {

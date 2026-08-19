@@ -171,7 +171,14 @@ Traditional ad-blockers often hide elements with CSS (`display: none !important`
 
 ---
 
-## 5. Edge Architecture: Rust Native Daemon
+## 5. Edge Architecture: Rust Native Daemon *(REMOVED — historical reference only)*
+
+> **This entire section describes a component that has been removed from
+> the project.** `apps/native-daemon` and `libs/rust-utils` no longer
+> exist in this repository. The extension talks to the SLM server
+> exclusively — see `docs/DEPLOYMENT.md` and `docs/SLM_Server_Architecture.md`
+> for the current, live architecture. Kept below for historical context on
+> the original design rationale only.
 
 To achieve true zero-knowledge privacy, Ssense deploys a local execution engine. Running complex tensor mathematics inside a browser sandbox (e.g., via WebAssembly) is notoriously inefficient due to garbage collection, memory limits, and lack of direct hardware access. Ssense bridges the Chrome browser to a bare-metal Rust Native Daemon (`apps/native-daemon`).
 

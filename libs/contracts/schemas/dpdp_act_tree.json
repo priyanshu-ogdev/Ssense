@@ -1,758 +1,758 @@
 {
-  "DPDP Act Sec 4(1)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for processing of personal data without specific or free consent from the Data Principal."
-  },
-  "DPDP Act Sec 4(2)": {
-    "violation_type": "LEGITIMATE_USES_ABUSE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should check for processing of personal data for purposes that are expressly forbidden by law."
-  },
-  "DPDP Act Sec 5(1)": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should ensure that requests for consent are accompanied or preceded by a notice detailing the personal data and purpose of processing."
-  },
-  "DPDP Act Sec 5(2)(a)": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should verify that Data Fiduciaries provide a notice to Data Principals who consented before the Act's commencement, detailing the personal data processed and the purpose."
-  },
-  "DPDP Act Sec 5(2)(b)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for continued processing of personal data after the Data Principal withdraws consent."
-  },
-  "DPDP Act Sec 5(3)": {
-    "violation_type": "LANGUAGE_ACCESSIBILITY",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "LOW",
-    "description": "The interceptor should ensure that Data Principals have the option to access the contents of the notice in English or any language specified in the Eighth Schedule to the Constitution."
-  },
-  "DPDP Act Sec 6(1)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Detects if consent is not free, specific, informed, unconditional, and unambiguous with a clear affirmative action."
-  },
-  "DPDP Act Sec 6(2)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Identifies if any part of the consent infringes the DPDP Act or other laws, invalidating it to the extent of such infringement."
-  },
-  "DPDP Act Sec 6(3)": {
-    "violation_type": "LANGUAGE_ACCESSIBILITY",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "LOW",
-    "description": "Checks for requests for consent not presented in clear and plain language or not providing options in English or any language specified in the Eighth Schedule to the Constitution."
-  },
-  "DPDP Act Sec 6(4)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Ensures the right to withdraw consent at any time with comparable ease to giving consent."
-  },
-  "DPDP Act Sec 6(6)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Monitors if a Data Fiduciary continues processing personal data after consent withdrawal, unless processing is required or authorized under the DPDP Act or other laws."
-  },
-  "DPDP Act Sec 6(7)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Ensures the Data Principal can give, manage, review, or withdraw consent through a Consent Manager."
-  },
-  "DPDP Act Sec 6(8)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Verifies that the Consent Manager acts on behalf of the Data Principal in a manner and subject to obligations as prescribed."
-  },
-  "DPDP Act Sec 6(9)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Confirms that every Consent Manager is registered with the Board and subject to prescribed conditions."
-  },
-  "DPDP Act Sec 6(10)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Ensures that in a proceeding, the Data Fiduciary can prove that a notice was given and consent was obtained in accordance with the DPDP Act."
-  },
-  "DPDP Act Sec 7": {
-    "violation_type": "LEGITIMATE_USES_ABUSE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The section allows processing of personal data for legitimate uses, but misuse or overreach in processing data beyond the specified purposes could occur, requiring monitoring for unauthorized data use."
-  },
-  "DPDP Act Sec 8(1)": {
-    "violation_type": "LEGITIMATE_USES_ABUSE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary fails to comply with DPDP Act provisions regarding data processing."
-  },
-  "DPDP Act Sec 8(2)": {
-    "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Data Fiduciary engages a Data Processor without a valid contract for processing personal data."
-  },
-  "DPDP Act Sec 8(3)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary processes personal data without ensuring its completeness, accuracy, and consistency."
-  },
-  "DPDP Act Sec 8(4)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "HIGH",
-    "description": "Data Fiduciary fails to implement appropriate technical and organizational measures for data protection."
-  },
-  "DPDP Act Sec 8(5)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary fails to protect personal data with reasonable security safeguards."
-  },
-  "DPDP Act Sec 8(6)": {
-    "violation_type": "BREACH_NOTIFICATION_FAILURE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary fails to notify the Board and affected Data Principals of a personal data breach."
-  },
-  "DPDP Act Sec 8(7)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary retains personal data beyond the specified purpose or consent withdrawal."
-  },
-  "DPDP Act Sec 8(9)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary fails to publish contact information for Data Protection Officer or equivalent."
-  },
-  "DPDP Act Sec 8(10)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary lacks an effective mechanism for redressing grievances of Data Principals."
-  },
-  "DPDP Act Sec 9(1)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary processes personal data of a child without verifiable consent of the parent or guardian."
-  },
-  "DPDP Act Sec 9(2)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary processes personal data of a child in a manner causing detrimental effects on the child's well-being."
-  },
-  "DPDP Act Sec 9(3)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary undertakes tracking, behavioural monitoring of children, or targeted advertising directed at children."
-  },
-  "DPDP Act Sec 10(1)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Significant Data Fiduciary (SDF) designation criteria not met, including volume and sensitivity of personal data processed."
-  },
-  "DPDP Act Sec 10(2)(a)(i)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Protection Officer not representing the SDF under the Act."
-  },
-  "DPDP Act Sec 10(2)(a)(ii)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Protection Officer not based in India."
-  },
-  "DPDP Act Sec 10(2)(a)(iii)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Protection Officer not responsible to the Board of Directors or similar governing body."
-  },
-  "DPDP Act Sec 10(2)(a)(iv)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Protection Officer not the point of contact for the grievance redressal mechanism."
-  },
-  "DPDP Act Sec 10(2)(b)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Independent data auditor not appointed to carry out data audit."
-  },
-  "DPDP Act Sec 10(2)(c)(i)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Periodic Data Protection Impact Assessment not undertaken."
-  },
-  "DPDP Act Sec 10(2)(c)(ii)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Periodic audit not undertaken."
-  },
-  "DPDP Act Sec 11(1)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Principal's right to access information about personal data not honored."
-  },
-  "DPDP Act Sec 12(1)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Principal's right to correction and erasure of personal data not honored."
-  },
-  "DPDP Act Sec 13(1)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Grievance redressal mechanism not readily available to Data Principal."
-  },
-  "DPDP Act Sec 13(2)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary or Consent Manager not responding to grievances within prescribed period."
-  },
-  "DPDP Act Sec 14(1)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Principal's right to nominate not honored."
-  },
-  "DPDP Act Sec 15(b)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for impersonation attempts during data submission for specified purposes."
-  },
-  "DPDP Act Sec 15(c)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect suppression of material information in personal data provided for official documents."
-  },
-  "DPDP Act Sec 15(d)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should flag false or frivolous grievances or complaints to Data Fiduciaries or the Board."
-  },
-  "DPDP Act Sec 15(e)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should ensure that information provided for correction or erasure is verifiably authentic."
-  },
-  "DPDP Act Sec 16(1)": {
-    "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "The interceptor should block transfer of personal data by a Data Fiduciary for processing outside India to restricted countries."
-  },
-  "DPDP Act Sec 17(1)(a)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for processing of personal data beyond enforcing legal rights or claims."
-  },
-  "DPDP Act Sec 17(1)(b)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect processing of personal data by courts or tribunals not necessary for their functions."
-  },
-  "DPDP Act Sec 17(1)(c)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should watch for processing of personal data not in the interest of law enforcement."
-  },
-  "DPDP Act Sec 17(1)(d)": {
-    "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should ensure processing of non-resident Data Principals' data is contractually based."
-  },
-  "DPDP Act Sec 17(1)(e)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for processing of personal data not related to corporate restructuring."
-  },
-  "DPDP Act Sec 17(1)(f)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect processing of personal data not for ascertaining financial information of defaulters."
-  },
-  "DPDP Act Sec 17(2)(a)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should flag processing by notified instrumentalities of the State not in national interest."
-  },
-  "DPDP Act Sec 17(2)(b)": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for processing for research, archiving, or statistics not meeting prescribed standards."
-  },
-  "DPDP Act Sec 17(3)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should ensure certain Data Fiduciaries or startups comply with specified sections."
-  },
-  "DPDP Act Sec 17(4)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for non-application of consent and notice provisions in state processing."
-  },
-  "DPDP Act Sec 17(5)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect exemptions granted to Data Fiduciaries within five years of Act commencement."
-  },
-  "DPDP Act Sec 5(1) (Part 2)": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to provide adequate notice to Data Principal regarding data processing activities."
-  },
-  "DPDP Act Sec 5(2)": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Inadequate notice to Data Principal about specific data processing purposes."
-  },
-  "DPDP Act Sec 6(8) (Part 2)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Consent Manager fails to uphold accountability and obligations, obstructing Data Principal's rights."
-  },
-  "DPDP Act Sec 6(9) (Part 2)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Improper registration or conditions for Consent Manager, leading to potential consent mismanagement."
-  },
-  "DPDP Act Sec 7(b)": {
-    "violation_type": "LEGITIMATE_USES_ABUSE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Processing personal data for subsidy, benefit, or service issuance without proper justification."
-  },
-  "DPDP Act Sec 8(6) (Part 2)": {
-    "violation_type": "BREACH_NOTIFICATION_FAILURE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "HIGH",
-    "description": "Failure to notify the Board of a personal data breach in the required form and manner."
-  },
-  "DPDP Act Sec 8(8)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data retention beyond the specified time period without serving a specified purpose."
-  },
-  "DPDP Act Sec 8(9) (Part 2)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to publish business contact information of Data Protection Officer as required."
-  },
-  "DPDP Act Sec 9(1) (Part 2)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Obtaining verifiable consent without adhering to the specified manner."
-  },
-  "DPDP Act Sec 9(4)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "HIGH",
-    "description": "Processing of child's personal data without meeting the conditions for specific classes of Data Fiduciaries."
-  },
-  "DPDP Act Sec 10(2)(c)(i) (Part 2)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Inadequate Data Protection Impact Assessment process as part of Significant Data Fiduciary obligations."
-  },
-  "DPDP Act Sec 10(2)(c)(iii)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Lack of specified measures undertaken by Significant Data Fiduciary as required."
-  },
-  "DPDP Act Sec 11(1) (Part 2)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to provide Data Principal with requested information related to personal data processing."
-  },
-  "DPDP Act Sec 12(3)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Non-compliance with Data Principal's request for erasure of personal data."
-  },
-  "DPDP Act Sec 13(2) (Part 2)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Non-adherence to the specified period for responding to grievances by the Data Fiduciary."
-  },
-  "DPDP Act Sec 14(1) (Part 2)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Improper nomination process for another individual by the Data Principal."
-  },
-  "DPDP Act Sec 17(2)(b) (Part 2)": {
-    "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Non-compliance with standards for processing personal data for cross-border transfer exemptions."
-  },
-  "DPDP Act Sec 3": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The notice given by the Data Fiduciary to the Data Principal must be understandable independently and provide a fair account of details necessary for informed consent."
-  },
-  "DPDP Act Sec 4(4)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "If a Consent Manager is not adhering to conditions and obligations, the Board may direct measures to ensure adherence or suspend/cancel registration."
-  },
-  "DPDP Act Rule 6(1)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "HIGH",
-    "description": "The interceptor should monitor for inadequate security measures, such as lack of encryption, obfuscation, masking, or use of virtual tokens for personal data protection."
-  },
-  "DPDP Act Rule 6(1)(a)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should look for instances where personal data is not secured through encryption, obfuscation, masking, or the use of virtual tokens."
-  },
-  "DPDP Act Rule 6(1)(b)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect if there are no measures to control access to computer resources used by the Data Fiduciary or Data Processor."
-  },
-  "DPDP Act Rule 6(1)(c)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should check for the absence of logs, monitoring, and review mechanisms to detect unauthorized access to personal data."
-  },
-  "DPDP Act Rule 6(1)(d)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should identify if there are no reasonable measures for continued processing in the event of a compromise of personal data confidentiality, integrity, or availability."
-  },
-  "DPDP Act Rule 6(1)(e)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should ensure that logs and personal data are retained for a period of one year, unless otherwise required by law."
-  },
-  "DPDP Act Rule 6(1)(f)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should verify if there are no provisions in the contract between the Data Fiduciary and Data Processor for taking reasonable security safeguards."
-  },
-  "DPDP Act Rule 6(1)(g)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect if there are no technical and organizational measures in place to ensure effective observance of security safeguards."
-  },
-  "DPDP Act Rule 7(1)": {
-    "violation_type": "BREACH_NOTIFICATION_FAILURE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "The interceptor should monitor for failure to notify affected Data Principals of a personal data breach in a concise, clear, and plain manner without delay."
-  },
-  "DPDP Act Rule 7(2)": {
-    "violation_type": "BREACH_NOTIFICATION_FAILURE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "CRITICAL",
-    "description": "The interceptor should detect if the Data Fiduciary fails to notify the Board of a personal data breach without delay, including detailed information within seventy-two hours."
-  },
-  "DPDP Act Rule 8(1)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for the retention of personal data beyond the specified time period in the Third Schedule, unless required by law."
-  },
-  "DPDP Act Rule 8(2)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should detect if the Data Fiduciary fails to inform the Data Principal at least forty-eight hours before the completion of the time period for erasure of personal data."
-  },
-  "DPDP Act Rule 8(3)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for the retention of personal data, associated traffic data, and logs for less than one year from the date of processing, unless required by law for a longer period."
-  },
-  "DPDP Act Rule 9": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary fails to prominently publish contact information for data processing inquiries on their website or app."
-  },
-  "DPDP Act Rule 10(1)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "CRITICAL",
-    "description": "Data Fiduciary processes personal data of a child without obtaining verifiable consent from the parent or guardian."
-  },
-  "DPDP Act Rule 10(2)(a)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary does not recognize the correct definition of an adult in the context of obtaining consent for processing a child's data."
-  },
-  "DPDP Act Rule 10(2)(b)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data Fiduciary fails to verify the identity of the parent or guardian through authorized entities or virtual tokens mapped to identity and age details."
-  },
-  "DPDP Act Rule 11(1)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Checks for processing of personal data of a person with disability without verifiable consent from a lawful guardian appointed by a court or designated authority."
-  },
-  "DPDP Act Rule 12(1)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Ensures that processing of personal data of a child by specified Data Fiduciaries adheres to exemptions and conditions outlined in Part A of the Fourth Schedule."
-  },
-  "DPDP Act Rule 12(2)": {
-    "violation_type": "CHILD_CONSENT_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "HIGH",
-    "description": "Ensures that processing of personal data of a child for specified purposes adheres to exemptions and conditions outlined in Part B of the Fourth Schedule."
-  },
-  "DPDP Act Rule 13(1)": {
-    "violation_type": "SDF_OBLIGATIONS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Monitors Significant Data Fiduciaries for compliance with annual Data Protection Impact Assessment and audit requirements."
-  },
-  "DPDP Act Rule 13(3)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Verifies that technical measures and algorithmic software used by Significant Data Fiduciaries do not pose a risk to Data Principals' rights."
-  },
-  "DPDP Act Rule 13(4)": {
-    "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "CRITICAL",
-    "description": "Prevents the transfer of specified personal data and traffic data outside India as per Central Government restrictions."
-  },
-  "DPDP Act Rule 14(1)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to prominently publish on website or app the means for Data Principals to exercise their rights and required particulars for identification."
-  },
-  "DPDP Act Rule 14(2)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to allow Data Principals to exercise rights by making a request to the Data Fiduciary using the means and particulars required."
-  },
-  "DPDP Act Rule 14(3)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "HIGH",
-    "description": "Failure to publish a grievance redressal system within 90 days and implement technical and organisational measures for effectiveness."
-  },
-  "DPDP Act Rule 14(4)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Failure to allow Data Principals to nominate individuals for exercising rights in accordance with terms of service and applicable law."
-  },
-  "DPDP Act Rule 15": {
-    "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
-    "network_action": "BLOCK_THIRD_PARTY",
-    "severity": "CRITICAL",
-    "description": "Transfer of personal data outside India without meeting requirements specified by the Central Government."
-  },
-  "DPDP Act Rule 16": {
-    "violation_type": "PURPOSE_LIMITATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Processing of personal data for research, archiving, or statistical purposes not in accordance with standards specified in Second Schedule."
-  },
-  "DPDP Act Sec 8(a)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager's interoperable platform must be consistent with data protection standards and assurance framework published by the Board."
-  },
-  "DPDP Act Sec 8(b)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Technical and organisational measures must be in place to ensure adherence to standards and framework."
-  },
-  "DPDP Act Sec 9(1) (Part 3)": {
-    "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager must enable Data Principals to give consent to the processing of personal data by Data Fiduciaries."
-  },
-  "DPDP Act Sec 9(2) (Part 2)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager must ensure that personal data is not readable by it when shared."
-  },
-  "DPDP Act Sec 9(3) (Part 2)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager must maintain records of consents, notices, and sharing of personal data."
-  },
-  "DPDP Act Sec 9(4) (Part 2)": {
-    "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager must provide Data Principals access to records and maintain them for at least seven years."
-  },
-  "DPDP Act Sec 9(5)": {
-    "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager must develop and maintain a website or app as the primary means for Data Principals to access services."
-  },
-  "DPDP Act Sec 9(6)": {
-    "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall not sub-contract or assign the performance of any of its obligations."
-  },
-  "DPDP Act Sec 9(7)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall take reasonable security safeguards to prevent personal data breach."
-  },
-  "DPDP Act Sec 9(8)": {
-    "violation_type": "LEGITIMATE_USES_ABUSE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall act in a fiduciary capacity in relation to the Data Principal."
-  },
-  "DPDP Act Sec 9(9)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall avoid conflict of interest with Data Fiduciaries."
-  },
-  "DPDP Act Sec 9(10)": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall have measures to ensure no conflict of interest arises due to its directors, key managerial personnel, and senior management."
-  },
-  "DPDP Act Sec 9(11)": {
-    "violation_type": "NOTICE_INADEQUATE",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall publish information regarding its promoters, directors, key managerial personnel, and senior management."
-  },
-  "DPDP Act Sec 9(12)": {
-    "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The Consent Manager shall have effective audit mechanisms to review, monitor, evaluate, and report the outcome of such audit to the Board."
-  },
-  "DPDP Act Sec 13": {
-    "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should monitor for unauthorized transfers of control of the Consent Manager without Board approval."
-  },
-  "SECOND SCHEDULE Rule 5(1)": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "INJECT_GPC_SIGNAL",
-    "severity": "HIGH",
-    "description": "The interceptor should ensure that the Data Fiduciary implements technical and organizational measures to protect personal data."
-  },
-  "SECOND SCHEDULE Rule 16": {
-    "violation_type": "SECURITY_SAFEGUARDS_MISSING",
-    "network_action": "INJECT_GPC_SIGNAL",
-    "severity": "HIGH",
-    "description": "The interceptor should ensure that the Data Fiduciary implements technical and organizational measures to protect personal data."
-  },
-  "THIRD SCHEDULE Rule 8(1) Class 1": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should check if the e-commerce entity retains data beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025."
-  },
-  "THIRD SCHEDULE Rule 8(1) Class 2": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "The interceptor should check if the online gaming intermediary retains data beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025."
-  },
-  "DPDP Act Sec 9(1) (Part 4)": {
-    "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Data retention beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025, whichever is later, for social media intermediaries with over two crore registered users in India."
-  },
-  "DPDP Act Sec 9(3) (Part 3)": {
-    "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
-    "network_action": "WARN_USER_ONLY",
-    "severity": "MEDIUM",
-    "description": "Restrictions on processing by certain classes of Data Fiduciaries for purposes not aligned with the protection of health, education, safety, or legal duties concerning children."
-  }
+    "DPDP Act Sec 4(1)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for processing of personal data without specific or free consent from the Data Principal."
+    },
+    "DPDP Act Sec 4(2)": {
+        "violation_type": "LEGITIMATE_USES_ABUSE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should check for processing of personal data for purposes that are expressly forbidden by law."
+    },
+    "DPDP Act Sec 5(1)": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should ensure that requests for consent are accompanied or preceded by a notice detailing the personal data and purpose of processing."
+    },
+    "DPDP Act Sec 5(2)(a)": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should verify that Data Fiduciaries provide a notice to Data Principals who consented before the Act's commencement, detailing the personal data processed and the purpose."
+    },
+    "DPDP Act Sec 5(2)(b)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for continued processing of personal data after the Data Principal withdraws consent."
+    },
+    "DPDP Act Sec 5(3)": {
+        "violation_type": "LANGUAGE_ACCESSIBILITY",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "LOW",
+        "description": "The interceptor should ensure that Data Principals have the option to access the contents of the notice in English or any language specified in the Eighth Schedule to the Constitution."
+    },
+    "DPDP Act Sec 6(1)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Detects if consent is not free, specific, informed, unconditional, and unambiguous with a clear affirmative action."
+    },
+    "DPDP Act Sec 6(2)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Identifies if any part of the consent infringes the DPDP Act or other laws, invalidating it to the extent of such infringement."
+    },
+    "DPDP Act Sec 6(3)": {
+        "violation_type": "LANGUAGE_ACCESSIBILITY",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "LOW",
+        "description": "Checks for requests for consent not presented in clear and plain language or not providing options in English or any language specified in the Eighth Schedule to the Constitution."
+    },
+    "DPDP Act Sec 6(4)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Ensures the right to withdraw consent at any time with comparable ease to giving consent."
+    },
+    "DPDP Act Sec 6(6)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Monitors if a Data Fiduciary continues processing personal data after consent withdrawal, unless processing is required or authorized under the DPDP Act or other laws."
+    },
+    "DPDP Act Sec 6(7)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Ensures the Data Principal can give, manage, review, or withdraw consent through a Consent Manager."
+    },
+    "DPDP Act Sec 6(8)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Verifies that the Consent Manager acts on behalf of the Data Principal in a manner and subject to obligations as prescribed."
+    },
+    "DPDP Act Sec 6(9)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Confirms that every Consent Manager is registered with the Board and subject to prescribed conditions."
+    },
+    "DPDP Act Sec 6(10)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Ensures that in a proceeding, the Data Fiduciary can prove that a notice was given and consent was obtained in accordance with the DPDP Act."
+    },
+    "DPDP Act Sec 7": {
+        "violation_type": "LEGITIMATE_USES_ABUSE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The section allows processing of personal data for legitimate uses, but misuse or overreach in processing data beyond the specified purposes could occur, requiring monitoring for unauthorized data use."
+    },
+    "DPDP Act Sec 8(1)": {
+        "violation_type": "LEGITIMATE_USES_ABUSE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary fails to comply with DPDP Act provisions regarding data processing."
+    },
+    "DPDP Act Sec 8(2)": {
+        "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Data Fiduciary engages a Data Processor without a valid contract for processing personal data."
+    },
+    "DPDP Act Sec 8(3)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary processes personal data without ensuring its completeness, accuracy, and consistency."
+    },
+    "DPDP Act Sec 8(4)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "HIGH",
+        "description": "Data Fiduciary fails to implement appropriate technical and organizational measures for data protection."
+    },
+    "DPDP Act Sec 8(5)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary fails to protect personal data with reasonable security safeguards."
+    },
+    "DPDP Act Sec 8(6)": {
+        "violation_type": "BREACH_NOTIFICATION_FAILURE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary fails to notify the Board and affected Data Principals of a personal data breach."
+    },
+    "DPDP Act Sec 8(7)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary retains personal data beyond the specified purpose or consent withdrawal."
+    },
+    "DPDP Act Sec 8(9)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary fails to publish contact information for Data Protection Officer or equivalent."
+    },
+    "DPDP Act Sec 8(10)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary lacks an effective mechanism for redressing grievances of Data Principals."
+    },
+    "DPDP Act Sec 9(1)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary processes personal data of a child without verifiable consent of the parent or guardian."
+    },
+    "DPDP Act Sec 9(2)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary processes personal data of a child in a manner causing detrimental effects on the child's well-being."
+    },
+    "DPDP Act Sec 9(3)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary undertakes tracking, behavioural monitoring of children, or targeted advertising directed at children."
+    },
+    "DPDP Act Sec 10(1)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Significant Data Fiduciary (SDF) designation criteria not met, including volume and sensitivity of personal data processed."
+    },
+    "DPDP Act Sec 10(2)(a)(i)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Protection Officer not representing the SDF under the Act."
+    },
+    "DPDP Act Sec 10(2)(a)(ii)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Protection Officer not based in India."
+    },
+    "DPDP Act Sec 10(2)(a)(iii)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Protection Officer not responsible to the Board of Directors or similar governing body."
+    },
+    "DPDP Act Sec 10(2)(a)(iv)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Protection Officer not the point of contact for the grievance redressal mechanism."
+    },
+    "DPDP Act Sec 10(2)(b)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Independent data auditor not appointed to carry out data audit."
+    },
+    "DPDP Act Sec 10(2)(c)(i)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Periodic Data Protection Impact Assessment not undertaken."
+    },
+    "DPDP Act Sec 10(2)(c)(ii)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Periodic audit not undertaken."
+    },
+    "DPDP Act Sec 11(1)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Principal's right to access information about personal data not honored."
+    },
+    "DPDP Act Sec 12(1)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Principal's right to correction and erasure of personal data not honored."
+    },
+    "DPDP Act Sec 13(1)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Grievance redressal mechanism not readily available to Data Principal."
+    },
+    "DPDP Act Sec 13(2)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary or Consent Manager not responding to grievances within prescribed period."
+    },
+    "DPDP Act Sec 14(1)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Principal's right to nominate not honored."
+    },
+    "DPDP Act Sec 15(b)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for impersonation attempts during data submission for specified purposes."
+    },
+    "DPDP Act Sec 15(c)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect suppression of material information in personal data provided for official documents."
+    },
+    "DPDP Act Sec 15(d)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should flag false or frivolous grievances or complaints to Data Fiduciaries or the Board."
+    },
+    "DPDP Act Sec 15(e)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should ensure that information provided for correction or erasure is verifiably authentic."
+    },
+    "DPDP Act Sec 16(1)": {
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "The interceptor should block transfer of personal data by a Data Fiduciary for processing outside India to restricted countries."
+    },
+    "DPDP Act Sec 17(1)(a)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for processing of personal data beyond enforcing legal rights or claims."
+    },
+    "DPDP Act Sec 17(1)(b)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect processing of personal data by courts or tribunals not necessary for their functions."
+    },
+    "DPDP Act Sec 17(1)(c)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should watch for processing of personal data not in the interest of law enforcement."
+    },
+    "DPDP Act Sec 17(1)(d)": {
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should ensure processing of non-resident Data Principals' data is contractually based."
+    },
+    "DPDP Act Sec 17(1)(e)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for processing of personal data not related to corporate restructuring."
+    },
+    "DPDP Act Sec 17(1)(f)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect processing of personal data not for ascertaining financial information of defaulters."
+    },
+    "DPDP Act Sec 17(2)(a)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should flag processing by notified instrumentalities of the State not in national interest."
+    },
+    "DPDP Act Sec 17(2)(b)": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for processing for research, archiving, or statistics not meeting prescribed standards."
+    },
+    "DPDP Act Sec 17(3)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should ensure certain Data Fiduciaries or startups comply with specified sections."
+    },
+    "DPDP Act Sec 17(4)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for non-application of consent and notice provisions in state processing."
+    },
+    "DPDP Act Sec 17(5)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect exemptions granted to Data Fiduciaries within five years of Act commencement."
+    },
+    "DPDP Act Sec 5(1) (Part 2)": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to provide adequate notice to Data Principal regarding data processing activities."
+    },
+    "DPDP Act Sec 5(2)": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Inadequate notice to Data Principal about specific data processing purposes."
+    },
+    "DPDP Act Sec 6(8) (Part 2)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Consent Manager fails to uphold accountability and obligations, obstructing Data Principal's rights."
+    },
+    "DPDP Act Sec 6(9) (Part 2)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Improper registration or conditions for Consent Manager, leading to potential consent mismanagement."
+    },
+    "DPDP Act Sec 7(b)": {
+        "violation_type": "LEGITIMATE_USES_ABUSE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Processing personal data for subsidy, benefit, or service issuance without proper justification."
+    },
+    "DPDP Act Sec 8(6) (Part 2)": {
+        "violation_type": "BREACH_NOTIFICATION_FAILURE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "HIGH",
+        "description": "Failure to notify the Board of a personal data breach in the required form and manner."
+    },
+    "DPDP Act Sec 8(8)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data retention beyond the specified time period without serving a specified purpose."
+    },
+    "DPDP Act Sec 8(9) (Part 2)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to publish business contact information of Data Protection Officer as required."
+    },
+    "DPDP Act Sec 9(1) (Part 2)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Obtaining verifiable consent without adhering to the specified manner."
+    },
+    "DPDP Act Sec 9(4)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "HIGH",
+        "description": "Processing of child's personal data without meeting the conditions for specific classes of Data Fiduciaries."
+    },
+    "DPDP Act Sec 10(2)(c)(i) (Part 2)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Inadequate Data Protection Impact Assessment process as part of Significant Data Fiduciary obligations."
+    },
+    "DPDP Act Sec 10(2)(c)(iii)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Lack of specified measures undertaken by Significant Data Fiduciary as required."
+    },
+    "DPDP Act Sec 11(1) (Part 2)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to provide Data Principal with requested information related to personal data processing."
+    },
+    "DPDP Act Sec 12(3)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Non-compliance with Data Principal's request for erasure of personal data."
+    },
+    "DPDP Act Sec 13(2) (Part 2)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Non-adherence to the specified period for responding to grievances by the Data Fiduciary."
+    },
+    "DPDP Act Sec 14(1) (Part 2)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Improper nomination process for another individual by the Data Principal."
+    },
+    "DPDP Act Sec 17(2)(b) (Part 2)": {
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Non-compliance with standards for processing personal data for cross-border transfer exemptions."
+    },
+    "DPDP Act Sec 3": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The notice given by the Data Fiduciary to the Data Principal must be understandable independently and provide a fair account of details necessary for informed consent."
+    },
+    "DPDP Act Sec 4(4)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "If a Consent Manager is not adhering to conditions and obligations, the Board may direct measures to ensure adherence or suspend/cancel registration."
+    },
+    "DPDP Act Rule 6(1)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "HIGH",
+        "description": "The interceptor should monitor for inadequate security measures, such as lack of encryption, obfuscation, masking, or use of virtual tokens for personal data protection."
+    },
+    "DPDP Act Rule 6(1)(a)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should look for instances where personal data is not secured through encryption, obfuscation, masking, or the use of virtual tokens."
+    },
+    "DPDP Act Rule 6(1)(b)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect if there are no measures to control access to computer resources used by the Data Fiduciary or Data Processor."
+    },
+    "DPDP Act Rule 6(1)(c)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should check for the absence of logs, monitoring, and review mechanisms to detect unauthorized access to personal data."
+    },
+    "DPDP Act Rule 6(1)(d)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should identify if there are no reasonable measures for continued processing in the event of a compromise of personal data confidentiality, integrity, or availability."
+    },
+    "DPDP Act Rule 6(1)(e)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should ensure that logs and personal data are retained for a period of one year, unless otherwise required by law."
+    },
+    "DPDP Act Rule 6(1)(f)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should verify if there are no provisions in the contract between the Data Fiduciary and Data Processor for taking reasonable security safeguards."
+    },
+    "DPDP Act Rule 6(1)(g)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect if there are no technical and organizational measures in place to ensure effective observance of security safeguards."
+    },
+    "DPDP Act Rule 7(1)": {
+        "violation_type": "BREACH_NOTIFICATION_FAILURE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "The interceptor should monitor for failure to notify affected Data Principals of a personal data breach in a concise, clear, and plain manner without delay."
+    },
+    "DPDP Act Rule 7(2)": {
+        "violation_type": "BREACH_NOTIFICATION_FAILURE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "CRITICAL",
+        "description": "The interceptor should detect if the Data Fiduciary fails to notify the Board of a personal data breach without delay, including detailed information within seventy-two hours."
+    },
+    "DPDP Act Rule 8(1)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for the retention of personal data beyond the specified time period in the Third Schedule, unless required by law."
+    },
+    "DPDP Act Rule 8(2)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should detect if the Data Fiduciary fails to inform the Data Principal at least forty-eight hours before the completion of the time period for erasure of personal data."
+    },
+    "DPDP Act Rule 8(3)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for the retention of personal data, associated traffic data, and logs for less than one year from the date of processing, unless required by law for a longer period."
+    },
+    "DPDP Act Rule 9": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary fails to prominently publish contact information for data processing inquiries on their website or app."
+    },
+    "DPDP Act Rule 10(1)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "CRITICAL",
+        "description": "Data Fiduciary processes personal data of a child without obtaining verifiable consent from the parent or guardian."
+    },
+    "DPDP Act Rule 10(2)(a)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary does not recognize the correct definition of an adult in the context of obtaining consent for processing a child's data."
+    },
+    "DPDP Act Rule 10(2)(b)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data Fiduciary fails to verify the identity of the parent or guardian through authorized entities or virtual tokens mapped to identity and age details."
+    },
+    "DPDP Act Rule 11(1)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Checks for processing of personal data of a person with disability without verifiable consent from a lawful guardian appointed by a court or designated authority."
+    },
+    "DPDP Act Rule 12(1)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Ensures that processing of personal data of a child by specified Data Fiduciaries adheres to exemptions and conditions outlined in Part A of the Fourth Schedule."
+    },
+    "DPDP Act Rule 12(2)": {
+        "violation_type": "CHILD_CONSENT_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "HIGH",
+        "description": "Ensures that processing of personal data of a child for specified purposes adheres to exemptions and conditions outlined in Part B of the Fourth Schedule."
+    },
+    "DPDP Act Rule 13(1)": {
+        "violation_type": "SDF_OBLIGATIONS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Monitors Significant Data Fiduciaries for compliance with annual Data Protection Impact Assessment and audit requirements."
+    },
+    "DPDP Act Rule 13(3)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Verifies that technical measures and algorithmic software used by Significant Data Fiduciaries do not pose a risk to Data Principals' rights."
+    },
+    "DPDP Act Rule 13(4)": {
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "CRITICAL",
+        "description": "Prevents the transfer of specified personal data and traffic data outside India as per Central Government restrictions."
+    },
+    "DPDP Act Rule 14(1)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to prominently publish on website or app the means for Data Principals to exercise their rights and required particulars for identification."
+    },
+    "DPDP Act Rule 14(2)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to allow Data Principals to exercise rights by making a request to the Data Fiduciary using the means and particulars required."
+    },
+    "DPDP Act Rule 14(3)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "HIGH",
+        "description": "Failure to publish a grievance redressal system within 90 days and implement technical and organisational measures for effectiveness."
+    },
+    "DPDP Act Rule 14(4)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Failure to allow Data Principals to nominate individuals for exercising rights in accordance with terms of service and applicable law."
+    },
+    "DPDP Act Rule 15": {
+        "violation_type": "CROSS_BORDER_TRANSFER_VIOLATION",
+        "network_action": "BLOCK_THIRD_PARTY",
+        "severity": "CRITICAL",
+        "description": "Transfer of personal data outside India without meeting requirements specified by the Central Government."
+    },
+    "DPDP Act Rule 16": {
+        "violation_type": "PURPOSE_LIMITATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Processing of personal data for research, archiving, or statistical purposes not in accordance with standards specified in Second Schedule."
+    },
+    "DPDP Act Sec 8(a)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager's interoperable platform must be consistent with data protection standards and assurance framework published by the Board."
+    },
+    "DPDP Act Sec 8(b)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Technical and organisational measures must be in place to ensure adherence to standards and framework."
+    },
+    "DPDP Act Sec 9(1) (Part 3)": {
+        "violation_type": "CONSENT_NOT_FREE_OR_SPECIFIC",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager must enable Data Principals to give consent to the processing of personal data by Data Fiduciaries."
+    },
+    "DPDP Act Sec 9(2) (Part 2)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager must ensure that personal data is not readable by it when shared."
+    },
+    "DPDP Act Sec 9(3) (Part 2)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager must maintain records of consents, notices, and sharing of personal data."
+    },
+    "DPDP Act Sec 9(4) (Part 2)": {
+        "violation_type": "GRIEVANCE_REDRESSAL_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager must provide Data Principals access to records and maintain them for at least seven years."
+    },
+    "DPDP Act Sec 9(5)": {
+        "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager must develop and maintain a website or app as the primary means for Data Principals to access services."
+    },
+    "DPDP Act Sec 9(6)": {
+        "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall not sub-contract or assign the performance of any of its obligations."
+    },
+    "DPDP Act Sec 9(7)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall take reasonable security safeguards to prevent personal data breach."
+    },
+    "DPDP Act Sec 9(8)": {
+        "violation_type": "LEGITIMATE_USES_ABUSE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall act in a fiduciary capacity in relation to the Data Principal."
+    },
+    "DPDP Act Sec 9(9)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall avoid conflict of interest with Data Fiduciaries."
+    },
+    "DPDP Act Sec 9(10)": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall have measures to ensure no conflict of interest arises due to its directors, key managerial personnel, and senior management."
+    },
+    "DPDP Act Sec 9(11)": {
+        "violation_type": "NOTICE_INADEQUATE",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall publish information regarding its promoters, directors, key managerial personnel, and senior management."
+    },
+    "DPDP Act Sec 9(12)": {
+        "violation_type": "PROCESSOR_ACCOUNTABILITY_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The Consent Manager shall have effective audit mechanisms to review, monitor, evaluate, and report the outcome of such audit to the Board."
+    },
+    "DPDP Act Sec 13": {
+        "violation_type": "CONSENT_MANAGER_OBSTRUCTION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should monitor for unauthorized transfers of control of the Consent Manager without Board approval."
+    },
+    "SECOND SCHEDULE Rule 5(1)": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "INJECT_GPC_SIGNAL",
+        "severity": "HIGH",
+        "description": "The interceptor should ensure that the Data Fiduciary implements technical and organizational measures to protect personal data."
+    },
+    "SECOND SCHEDULE Rule 16": {
+        "violation_type": "SECURITY_SAFEGUARDS_MISSING",
+        "network_action": "INJECT_GPC_SIGNAL",
+        "severity": "HIGH",
+        "description": "The interceptor should ensure that the Data Fiduciary implements technical and organizational measures to protect personal data."
+    },
+    "THIRD SCHEDULE Rule 8(1) Class 1": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should check if the e-commerce entity retains data beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025."
+    },
+    "THIRD SCHEDULE Rule 8(1) Class 2": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "The interceptor should check if the online gaming intermediary retains data beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025."
+    },
+    "DPDP Act Sec 9(1) (Part 4)": {
+        "violation_type": "DATA_RETENTION_LIMIT_EXCEEDED",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Data retention beyond three years from the last interaction or the commencement of the Digital Personal Data Protection Rules, 2025, whichever is later, for social media intermediaries with over two crore registered users in India."
+    },
+    "DPDP Act Sec 9(3) (Part 3)": {
+        "violation_type": "RIGHTS_IMPLEMENTATION_VIOLATION",
+        "network_action": "WARN_USER_ONLY",
+        "severity": "MEDIUM",
+        "description": "Restrictions on processing by certain classes of Data Fiduciaries for purposes not aligned with the protection of health, education, safety, or legal duties concerning children."
+    }
 }

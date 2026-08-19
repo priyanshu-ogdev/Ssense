@@ -1,19 +1,33 @@
-# 1. Protect the raw data forge outputs (Do Not Upload)
+# 1. Protect Raw Data Forge Outputs (Massive Bloat)
 data-forge/training-pairs/
+data-forge/raw-policies/
+data-forge/indian-seeds/
+*.log
 
-# 2. Exclude Base Models (Already on HF, saves bandwidth)
+# 2. Exclude Base Models (Already on HF)
 models/Qwen*-Instruct*/
 models/Qwen3.5*/
 models/bge-small*/
 models/bge-reranker*/
 
-# 3. Exclude Training Bloat (Optimizer states, checkpoints)
+# 3. Exclude Training Bloat
 models/*checkpoints*/
 models/*intermediate*/
 slm-training/unsloth_compiled_cache/
 
-# 4. Standard Python Ignores
+# 4. Standard Python & OS Ignores
 __pycache__/
 *.pyc
 .env
+.venv/
+venv/
+env/
 .ipynb_checkpoints/
+logs/
+.cache/
+optimizer.pt
+scheduler.pt
+rng_state.pth
+.vllm_cache/
+.DS_Store
+desktop.ini

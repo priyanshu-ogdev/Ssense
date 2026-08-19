@@ -5,11 +5,14 @@ tags:
 - dpdp
 - qwen
 - slm
+- gguf     
+- vllm    
 - unsloth
 - simpo
 - rslora
 - rag
 - bge
+base_model: Qwen/Qwen2.5-7B-Instruct
 license: apache-2.0
 language:
 - en

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- 🚀 SOTA FIX: Forces Chromium to render native UI (scrollbars, inputs) in dark mode instantly -->
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#09090B" />
+  <title>Ssense Settings</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100vh;
+      background-color: #09090B;
+      color: #FAFAFA;
+      /* Privacy-first system font stack (No external network requests to Google Fonts) */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Anti-FOUC Skeleton Loader */
+    #root:empty {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #18181B 0%, #09090B 100%);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/options/main.tsx"></script>
+</body>
+
+</html>

@@ -1,9 +1,7 @@
-// apps/native-daemon/src/messaging/protocol.rs
-
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════
-// REQUESTS (Extension -> Daemon)
+// REQUESTS (Chrome Extension -> Rust Daemon)
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(Debug, Deserialize)]
@@ -13,6 +11,7 @@ pub enum DaemonRequest {
     Chat(ChatRequest),
     GetTrustScore(GetTrustScoreRequest),
     HealthCheck(HealthCheckRequest),
+    DownloadModels(DownloadModelsRequest), // SOTA FIX: Explicit UI control over network usage
 }
 
 impl DaemonRequest {
@@ -22,13 +21,12 @@ impl DaemonRequest {
             Self::Chat(r) => &r.request_id,
             Self::GetTrustScore(r) => &r.request_id,
             Self::HealthCheck(r) => &r.request_id,
+            Self::DownloadModels(r) => &r.request_id,
         }
     }
 }
 
-// 🚀 SOTA FIX: The Fallback Envelope
-// If full deserialization fails, we use this to rescue the requestId
-// so we can send an error back to Chrome and unlock the UI.
+// Fallback envelope to rescue request_ids if JSON parsing fails structurally
 #[derive(Debug, Deserialize)]
 pub struct RawEnvelope {
     #[serde(rename = "requestId")]
@@ -64,8 +62,14 @@ pub struct HealthCheckRequest {
     pub request_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadModelsRequest {
+    pub request_id: String,
+}
+
 // ═══════════════════════════════════════════════════════════════
-// RESPONSES (Daemon -> Extension)
+// RESPONSES (Rust Daemon -> Chrome Extension)
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(Debug, Serialize)]
@@ -77,16 +81,15 @@ pub enum DaemonResponse {
         report: DpdpAuditReport,
         cached: bool,
     },
-    ChatResult {
+    // SOTA FIX: Added real-time SSE-style streaming for the Native Messaging pipe
+    ChatStreamChunk {
         #[serde(rename = "requestId")] request_id: String,
-        success: bool,
-        message: String,
+        token: String,
+        is_final: bool,
     },
     TrustScoreResult {
         #[serde(rename = "requestId")] request_id: String,
         success: bool,
-        // 🚀 SOTA FIX: Removed skip_serializing_if. 
-        // Serde will now natively serialize None as `null`, preventing V8 `undefined` crashes.
         score: Option<i32>,
     },
     HealthCheckResult {
@@ -97,10 +100,21 @@ pub enum DaemonResponse {
         #[serde(rename = "totalInferences")] total_inferences: u64,
         #[serde(rename = "avgTokensPerSecond")] avg_tokens_per_second: u32,
     },
+    Status {
+        #[serde(rename = "requestId")] request_id: Option<String>,
+        status: String,
+        message: String,
+    },
     Error {
         #[serde(rename = "requestId")] request_id: String,
         success: bool,
         error: String,
+    },
+    DownloadProgress {
+        #[serde(rename = "requestId")] request_id: Option<String>,
+        file: String,
+        pct: f64,
+        #[serde(rename = "mbPerSec")] mb_per_sec: f64,
     },
 }
 
@@ -113,12 +127,15 @@ pub struct DpdpAuditReport {
     pub global_legal_reasoning: String,
     pub violations: Vec<Violation>,
     pub dpdp_trust_score: i32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subtlety_score: Option<i32>, 
+    pub subtlety_score: i32, 
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Violation {
+    pub step_1_active_claim_analysis: String,
+    pub step_2_statute_match: String,
+    pub omission_check: bool,
+    pub step_3_semantic_justification: String,
     pub statute_reference: String,
     pub violation_type: ViolationType,
     pub evidence_quote: String,
@@ -131,14 +148,30 @@ pub struct Violation {
 pub enum ViolationType {
     PurposeLimitationViolation,
     ConsentNotFreeOrSpecific,
+    LegitimateUsesAbuse,
     NoticeInadequate,
     DataRetentionLimitExceeded,
+    ErasureNoticePeriodViolation,
+    LogRetentionMandateViolation,
     ChildConsentViolation,
     SecuritySafeguardsMissing,
     GrievanceRedressalInadequate,
     BreachNotificationFailure,
+    ProcessorAccountabilityViolation,
     SdfObligationsMissing,
+    SdfDataLocalizationViolation,
     CrossBorderTransferViolation,
+    ConsentManagerObstruction,
+    LanguageAccessibility,
+    AlgorithmicProfilingSdf,
+    RightsImplementationViolation,
+    DataAccuracyCompletenessViolation,
+    BoardComplianceViolation,
+    PenaltyAvoidance,
+    AppealProcessViolation,
+    ScopeApplicationEvasion,
+    IllegalExemptionClaim,
+    ConsentMechanicsViolation,
     #[serde(other)]
     UnknownViolation,
 }

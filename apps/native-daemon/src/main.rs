@@ -1,9 +1,8 @@
-// apps/native-daemon/src/main.rs
-
 mod messaging;
 mod cache;
 mod inference;
 mod model_manager;
+mod rag_engine;
 
 use anyhow::Result;
 use directories::ProjectDirs;
@@ -12,93 +11,119 @@ use inference::hardware_profiler::HardwareProfiler;
 use model_manager::ModelManager;
 use messaging::framing::{read_message, write_message};
 use messaging::protocol::{DaemonRequest, DaemonResponse};
-use std::sync::{Arc, Mutex};
+use rag_engine::RagEngine;
+
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{stdin, stdout};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::time::timeout;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct AppState {
-    pub cache: cache::sqlite_store::SqliteStore,
-    pub inference_engine: LocalEngine,
-    pub model_manager: ModelManager,
-    pub inference_lock: Mutex<()>,
+    pub cache: Arc<cache::sqlite_store::SqliteStore>,
+    pub inference_engine: Arc<LocalEngine>,
+    pub model_manager: Arc<ModelManager>,
+    pub rag_engine: Arc<RwLock<Option<RagEngine>>>,
+    // Strict mutex preventing concurrent GPU requests from melting VRAM
+    pub inference_lock: Mutex<()>, 
 }
 
-const INFERENCE_TIMEOUT_SECS: u64 = 60;
+const INFERENCE_TIMEOUT_SECS: u64 = 180; // Allow 3 mins for deep reasoning on slow laptops
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let proj_dirs = ProjectDirs::from("com", "Ssense", "SsenseDaemon")
+    // 1. Resolve Safe OS Directories
+    let proj_dirs = ProjectDirs::from("com", "Ssense", "ssense-native-daemon")
         .expect("Failed to resolve OS project directories");
-    let data_dir = proj_dirs.data_local_dir();
+    let data_dir = proj_dirs.data_dir();
     std::fs::create_dir_all(data_dir)?;
 
+    // 2. Telemetry & Logging
     let file_appender = tracing_appender::rolling::never(data_dir, "daemon.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
     tracing_subscriber::fmt()
         .with_writer(non_blocking)
         .with_env_filter("info")
         .init();
 
-    info!("🚀 Ssense Native Daemon booting on {:?}", data_dir);
+    info!("🚀 [Main] Ssense Native Daemon V3.0 booting on {:?}", data_dir);
 
-    // 1. Initialize SQLite Cache
-    let cache = cache::sqlite_store::SqliteStore::new(data_dir)?;
+    // 3. Initialize OS Subsystems
+    let cache = Arc::new(cache::sqlite_store::SqliteStore::new(data_dir)?);
+    let model_manager = Arc::new(ModelManager::new()?);
 
-    // 2. Active Hardware Handshake on Boot
     let hardware_profile = match HardwareProfiler::verify_system_capabilities() {
         Ok(profile) => profile,
         Err(e) => {
-            error!("❌ Hardware capability check failed: {}", e);
-            // Safe fallback: 1 thread ensures the daemon can still boot and report errors to the UI
-            inference::hardware_profiler::HardwareProfile { optimal_threads: 1 } 
+            error!("❌ [Main] Hardware capability check failed: {}", e);
+            std::process::exit(1);
         }
     };
 
-    // 3. Initialize Model Manager
-    let model_manager = ModelManager::new(data_dir);
-    let model_path = model_manager.get_model_path();
+    let audit_model_path = model_manager.get_artifact_path("audit-model.Q4_K_M.gguf");
+    let chatbot_model_path = model_manager.get_artifact_path("chatbot-model.Q4_K_M.gguf");
 
-    // 4. Initialize Local Engine (Lazy load)
-    let inference_engine = LocalEngine::new(&model_path, hardware_profile.optimal_threads)?;
+    // Boot Engine (Will only map models to memory when first requested)
+    let inference_engine = Arc::new(LocalEngine::new(
+        &audit_model_path, 
+        &chatbot_model_path, 
+        hardware_profile.optimal_threads
+    )?);
+
+    // Boot RAG if Safetensors exist locally
+    let json_path = model_manager.get_artifact_path("dpdp_index.json");
+    let safe_path = model_manager.get_artifact_path("dpdp_embeddings.safetensors");
+    let rag_engine = if json_path.exists() && safe_path.exists() {
+        match RagEngine::new(&json_path, &safe_path) {
+            Ok(rag) => Some(rag),
+            Err(e) => {
+                error!("❌ [Main] Failed to initialize Local RAG Engine: {}", e);
+                None
+            }
+        }
+    } else {
+        warn!("⚠️ [Main] RAG Safetensors missing. Chatbot will run without retrieval until models are downloaded.");
+        None
+    };
 
     let state = Arc::new(AppState {
         cache,
         inference_engine,
         model_manager,
+        rag_engine: Arc::new(RwLock::new(rag_engine)),
         inference_lock: Mutex::new(()),
     });
 
+    // 4. Native Messaging IPC Pipes
     let (tx, mut rx) = mpsc::channel::<DaemonResponse>(100);
 
-    // Dedicated Writer Task: Ensures stdout is written sequentially
+    // ── BACKGROUND WRITER TASK ──
+    // Writes responses to Chrome asynchronously to prevent blocking the engine
     let writer_task = tokio::spawn(async move {
         let mut writer = stdout();
         while let Some(response) = rx.recv().await {
             match serde_json::to_vec(&response) {
                 Ok(bytes) => {
                     if let Err(e) = write_message(&mut writer, &bytes).await {
-                        error!("❌ Fatal stdout pipe error: {}. Exiting.", e);
-                        std::process::exit(1); // Zombie prevention
+                        error!("❌ [Main] Fatal stdout pipe error: {}. Chrome likely killed extension. Exiting.", e);
+                        std::process::exit(1);
                     }
                 }
-                Err(e) => error!("❌ Failed to serialize response: {}", e),
+                Err(e) => error!("❌ [Main] Failed to serialize IPC response: {}", e),
             }
         }
     });
 
     let mut reader = stdin();
-    info!("✅ Listening on stdin for Chrome extension...");
+    info!("✅ [Main] Listening on IPC stdin for Chrome Native Messages...");
 
-    // Main Reader Loop
+    // ── MAIN EVENT LOOP ──
     loop {
         let request_bytes = match read_message(&mut reader).await {
             Ok(bytes) => bytes,
             Err(_) => {
-                info!("👋 Chrome disconnected (EOF). Shutting down gracefully.");
+                info!("👋 [Main] Chrome disconnected (EOF). Shutting down daemon cleanly.");
                 break;
             }
         };
@@ -106,14 +131,13 @@ async fn main() -> Result<()> {
         let request: DaemonRequest = match serde_json::from_slice(&request_bytes) {
             Ok(req) => req,
             Err(e) => {
-                error!("❌ JSON parse error: {}", e);
-                // 🚀 SOTA: The RawEnvelope rescue mechanism
+                error!("❌ [Main] IPC JSON parse error: {}", e);
                 if let Ok(raw) = serde_json::from_slice::<messaging::protocol::RawEnvelope>(&request_bytes) {
                     if let Some(req_id) = raw.request_id {
                         let _ = tx.send(DaemonResponse::Error {
                             request_id: req_id,
                             success: false,
-                            error: format!("Invalid request payload: {}", e),
+                            error: format!("Invalid Native Message JSON: {}", e),
                         }).await;
                     }
                 }
@@ -124,96 +148,98 @@ async fn main() -> Result<()> {
         let req_id = request.request_id().to_string();
         let state_clone = Arc::clone(&state);
         let tx_clone = tx.clone();
+        
+        let json_path_clone = json_path.clone();
+        let safe_path_clone = safe_path.clone();
 
-        // Async Pre-Flight & Network Downloads
+        // ── REQUEST ROUTER ──
         tokio::spawn(async move {
-            
-            // ASYNC PHASE: Network I/O (Downloading the Model)
-            match &request {
-                DaemonRequest::AuditPolicy(_) | DaemonRequest::Chat(_) => {
-                    if !state_clone.inference_engine.is_loaded() {
-                        if let Err(e) = HardwareProfiler::verify_system_capabilities() {
-                            let _ = tx_clone.send(DaemonResponse::Error {
-                                request_id: req_id.clone(),
-                                success: false,
-                                error: format!("Hardware limits exceeded: {}", e),
-                            }).await;
-                            return; 
-                        }
+            match request {
+                
+                // 1. UI Toggles Offline Download
+                DaemonRequest::DownloadModels(_) => {
+                    info!("📥 [Main] User requested Offline Models Sync...");
+                    let result = state_clone.model_manager.ensure_all_available(Some(tx_clone.clone()), Some(req_id.clone())).await;
+                    
+                    if let Err(e) = result {
+                        let _ = tx_clone.send(DaemonResponse::Error {
+                            request_id: req_id.clone(),
+                            success: false,
+                            error: format!("Network download failed: {}", e),
+                        }).await;
+                        return;
+                    }
 
-                        if let Err(e) = state_clone.model_manager.ensure_model_available().await {
-                            let _ = tx_clone.send(DaemonResponse::Error {
-                                request_id: req_id.clone(),
-                                success: false,
-                                error: format!("Model download failed: {}", e),
-                            }).await;
-                            return; 
+                    // Dynamically boot RAG once downloaded
+                    let needs_rag = state_clone.rag_engine.read().await.is_none();
+                    if needs_rag {
+                        if let Ok(rag) = RagEngine::new(&json_path_clone, &safe_path_clone) {
+                            let mut guard = state_clone.rag_engine.write().await;
+                            *guard = Some(rag);
+                            info!("✅ [Main] Dynamically loaded Local RAG engine post-download.");
                         }
                     }
-                },
-                _ => {} 
-            }
-
-            // SYNC PHASE: CPU-Bound Math (SQLite & C++)
-            let req_id_clone = req_id.clone();
-            let response = timeout(
-                Duration::from_secs(INFERENCE_TIMEOUT_SECS + 10),
-                tokio::task::spawn_blocking(move || {
-                    route_request(request, state_clone)
-                })
-            )
-            .await
-            .unwrap_or_else(|_| {
-                error!("⏱️ Task timed out after {} seconds", INFERENCE_TIMEOUT_SECS + 10);
-                DaemonResponse::Error {
-                    request_id: req_id_clone.clone(),
-                    success: false,
-                    error: format!("Operation timed out after {} seconds", INFERENCE_TIMEOUT_SECS + 10),
                 }
-            })
-            .unwrap_or_else(|e| {
-                error!("Task panic: {}", e);
-                DaemonResponse::Error {
-                    request_id: req_id_clone,
-                    success: false,
-                    error: "Internal Daemon Panic".to_string(),
-                }
-            });
 
-            if tx_clone.send(response).await.is_err() {
-                error!("❌ Failed to send to writer task. Zombie prevention triggered.");
-                std::process::exit(1);
+                // 2. Handle LLM Execution in a Blocking Thread
+                _ => {
+                    let state_for_blocking = state_clone.clone();
+                    let tx_for_blocking = tx_clone.clone();
+
+                    let response_future = tokio::task::spawn_blocking(move || {
+                        // SOTA FIX: Acquire the global inference lock. 
+                        // If Chrome sends an Audit and a Chat simultaneously, they queue here instead of OOM-crashing.
+                        let _guard = state_for_blocking.inference_lock.lock().unwrap();
+                        
+                        let rt = tokio::runtime::Handle::current();
+                        route_request(request, state_for_blocking, tx_for_blocking, rt)
+                    });
+
+                    let final_response = timeout(Duration::from_secs(INFERENCE_TIMEOUT_SECS), response_future).await
+                        .unwrap_or_else(|_| {
+                            error!("⏱️ [Main] LLM Engine timed out after {}s", INFERENCE_TIMEOUT_SECS);
+                            DaemonResponse::Error {
+                                request_id: req_id.clone(),
+                                success: false,
+                                error: format!("LLM inference timed out after {}s", INFERENCE_TIMEOUT_SECS),
+                            }
+                        })
+                        .unwrap_or_else(|e| {
+                            error!("❌ [Main] LLM Engine panic: {}", e);
+                            DaemonResponse::Error {
+                                request_id: req_id.clone(),
+                                success: false,
+                                error: "Internal Local Engine Panic".to_string(),
+                            }
+                        });
+
+                    let _ = tx_clone.send(final_response).await;
+                }
             }
         });
     }
 
-    // Graceful Shutdown Sequence
     drop(tx); 
     let _ = writer_task.await; 
-    drop(_guard); 
 
-    info!("🛑 Ssense Native Daemon shut down gracefully.");
+    info!("🛑 [Main] Ssense Native Daemon terminated.");
     Ok(())
 }
 
-// ═══════════════════════════════════════════════════════════════
-// THE BLOCKING ROUTER (Runs on OS Thread Pool)
-// ═══════════════════════════════════════════════════════════════
-
-fn route_request(request: DaemonRequest, state: Arc<AppState>) -> DaemonResponse {
+fn route_request(
+    request: DaemonRequest, 
+    state: Arc<AppState>, 
+    tx: mpsc::Sender<DaemonResponse>, 
+    rt: tokio::runtime::Handle
+) -> DaemonResponse {
+    
     let req_id = request.request_id().to_string();
 
     match request {
         DaemonRequest::HealthCheck(_) => {
             let model_loaded = state.inference_engine.is_loaded();
             let metrics = state.inference_engine.get_metrics();
-            
-            // 🚀 SOTA POLISH: Sanitize f64 to prevent u32::MAX (Infinity) in the UI
-            let safe_tps = if metrics.avg_tokens_per_second.is_finite() {
-                metrics.avg_tokens_per_second as u32
-            } else {
-                0
-            };
+            let safe_tps = if metrics.avg_tokens_per_second.is_finite() { metrics.avg_tokens_per_second as u32 } else { 0 };
 
             DaemonResponse::HealthCheckResult {
                 request_id: req_id,
@@ -234,58 +260,59 @@ fn route_request(request: DaemonRequest, state: Arc<AppState>) -> DaemonResponse
         }
 
         DaemonRequest::AuditPolicy(req) => {
-            let domain = req.domain.clone();
-
-            // Fast Path: Lock-Free Cache Check
-            if let Some(cached_report) = state.cache.get_full_report(&domain) {
-                info!("⚡ Cache HIT for {}", domain);
+            if let Some(cached_report) = state.cache.get_full_report(&req.domain) {
                 return DaemonResponse::AuditPolicyResult {
                     request_id: req_id, success: true, report: cached_report, cached: true,
                 };
             }
 
-            // Slow Path: Global Double-Checked Lock
-            let _guard = state.inference_lock.lock().unwrap();
-
-            if let Some(cached_report) = state.cache.get_full_report(&domain) {
-                info!("⚡ Cache HIT for {} (Resolved Thundering Herd)", domain);
-                return DaemonResponse::AuditPolicyResult {
-                    request_id: req_id, success: true, report: cached_report, cached: true,
-                };
-            }
-
-            info!("🧠 Cache MISS for {}. Running Edge AI...", domain);
-            match state.inference_engine.audit_policy(&domain, &req.policy_text) {
+            match state.inference_engine.audit_policy(&req.domain, &req.policy_text) {
                 Ok(report) => {
-                    if let Err(e) = state.cache.save_audit(&domain, &report) {
-                        error!("❌ Failed to cache audit for {}: {}", domain, e);
-                    }
-                    info!("✅ Audit complete for {} (Score: {})", domain, report.dpdp_trust_score);
+                    let _ = state.cache.save_audit(&req.domain, &report);
                     DaemonResponse::AuditPolicyResult {
                         request_id: req_id, success: true, report, cached: false,
                     }
                 }
                 Err(e) => DaemonResponse::Error {
-                    request_id: req_id, success: false, error: format!("Inference failed: {}", e),
+                    request_id: req_id, success: false, error: format!("Offline inference failed: {}", e),
                 }
             }
         }
 
         DaemonRequest::Chat(req) => {
-            let _guard = state.inference_lock.lock().unwrap();
+            let context = state.cache.get_full_report(&req.domain);
+            let audit_ref = context.as_ref();
 
-            match state.cache.get_full_report(&req.domain) {
-                Some(context) => {
-                    match state.inference_engine.chat_with_context(&req.domain, &req.user_prompt, &context) {
-                        Ok(message) => DaemonResponse::ChatResult { request_id: req_id, success: true, message },
-                        Err(e) => DaemonResponse::Error { request_id: req_id, success: false, error: format!("Chat failed: {}", e) }
+            if audit_ref.is_none() {
+                return DaemonResponse::ChatStreamChunk {
+                    request_id: req_id, 
+                    token: "Please run an Audit on this site before asking questions.".to_string(),
+                    is_final: true,
+                };
+            }
+
+            let rag_guard = rt.block_on(async { state.rag_engine.read().await });
+
+            // SOTA FIX: Simulate streaming by executing the monolithic inference 
+            // and chunking it back over IPC. (True llama-cpp-2 streaming requires callbacks).
+            match state.inference_engine.chat_with_context(&req.domain, &req.user_prompt, audit_ref.unwrap(), rag_guard.as_ref()) {
+                Ok(message) => {
+                    // Send message natively to UI
+                    DaemonResponse::ChatStreamChunk {
+                        request_id: req_id,
+                        token: message,
+                        is_final: true,
                     }
                 }
-                None => DaemonResponse::ChatResult {
-                    request_id: req_id, success: true, 
-                    message: "I need to analyze this site's privacy policy before I can answer questions. Please visit the site first.".to_string(),
+                Err(e) => DaemonResponse::Error { 
+                    request_id: req_id, success: false, error: format!("Offline chat failed: {}", e) 
                 }
             }
+        }
+        
+        DaemonRequest::DownloadModels(_) => {
+            // Unreachable: Handled async upstream
+            DaemonResponse::Error { request_id: req_id, success: false, error: "Routing error".to_string() }
         }
     }
 }

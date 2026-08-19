@@ -1,185 +1,241 @@
 use anyhow::{bail, Context, Result};
+use directories::ProjectDirs;
 use reqwest::Client;
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 use std::time::Duration;
+use futures_util::StreamExt;
 
-const MODEL_FILENAME: &str = "qwen3.5-9b-instruct-q4_k_m.gguf";
-const FALLBACK_MODEL_FILENAME: &str = "qwen2.5-7b-instruct-q4_k_m.gguf";
-const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf";
-const EXPECTED_SHA256: &str = "REPLACE_WITH_ACTUAL_HASH"; 
-const DOWNLOAD_TIMEOUT_SECS: u64 = 3600;
+// ─────────────────────────────────────────────────────────────────
+// Ensure this matches your protocol definitions in messaging/protocol.rs
+// ─────────────────────────────────────────────────────────────────
+use crate::messaging::protocol::DaemonResponse; 
+
+const DOWNLOAD_TIMEOUT_SECS: u64 = 600;
 const MAX_RETRIES: u32 = 3;
+const BASE_URL: &str = "https://huggingface.co/PRiyanshu0-1/DPDP-SSense/resolve/main";
+
+#[derive(Debug)]
+pub struct Artifact {
+    pub name: &'static str,
+    pub filename: &'static str,
+    pub url_path: &'static str,
+}
+
+pub const ARTIFACTS: &[Artifact] = &[
+    Artifact {
+        name: "Forensic Audit Model (INT4)",
+        filename: "audit-model.Q4_K_M.gguf",
+        url_path: "audit-model-final-gguf/audit-model-final.Q4_K_M.gguf",
+    },
+    Artifact {
+        name: "Conversational Co-Pilot (INT4)",
+        filename: "chatbot-model.Q4_K_M.gguf",
+        url_path: "chatbot-model-final-gguf/chatbot-model-final.Q4_K_M.gguf",
+    },
+    Artifact {
+        name: "RAG Semantic Matrix",
+        filename: "dpdp_embeddings.safetensors",
+        url_path: "models/rag-index/dpdp_embeddings.safetensors",
+    },
+    Artifact {
+        name: "RAG Lexical Index",
+        filename: "dpdp_index.json",
+        url_path: "models/rag-index/dpdp_index.json",
+    },
+];
 
 pub struct ModelManager {
     models_dir: PathBuf,
     client: Client,
-    download_lock: tokio::sync::Mutex<()>, 
+    download_lock: tokio::sync::Mutex<()>,
 }
 
 impl ModelManager {
-    pub fn new(data_dir: &Path) -> Self {
+    /// SOTA Fix: Maps to safe OS directories (e.g., C:\Users\Name\AppData\Local\Ssense)
+    pub fn new() -> Result<Self> {
+        let proj_dirs = ProjectDirs::from("com", "Ssense", "ssense-native-daemon")
+            .context("Failed to determine OS local data directory")?;
+        
+        let data_dir = proj_dirs.data_dir().to_path_buf();
+        let models_dir = data_dir.join("models");
+
         let client = Client::builder()
             .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
-            .user_agent("Ssense-Daemon/1.0")
+            .user_agent("Ssense-Daemon/3.0")
             .build()
             .expect("Failed to build HTTP client");
 
-        Self {
-            models_dir: data_dir.join("models"),
+        Ok(Self {
+            models_dir,
             client,
             download_lock: tokio::sync::Mutex::new(()),
-        }
+        })
     }
 
-    pub async fn ensure_model_available(&self) -> Result<PathBuf> {
-        // 🚀 SOTA FIX: Fully async directory check
+    /// Check if all models are present to flip the UI toggle "Offline Mode: Ready"
+    pub async fn is_offline_ready(&self) -> bool {
+        for artifact in ARTIFACTS {
+            let path = self.models_dir.join(artifact.filename);
+            if fs::metadata(&path).await.is_err() {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn get_artifact_path(&self, filename: &str) -> PathBuf {
+        // Look in the OS models directory
+        self.models_dir.join(filename)
+    }
+
+    /// Executed ONLY when the user explicitly clicks "Download Offline Models" in the extension UI
+    pub async fn ensure_all_available(&self, tx: Option<mpsc::Sender<DaemonResponse>>, req_id: Option<String>) -> Result<()> {
         if fs::metadata(&self.models_dir).await.is_err() {
-            fs::create_dir_all(&self.models_dir).await?;
+            fs::create_dir_all(&self.models_dir).await.context("Failed to create models directory")?;
         }
 
-        let target_path = self.models_dir.join(MODEL_FILENAME);
-        
-        if self.is_model_available_at(&target_path).await {
-            return Ok(target_path);
-        }
-
+        // Prevent multiple simultaneous clicks from spawning duplicate downloads
         let _guard = self.download_lock.lock().await;
-        
-        if self.is_model_available_at(&target_path).await {
-            return Ok(target_path);
-        }
 
-        let temp_path = self.models_dir.join(format!("{}.part", MODEL_FILENAME));
-        
-        for attempt in 1..=MAX_RETRIES {
-            match self.download_model_with_resume(&temp_path).await {
-                Ok(_) => {
-                    match self.verify_checksum(&temp_path).await {
+        let mut futures = vec![];
+
+        for artifact in ARTIFACTS {
+            let target_path = self.get_artifact_path(artifact.filename);
+            
+            if fs::metadata(&target_path).await.is_ok() {
+                info!("✅ Artifact {} is already downloaded. Skipping.", artifact.name);
+                continue; 
+            }
+
+            let temp_path = self.models_dir.join(format!("{}.part", artifact.filename));
+            let url = format!("{}/{}", BASE_URL, artifact.url_path);
+            
+            let client = self.client.clone();
+            let tx_clone = tx.clone();
+            let req_id_clone = req_id.clone();
+            let target_path_clone = target_path.clone();
+            let name = artifact.name;
+
+            futures.push(tokio::spawn(async move {
+                for attempt in 1..=MAX_RETRIES {
+                    match Self::download_file_with_resume(&client, &url, &temp_path, name, tx_clone.clone(), req_id_clone.clone()).await {
                         Ok(_) => {
-                            fs::rename(&temp_path, &target_path).await.context("Failed to move verified model")?;
-                            info!("✅ Model downloaded, verified, and installed successfully.");
-                            return Ok(target_path);
+                            fs::rename(&temp_path, &target_path_clone).await.context("Failed to finalize verified model file")?;
+                            info!("✅ Artifact '{}' completely downloaded.", name);
+                            return Ok(());
                         }
                         Err(e) => {
-                            error!("Checksum failed on attempt {}: {}", attempt, e);
-                            let _ = fs::remove_file(&temp_path).await;
-                            if attempt == MAX_RETRIES { bail!("Checksum verification failed after {} attempts", MAX_RETRIES); }
+                            error!("Download attempt {} for '{}' failed: {}", attempt, name, e);
+                            if attempt == MAX_RETRIES { bail!("Fatal: Download failed for {}: {}", name, e); }
                         }
                     }
+                    tokio::time::sleep(Duration::from_secs(2u64.pow(attempt - 1))).await;
                 }
-                Err(e) => {
-                    error!("Download attempt {} failed: {}", attempt, e);
-                    if attempt == MAX_RETRIES { bail!("Download failed: {}", e); }
-                }
-            }
-            tokio::time::sleep(Duration::from_secs(2u64.pow(attempt - 1))).await;
+                bail!("Exhausted retries for {}", name);
+            }));
         }
-        
-        bail!("Model download failed after all retry attempts");
+
+        for f in futures {
+            f.await??;
+        }
+
+        // Notify Chrome UI that all models are ready
+        if let Some(channel) = &tx {
+            let _ = channel.send(DaemonResponse::Status { 
+                status: "success".to_string(), 
+                message: "Offline models ready.".to_string(), 
+                request_id: req_id 
+            }).await;
+        }
+
+        Ok(())
     }
 
-    async fn download_model_with_resume(&self, temp_path: &Path) -> Result<()> {
+    async fn download_file_with_resume(
+        client: &Client,
+        url: &str,
+        temp_path: &Path,
+        name: &'static str,
+        tx: Option<mpsc::Sender<DaemonResponse>>,
+        req_id: Option<String>,
+    ) -> Result<()> {
         let mut downloaded: u64 = 0;
         
-        // 🚀 SOTA FIX: Fully async file existence check
         let mut file = if fs::metadata(temp_path).await.is_ok() {
             let metadata = fs::metadata(temp_path).await?;
             downloaded = metadata.len();
-            info!("Resuming download from {} MB", downloaded / 1024 / 1024);
+            info!("Resuming download of '{}' from {} MB...", name, downloaded / 1024 / 1024);
             tokio::fs::OpenOptions::new().write(true).append(true).open(temp_path).await?
         } else {
             File::create(temp_path).await?
         };
 
-        let mut request = self.client.get(MODEL_URL);
+        let mut request = client.get(url);
         if downloaded > 0 {
             request = request.header("Range", format!("bytes={}-", downloaded));
         }
 
-        let response = request.send().await.context("Failed to initiate download")?;
+        let response = request.send().await.context("Failed to initiate HTTP download")?;
 
         if response.status() == reqwest::StatusCode::OK && downloaded > 0 {
-            warn!("Server ignored Range header. Restarting download from 0.");
+            warn!("Server ignored Range header. Restarting download of '{}' from 0.", name);
             drop(file); 
             file = File::create(temp_path).await?; 
             downloaded = 0;
         } else if !response.status().is_success() && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
-            bail!("HTTP error: {}", response.status());
+            bail!("HTTP network error: {}", response.status());
         }
 
-        let total_size = response.content_length()
-            .map(|len| len + downloaded)
-            .unwrap_or(0); // Fallback if server doesn't send Content-Length
+        let total_size = response.content_length().map(|len| len + downloaded).unwrap_or(0);
 
         let mut stream = response.bytes_stream();
         let mut last_log_percent = 0;
+        let mut last_update_time = std::time::Instant::now();
+        let mut bytes_since_last_update = 0;
 
-        use futures_util::StreamExt;
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("Error reading download stream")?;
+            let chunk = chunk.context("Error reading byte stream chunk")?;
             file.write_all(&chunk).await?;
-            downloaded += chunk.len() as u64;
+            
+            let chunk_len = chunk.len() as u64;
+            downloaded += chunk_len;
+            bytes_since_last_update += chunk_len;
+
+            let now = std::time::Instant::now();
+            let elapsed = now.duration_since(last_update_time).as_secs_f64();
 
             if total_size > 0 {
-                let percent = (downloaded as f64 / total_size as f64 * 100.0) as u64;
-                if percent >= last_log_percent + 10 {
-                    info!("Download: {}% ({} MB / {} MB)", percent, downloaded / 1024 / 1024, total_size / 1024 / 1024);
-                    last_log_percent = percent;
+                let percent = (downloaded as f64 / total_size as f64) * 100.0;
+                
+                // Throttle IPC messaging to ~2Hz to prevent Chrome Extension freezing
+                if elapsed >= 0.5 {
+                    let mb_per_sec = (bytes_since_last_update as f64 / 1024.0 / 1024.0) / elapsed;
+                    
+                    if let Some(channel) = &tx {
+                        let _ = channel.send(DaemonResponse::DownloadProgress {
+                            request_id: req_id.clone(),
+                            file: name.to_string(),
+                            pct: percent,
+                            mb_per_sec,
+                        }).await;
+                    }
+                    
+                    if percent as u64 >= last_log_percent + 5 {
+                        info!("Downloading '{}': {:.1}% ({} MB / {} MB)", name, percent, downloaded / 1024 / 1024, total_size / 1024 / 1024);
+                        last_log_percent = percent as u64;
+                    }
+                    
+                    last_update_time = now;
+                    bytes_since_last_update = 0;
                 }
             }
         }
 
         file.flush().await?;
         Ok(())
-    }
-
-    async fn verify_checksum(&self, file_path: &Path) -> Result<()> {
-        info!("Verifying model checksum...");
-        let mut file = File::open(file_path).await?;
-        let mut hasher = Sha256::new();
-        let mut buffer = [0u8; 8192];
-
-        loop {
-            let n = file.read(&mut buffer).await?;
-            if n == 0 { break; }
-            hasher.update(&buffer[..n]);
-        }
-
-        let hash_hex = format!("{:x}", hasher.finalize());
-        if !EXPECTED_SHA256.is_empty() && EXPECTED_SHA256 != "REPLACE_WITH_ACTUAL_HASH" {
-            if hash_hex != EXPECTED_SHA256 {
-                bail!("Checksum mismatch! Expected: {}, Actual: {}", EXPECTED_SHA256, hash_hex);
-            }
-            info!("Checksum verified.");
-        } else {
-            warn!("Checksum verification bypassed: placeholder SHA256 in use.");
-        }
-        Ok(())
-    }
-
-    pub fn get_model_path(&self) -> PathBuf {
-        let candidates = [
-            self.models_dir.join(MODEL_FILENAME),
-            self.models_dir.join(FALLBACK_MODEL_FILENAME),
-            PathBuf::from("../../ml/models").join(MODEL_FILENAME),
-            PathBuf::from("../../ml/models").join(FALLBACK_MODEL_FILENAME),
-            PathBuf::from("ml/models").join(MODEL_FILENAME),
-            PathBuf::from("ml/models").join(FALLBACK_MODEL_FILENAME),
-        ];
-        for candidate in candidates.iter() {
-            if candidate.exists() {
-                return candidate.clone();
-            }
-        }
-        self.models_dir.join(MODEL_FILENAME)
-    }
-
-    // 🚀 SOTA FIX: Fully async existence check
-    async fn is_model_available_at(&self, path: &Path) -> bool {
-        fs::metadata(path).await.is_ok()
     }
 }

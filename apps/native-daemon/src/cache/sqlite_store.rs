@@ -1,17 +1,16 @@
-// apps/native-daemon/src/cache/sqlite_store.rs
-
 use anyhow::{Context, Result};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
-use sha2::{Digest, Sha256};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, error, info};
 
 use crate::messaging::protocol::DpdpAuditReport;
 
-const TTL_SECONDS: i64 = 86400; // 24 Hours
+const TTL_SECONDS: i64 = 86400; // 24 Hours Cache Expiration
 
 pub struct SqliteStore {
     pool: Pool<SqliteConnectionManager>,
@@ -21,14 +20,13 @@ impl SqliteStore {
     pub fn new(data_dir: &Path) -> Result<Self> {
         let db_path = data_dir.join("ssense_cache.db");
         
-        // 🚀 SOTA FIX 3: Thread-local PRAGMAs only. 
-        // Prevents database-level lock contention when r2d2 spawns new threads.
+        // SOTA FIX 1: Thread-local PRAGMAs for high-speed r2d2 pooling
         let manager = SqliteConnectionManager::file(&db_path)
             .with_init(|conn| {
                 conn.execute_batch(
-                    "PRAGMA busy_timeout=5000;        -- Wait 5s for locks
-                     PRAGMA cache_size=-20000;        -- Allocate 20MB of RAM for page cache
-                     PRAGMA temp_store=MEMORY;        -- Force temp tables/sorts into RAM"
+                    "PRAGMA busy_timeout=5000;
+                     PRAGMA cache_size=-20000;
+                     PRAGMA temp_store=MEMORY;"
                 )
             });
             
@@ -39,8 +37,7 @@ impl SqliteStore {
 
         let conn = pool.get().context("Failed to get initial DB connection")?;
         
-        // 🚀 SOTA FIX 3: Global PRAGMAs and Schema execution.
-        // These alter the physical .db file and only need to be run once on startup.
+        // SOTA FIX 2: Global PRAGMAs (WAL mode for zero-blocking concurrent reads/writes)
         conn.execute_batch(
             "PRAGMA journal_mode=WAL;
              PRAGMA synchronous=NORMAL;
@@ -53,32 +50,29 @@ impl SqliteStore {
             );"
         ).context("Failed to initialize SQLite schema")?;
 
-        info!("✅ SQLite Connection Pool initialized at {:?}", db_path);
+        info!("✅ [SqliteStore] Connected to Local Cache at {:?}", db_path);
 
-        // 🚀 SOTA FIX 1: Active Pruning on Boot.
-        // Prevents the "Lazy Purge" disk leak by wiping all expired audits instantly.
-        let now = Self::now_unix();
-        let expiration_threshold = now - TTL_SECONDS;
-        match conn.execute("DELETE FROM audits WHERE created_at <= ?1", params![expiration_threshold]) {
-            Ok(purged) if purged > 0 => info!("🧹 Active Pruning: Purged {} expired audits from disk", purged),
-            Ok(_) => debug!("🧹 Active Pruning: Cache is clean."),
-            Err(e) => error!("❌ Failed to purge expired audits: {}", e),
-        }
+        // Run initial prune
+        Self::prune_expired(&conn);
 
         Ok(Self { pool })
     }
 
-    /// 🚀 SOTA FIX 2: Domain Normalization
-    /// Strips "www." to ensure 'www.amazon.com' and 'amazon.com' share the same cache hit.
+    /// SOTA FIX 3: Domain Normalization
+    /// Strips "www." and "en." prefixes so "www.amazon.in" and "amazon.in" hit the same cache.
     fn normalize_domain(domain: &str) -> String {
-        domain.to_lowercase().trim_start_matches("www.").to_string()
+        let lower = domain.to_lowercase();
+        let stripped = lower.trim_start_matches("www.").trim_start_matches("en.");
+        stripped.to_string()
     }
 
+    /// SOTA FIX 4: Replaced heavy external `sha2` crate with Rust's native deterministic hasher
+    /// for smaller binary size and faster local execution.
     fn hash_domain(domain: &str) -> String {
         let normalized = Self::normalize_domain(domain);
-        let mut hasher = Sha256::new();
-        hasher.update(normalized.as_bytes());
-        format!("{:x}", hasher.finalize())
+        let mut hasher = DefaultHasher::new();
+        normalized.hash(&mut hasher);
+        format!("{:x}", hasher.finish())
     }
 
     fn now_unix() -> i64 {
@@ -86,6 +80,16 @@ impl SqliteStore {
             .duration_since(UNIX_EPOCH)
             .unwrap_or(std::time::Duration::ZERO)
             .as_secs() as i64
+    }
+
+    /// Wipes expired records. Can be called safely from a background thread.
+    pub fn prune_expired(conn: &rusqlite::Connection) {
+        let expiration_threshold = Self::now_unix() - TTL_SECONDS;
+        match conn.execute("DELETE FROM audits WHERE created_at <= ?1", params![expiration_threshold]) {
+            Ok(purged) if purged > 0 => info!("🧹 [SqliteStore] Purged {} expired audits from disk", purged),
+            Ok(_) => debug!("🧹 [SqliteStore] Cache is clean."),
+            Err(e) => error!("❌ [SqliteStore] Failed to purge expired audits: {}", e),
+        }
     }
 
     pub fn get_trust_score(&self, domain: &str) -> Option<i32> {
@@ -106,11 +110,7 @@ impl SqliteStore {
                 }
                 Some(score)
             }
-            Err(rusqlite::Error::QueryReturnedNoRows) => None,
-            Err(e) => {
-                error!("❌ SQLite read error (trust_score): {}", e);
-                None
-            }
+            _ => None,
         }
     }
 
@@ -132,9 +132,12 @@ impl SqliteStore {
                 }
 
                 match serde_json::from_str(&json_str) {
-                    Ok(report) => Some(report),
+                    Ok(report) => {
+                        info!("🎯 [SqliteStore] CACHE HIT: {} (Score: {})", domain, report.dpdp_trust_score);
+                        Some(report)
+                    },
                     Err(e) => {
-                        error!("❌ Failed to parse cached JSON for {}: {}", domain, e);
+                        error!("❌ [SqliteStore] Failed to parse cached JSON for {}: {}", domain, e);
                         let _ = conn.execute("DELETE FROM audits WHERE domain_hash = ?1", params![hash]);
                         None
                     }
@@ -144,11 +147,13 @@ impl SqliteStore {
         }
     }
 
+    /// Can be called by the Chrome Extension directly when it receives a report from the Cloud Server
+    /// OR by the LocalEngine when running in Offline Mode.
     pub fn save_audit(&self, domain: &str, report: &DpdpAuditReport) -> Result<()> {
         let conn = self.pool.get().context("Failed to get DB connection for save")?;
         let hash = Self::hash_domain(domain);
-        // We still save the normalized domain name for logging/debugging context
         let normalized_domain = Self::normalize_domain(domain); 
+        
         let json_str = serde_json::to_string(report).context("Failed to serialize report to JSON")?;
         let now = Self::now_unix();
 
@@ -158,7 +163,7 @@ impl SqliteStore {
             params![hash, normalized_domain, json_str, report.dpdp_trust_score, now],
         ).context("Failed to execute INSERT OR REPLACE")?;
 
-        info!("💾 Cached audit for {} (Score: {})", normalized_domain, report.dpdp_trust_score);
+        info!("💾 [SqliteStore] Saved audit for {} (Score: {}) to local disk.", normalized_domain, report.dpdp_trust_score);
         Ok(())
     }
 

@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Ssense DPDP Shield</title>
+  <title>Ssense</title>
   <style>
     :root {
       color-scheme: dark;
@@ -15,26 +15,30 @@
     body {
       margin: 0;
       padding: 0;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      /* ChatInterface.tsx handles the internal scrolling */
+      width: 400px;
+      /* SOTA FIX: Expanded from 320px for dense ML UI */
+      height: 600px;
+      /* Locked height prevents the popup from "snapping" during render */
       background-color: #09090B;
       color: #FAFAFA;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      /* Prevent double-scrollbars in Chrome dropdown */
     }
 
     #root {
       width: 100%;
       height: 100%;
+      display: flex;
+      flex-direction: column;
     }
   </style>
 </head>
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/sidebar/main.tsx"></script>
+  <script type="module" src="/src/popup/main.tsx"></script>
 </body>
 
 </html>

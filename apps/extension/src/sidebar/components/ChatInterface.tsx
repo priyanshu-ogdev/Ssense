@@ -6,7 +6,7 @@ import type { ChatResponse, DpdpAuditReport } from '../../types/native-protocol'
 // ═══════════════════════════════════════════════════════════════
 // 1. DESIGN SYSTEM
 // ═══════════════════════════════════════════════════════════════
-const DESIGN_SYSTEM_CSS = `
+export const DESIGN_SYSTEM_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
   :root {
@@ -143,7 +143,7 @@ const MessageBubble = React.memo(({ msg }: { msg: { role: 'user' | 'ai'; text: s
 // ═══════════════════════════════════════════════════════════════
 // 4. MAIN CO-PILOT INTERFACE
 // ═══════════════════════════════════════════════════════════════
-export const ChatInterface: React.FC = () => {
+export const ChatInterface: React.FC<{ onOpenHistory?: () => void }> = ({ onOpenHistory }) => {
   const [domain, setDomain] = useState<string | null>(null);
   const [isSystemPage, setIsSystemPage] = useState(false);
   const [trustScore, setTrustScore] = useState<number | null>(null);
@@ -154,7 +154,6 @@ export const ChatInterface: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [loadingText, setLoadingText] = useState('Waking Edge AI...');
   const [isDaemonOnline, setIsDaemonOnline] = useState(true);
-  const [engineMode, setEngineMode] = useState<'AUTO' | 'LOCAL_DAEMON' | 'CLOUD_SERVER'>('AUTO');
   const [tps, setTps] = useState<number>(120);
   const [showShieldSettings, setShowShieldSettings] = useState(false);
   const [shieldSettings, setShieldSettings] = useState({
@@ -197,16 +196,15 @@ export const ChatInterface: React.FC = () => {
   const currentDomainRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const styleTag = document.createElement('style');
-    styleTag.innerHTML = DESIGN_SYSTEM_CSS;
-    document.head.appendChild(styleTag);
-    return () => { document.head.removeChild(styleTag); };
+    // NOTE: CSS injection lives in App.tsx now (mounted once, never torn
+    // down) so switching between ChatInterface and HistoryView doesn't
+    // rip the stylesheet out from under whichever view is showing.
   }, []);
 
   useEffect(() => {
-    chrome.runtime.sendMessage({ type: 'GET_ENGINE_CONFIG' })
-      .then(cfg => { if (cfg?.mode) setEngineMode(cfg.mode); })
-      .catch(() => {});
+    // NOTE: GET_ENGINE_CONFIG no longer has a `mode` field (dual-mode was
+    // removed — SLM server is the only backend). This check now just
+    // confirms the ping below actually finds a reachable server config.
 
     const pingDaemon = () => {
       chrome.runtime.sendMessage({ type: 'HEALTH_CHECK', requestId: 'ping' })
@@ -350,20 +348,20 @@ export const ChatInterface: React.FC = () => {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <select
-            value={engineMode}
-            onChange={(e) => {
-              const mode = e.target.value as any;
-              setEngineMode(mode);
-              chrome.runtime.sendMessage({ type: 'SET_ENGINE_MODE', mode });
-            }}
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--ssense-border)', borderRadius: '6px', color: 'var(--ssense-text-primary)', fontSize: '11px', padding: '3px 6px', outline: 'none', cursor: 'pointer' }}
+          <button
+            onClick={() => onOpenHistory?.()}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+            title="View browsing history and past audits"
           >
-            <option value="AUTO">⚡ Auto Failover</option>
-            <option value="LOCAL_DAEMON">🖥️ Local Bare-Metal</option>
-            <option value="CLOUD_SERVER">☁️ Cloud Virtual Server</option>
-          </select>
-
+            🕘 History
+          </button>
+          <button
+            onClick={() => chrome.runtime.openOptionsPage()}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+            title="Configure server URL, API key, and HMAC secret"
+          >
+            ⚙️ Settings
+          </button>
           <div style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', background: 'rgba(6, 182, 212, 0.1)', color: 'var(--ssense-accent-cyan)' }}>
             {tps} TPS
           </div>

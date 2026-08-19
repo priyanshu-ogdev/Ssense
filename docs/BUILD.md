@@ -57,16 +57,21 @@ Chrome's Native Messaging API is notoriously fragile; a single unhandled stringi
 
 ## 🖥️ 4. Hardware Orchestration: Edge vs. Cloud Server
 
-### The Local Edge Paradigm (`LOCAL_DAEMON` Mode)
+> **⚠️ `LOCAL_DAEMON` mode and the dual-mode engine selector described in
+> this section have been removed.** The extension now talks to the SLM
+> server exclusively — see `docs/DEPLOYMENT.md`. The subsections below are
+> kept for historical design context only.
+
+### The Local Edge Paradigm (`LOCAL_DAEMON` Mode) *(removed)*
 Ssense runs the Qwen 9B model locally via `llama-cpp-rs`.
 * **Hardware Profiler (`hardware_profiler.rs`):** Before booting the engine, the profiler interrogates the host operating system. 
 * **GPU Acceleration:** If a compatible GPU is detected, it sets `n_gpu_layers = 9999`, offloading all tensor math to VRAM and achieving <100ms latency.
 * **CPU Fallback:** If no GPU is present, the profiler dynamically calculates the optimal thread count based strictly on *physical* cores (ignoring hyper-threading to prevent L1 cache thrashing).
 
-### The Cloud Virtual SLM Server (`CLOUD_SERVER` Failover Mode)
-To support enterprise deployments across low-end endpoints and mobile devices, Ssense incorporates a Virtual SLM Server (`apps/slm-server`).
-* **Dynamic Engine Selector:** Users can toggle between `AUTO` (local first, cloud failover), `LOCAL_DAEMON`, and `CLOUD_SERVER` directly from the Extension UI.
-* **Exponential Backoff:** If the local daemon disconnects (or the host runs out of RAM), the service worker intelligently fails over to the Virtual SLM Server using an exponential backoff retry schedule.
+### The Cloud Virtual SLM Server (now the only mode)
+Ssense runs on a Virtual SLM Server (`apps/slm-server`) behind Nginx.
+* ~~**Dynamic Engine Selector:** Users can toggle between `AUTO` (local first, cloud failover), `LOCAL_DAEMON`, and `CLOUD_SERVER` directly from the Extension UI.~~ *(removed — no selector, server-only)*
+* ~~**Exponential Backoff:** If the local daemon disconnects (or the host runs out of RAM), the service worker intelligently fails over to the Virtual SLM Server using an exponential backoff retry schedule.~~ *(removed — nothing to fail over from)*
 
 ---
 

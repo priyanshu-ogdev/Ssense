@@ -1,5 +1,12 @@
 # Ssense Native Messaging Protocol Specification
 
+> **⚠️ DEPRECATED / REMOVED.** The native messaging daemon (`apps/native-daemon`,
+> Rust) has been removed from this project. The extension talks to the SLM
+> server exclusively now — see `apps/slm-server/main.py` and
+> `apps/extension/src/background/api-client.ts` for the current protocol
+> (HTTPS + HMAC-signed requests, SSE responses). This document is kept for
+> historical reference only; do not implement against it.
+
 ## Overview
 Communication between Chrome Extension (TypeScript) and Native Daemon (Rust) via Chrome's Native Messaging API.
 

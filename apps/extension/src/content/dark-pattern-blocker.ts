@@ -113,30 +113,37 @@ function executeNetworkActions(report: DpdpAuditReport) {
 
   // 3. Real-Time MutationObserver (Optimized for SPAs & Dynamic Injections)
   const observer = new MutationObserver((mutations) => {
-    const elementsToCheck: Element[] = [];
-    
+    // OPTIMIZATION: use a Set instead of an array. On SPAs a single burst of
+    // mutations frequently touches the same element more than once (e.g. an
+    // added container plus one of its own descendants also reported, or an
+    // attribute change on a node that childList already queued) — dedupe
+    // once here instead of paying for the same textContent/src scan twice
+    // downstream in blockElements/highlightViolationsInNodes.
+    const elementsToCheck = new Set<Element>();
+
     for (const mutation of mutations) {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach(node => {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const el = node as Element;
-            elementsToCheck.push(el);
+            elementsToCheck.add(el);
             // Check descendants of the added node
             const descendants = el.querySelectorAll?.('iframe, script, img, p, span, div, li, h1, h2, h3, h4, h5, h6');
-            descendants?.forEach(desc => elementsToCheck.push(desc));
+            descendants?.forEach(desc => elementsToCheck.add(desc));
           }
         });
       } 
       // 🚀 SOTA FIX: Catch dynamic SPA src/href changes on existing elements
       else if (mutation.type === 'attributes' && mutation.target) {
-        elementsToCheck.push(mutation.target as Element);
+        elementsToCheck.add(mutation.target as Element);
       }
     }
 
-    if (elementsToCheck.length > 0) {
+    if (elementsToCheck.size > 0) {
+      const batch = Array.from(elementsToCheck);
       requestAnimationFrame(() => {
-        if (badDomains.length > 0) blockElements(elementsToCheck, badDomains);
-        if (quotesToHighlight.length > 0) highlightViolationsInNodes(elementsToCheck, quotesToHighlight);
+        if (badDomains.length > 0) blockElements(batch, badDomains);
+        if (quotesToHighlight.length > 0) highlightViolationsInNodes(batch, quotesToHighlight);
       });
     }
   });
@@ -240,6 +247,15 @@ function sweepAndBlock(rootNode: HTMLElement, badDomains: string[]) {
   }
 }
 
+// OPTIMIZATION: cap how large a container's subtree we're willing to
+// stringify via .textContent per call. When a big nested subtree is added
+// (e.g. an SPA route render), the MutationObserver batch already includes
+// each descendant individually — so also computing .textContent on their
+// large ancestor containers re-walks the same text repeatedly (effectively
+// O(depth) redundant work per insertion). Skipping large containers here
+// relies on their smaller descendants being checked directly instead.
+const MAX_DESCENDANTS_FOR_TEXT_SCAN = 200;
+
 // 🚀 SOTA: Incremental Highlighting (Only scans provided nodes)
 function highlightViolationsInNodes(nodes: Element[], quotes: string[]) {
   try {
@@ -247,7 +263,8 @@ function highlightViolationsInNodes(nodes: Element[], quotes: string[]) {
       // Only process text-bearing elements to save CPU
       if (['P', 'SPAN', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TD', 'TH'].includes(el.tagName)) {
         if (el.classList.contains('ssense-highlight-violation')) continue;
-        
+        if (el.getElementsByTagName('*').length > MAX_DESCENDANTS_FOR_TEXT_SCAN) continue;
+
         const text = (el.textContent || '').toLowerCase().replace(/\s+/g, ' ');
         
         for (const quote of quotes) {

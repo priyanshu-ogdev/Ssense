@@ -6,7 +6,6 @@
   "permissions": [
     "sidePanel",
     "storage",
-    "nativeMessaging",
     "scripting",
     "tabs"
   ],
@@ -24,7 +23,7 @@
     },
     {
       "matches": ["<all_urls>"],
-      "js": ["content/extractor.js", "content/dark-pattern-blocker.js"],
+      "js": ["content/extractor.js", "content/dark-pattern-blocker.js", "content/chat-widget.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }
@@ -32,8 +31,10 @@
   "side_panel": {
     "default_path": "sidepanel.html"
   },
+  "options_page": "options.html",
   "action": {
-    "default_title": "Open Ssense DPDP Shield"
+    "default_title": "Open Ssense DPDP Shield",
+    "default_popup": "popup.html"
   },
   "icons": {
     "16": "icons/icon16.png",
