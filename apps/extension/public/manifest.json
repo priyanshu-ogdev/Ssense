@@ -1,30 +1,45 @@
 {
   "manifest_version": 3,
   "name": "Ssense - DPDP Compliance Shield",
-  "version": "0.1.0",
-  "description": "Real-time enforcement of India's Digital Personal Data Protection Act",
+  "version": "0.4.0",
+  "description": "Real-time DPDP compliance protection with fast cloud inference and optional on-device private inference.",
   "permissions": [
     "sidePanel",
     "storage",
     "scripting",
-    "tabs"
+    "tabs",
+    "nativeMessaging"
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/api-spoof.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/api-spoof.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/extractor.js", "content/dark-pattern-blocker.js", "content/chat-widget.js"],
-      "css": ["content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/extractor.js",
+        "content/dark-pattern-blocker.js",
+        "content/chat-widget.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],

@@ -1,44 +1,69 @@
-# Ssense Native Messaging Protocol Specification
+# Ssense Native Messaging Protocol
 
-> **⚠️ DEPRECATED / REMOVED.** The native messaging daemon (`apps/native-daemon`,
-> Rust) has been removed from this project. The extension talks to the SLM
-> server exclusively now — see `apps/slm-server/main.py` and
-> `apps/extension/src/background/api-client.ts` for the current protocol
-> (HTTPS + HMAC-signed requests, SSE responses). This document is kept for
-> historical reference only; do not implement against it.
+This is the live contract between the Chrome extension and the Rust edge daemon.
 
-## Overview
-Communication between Chrome Extension (TypeScript) and Native Daemon (Rust) via Chrome's Native Messaging API.
+## Transport
 
-## Binary Framing
-All messages use the same framing format:
-[4 bytes: uint32 little-endian message length] [N bytes: JSON payload]
+Chrome Native Messaging uses:
 
-Maximum message size: 10 MB (enforced by daemon).
+- 4-byte unsigned little-endian message length
+- UTF-8 JSON payload
+- maximum message size enforced by the daemon
 
-## Message Types
+## Requests
 
-### Requests (Extension → Daemon)
+| Type | Purpose |
+|---|---|
+| `AUDIT_POLICY` | Audit a privacy policy locally |
+| `CHAT` | Ask the local DPDP co-pilot |
+| `GET_TRUST_SCORE` | Read a locally cached score |
+| `HEALTH_CHECK` | Check daemon health |
+| `DOWNLOAD_MODELS` | Explicitly download the optional offline model bundle |
 
-| Type | Description |
-|------|-------------|
-| `AUDIT_POLICY` | Submit privacy policy text for DPDP audit |
-| `CHAT` | Conversational query about a site's compliance |
-| `GET_TRUST_SCORE` | Retrieve cached trust score for a domain |
-| `HEALTH_CHECK` | Verify daemon is alive and model loaded |
+## Download events
 
-### Responses (Daemon → Extension)
+`DOWNLOAD_MODELS` is long-running. The daemon **does not** answer with a progress response that resolves the request.
 
-| Type | Description |
-|------|-------------|
-| `AUDIT_POLICY_RESULT` | Full DPDP audit report |
-| `CHAT_RESULT` | Natural language response |
-| `TRUST_SCORE_RESULT` | Cached score (or null) |
-| `HEALTH_CHECK_RESULT` | Daemon status |
-| `ERROR` | Error with message |
+Instead it emits:
 
-## Type Synchronization
-- TypeScript types: `apps/extension/src/types/native-protocol.ts`
-- Rust types: `apps/native-daemon/src/messaging/protocol.rs`
+```json
+{
+  "type": "DOWNLOAD_PROGRESS",
+  "requestId": "…",
+  "file": "Forensic Audit Model (INT4)",
+  "pct": 42.5,
+  "mbPerSec": 18.4
+}
+```
 
-**These MUST be manually kept in sync.** Any change to one requires a matching change to the other.
+When all artifacts are complete:
+
+```json
+{
+  "type": "STATUS",
+  "requestId": "…",
+  "status": "success",
+  "message": "Offline models ready."
+}
+```
+
+The extension treats `DOWNLOAD_PROGRESS` and `STATUS` as events and keeps the download request pending until the terminal response.
+
+## Offline model storage
+
+The daemon resolves its application data directory using the Rust `directories` crate. Models are stored under:
+
+`<OS local application data>/Ssense/ssense-native-daemon/models`
+
+On Windows this resolves inside the user's local `AppData` area rather than a repository-relative `../../ml` directory.
+
+Downloads use `.part` files and HTTP `Range` requests. If Chrome, the daemon, or the network is interrupted, the next explicit Offline Mode download resumes from the existing partial file.
+
+## Privacy UX contract
+
+1. The extension starts in **Cloud · Fast** mode.
+2. Installing the extension does **not** download the model bundle.
+3. The user explicitly enables **Private · Offline** mode.
+4. The extension asks the daemon to download the model bundle.
+5. The popup displays file-level percentage and throughput.
+6. Offline mode is marked ready only after the daemon reports success.

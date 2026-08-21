@@ -40,7 +40,7 @@ function openDb(): Promise<IDBDatabase> {
   return _dbPromise;
 }
 
-async function getEntry(domain: string): Promise<SiteHistoryEntry | null> {
+export async function getEntry(domain: string): Promise<SiteHistoryEntry | null> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');

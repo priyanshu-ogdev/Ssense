@@ -54,9 +54,20 @@ export interface DownloadModelsRequest {
 // RESPONSES (SLM Server / Rust Daemon -> Extension)
 // ═══════════════════════════════════════════════════════════════
 
+
+export interface ChatResultResponse {
+  type: "CHAT_RESULT";
+  requestId: string;
+  success: true;
+  message: string;
+}
+
+export type ChatResponse = ChatResultResponse | ErrorResponse;
+
 export type DaemonResponse =
   | AuditPolicyResponse
   | ChatStreamChunk
+  | ChatResultResponse
   | GetTrustScoreResponse
   | HealthCheckResponse
   | StatusResponse
@@ -115,17 +126,36 @@ export interface ErrorResponse {
   requestId: string;
   success: false;
   error: string;
+  errorKind?: 'network' | 'server' | 'auth' | 'timeout' | 'model' | 'native' | 'parse' | 'unknown';
+  retryable?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED TYPES (Strictly matching dpdp_schema.json & Rust Structs)
 // ═══════════════════════════════════════════════════════════════
 
+export interface ExplainabilityFeature {
+  feature: string;
+  shap_value: number;
+  value?: number | string;
+  direction?: 'positive' | 'negative' | 'neutral';
+  evidence?: string;
+}
+
+export interface AuditExplainability {
+  method: 'SHAP' | 'evidence_attribution';
+  base_value?: number;
+  output_value?: number;
+  model?: string;
+  features: ExplainabilityFeature[];
+}
+
 export interface DpdpAuditReport {
   global_legal_reasoning: string;
   violations: Violation[];
   dpdp_trust_score: number;
   subtlety_score: number;
+  explainability?: AuditExplainability;
 }
 
 export interface Violation {

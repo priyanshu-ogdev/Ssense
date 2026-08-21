@@ -18,15 +18,15 @@
   const stealthProxy = <T extends object, K extends keyof T>(
     targetObj: T,
     targetMethod: K,
-    proxyHandler: ProxyHandler<T[K]>
+    proxyHandler: ProxyHandler<(...args: any[]) => any>
   ) => {
     try {
       const original = targetObj[targetMethod];
       if (typeof original !== 'function') return;
 
-      const proxy = new Proxy(original as any, proxyHandler);
-      spoofedFunctions.add(proxy as any);
-      targetObj[targetMethod] = proxy as any;
+      const proxy = new Proxy(original as unknown as (...args: any[]) => any, proxyHandler);
+      spoofedFunctions.add(proxy as unknown as object);
+      targetObj[targetMethod] = proxy as unknown as T[K];
     } catch (e) { /* Ignore strict mode/CSP blocks */ }
   };
 
@@ -146,7 +146,7 @@
     if (typeof HTMLIFrameElement !== 'undefined') {
       const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
       if (originalContentWindow && originalContentWindow.get) {
-        const contentWindowGetter = function contentWindow() {
+        const contentWindowGetter = function contentWindow(this: HTMLIFrameElement) {
           const cw = originalContentWindow.get!.call(this);
           if (cw) { try { applySpoofs(cw); } catch (e) {} }
           return cw;
@@ -161,7 +161,7 @@
 
   // 7. Network Telemetry & Tracker Interception Hooks (fetch / XHR)
   try {
-    if (typeof window !== 'undefined' && window.fetch) {
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
       stealthProxy(window, 'fetch', {
         apply(target, thisArg, args) {
           const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) ? args[0].url : '';
@@ -180,7 +180,7 @@
       });
     }
 
-    if (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) {
+    if (typeof XMLHttpRequest !== 'undefined' && typeof XMLHttpRequest.prototype.open === 'function') {
       stealthProxy(XMLHttpRequest.prototype, 'open', {
         apply(target, thisArg, args) {
           const urlStr = typeof args[1] === 'string' ? args[1] : '';

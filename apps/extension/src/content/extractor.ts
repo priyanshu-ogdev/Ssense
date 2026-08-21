@@ -251,12 +251,24 @@ async function extractPolicyText(url: string): Promise<string | null> {
   }
 
   try {
+    // Store a local privacy snapshot before inference. The snapshot contains
+    // the exact source URL, extracted text length and hash, and is never
+    // uploaded by the content script itself. The service worker records the
+    // eventual Cloud/Offline transport after the audit completes.
+    await chrome.runtime.sendMessage({
+      type: 'PRIVACY_SNAPSHOT',
+      domain: window.location.hostname,
+      pageUrl: window.location.href,
+      policyUrl,
+      policyText: safeText,
+    });
+
     await chrome.runtime.sendMessage({
       type: 'AUDIT_POLICY',
       domain: window.location.hostname,
       policyText: safeText,
     });
-    console.log('[Ssense] Policy sent to Service Worker for audit.');
+    console.log('[Ssense] Privacy snapshot stored and policy queued for audit.');
   } catch (err) {
     console.error('[Ssense] Failed to send policy to Service Worker:', err);
   }

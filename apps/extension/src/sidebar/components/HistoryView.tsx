@@ -75,25 +75,27 @@ export const HistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   return (
     <div className="ssense-root">
       <header className="ssense-header">
-        <div className="ssense-header-left">
-          <button
-            onClick={onBack}
-            style={{ background: 'none', border: 'none', color: 'var(--ssense-text-secondary)', cursor: 'pointer', fontSize: 16, padding: '2px 4px' }}
-            title="Back"
-          >
-            ←
-          </button>
-          <div className="ssense-header-info">
-            <div className="ssense-domain">History &amp; Audit Log</div>
-            <div style={{ fontSize: 11, color: 'var(--ssense-text-muted)' }}>{entries.length} sites tracked</div>
+        <div className="ssense-header-top">
+          <div className="ssense-header-left">
+            <button
+              onClick={onBack}
+              style={{ background: 'none', border: 'none', color: 'var(--ssense-text-secondary)', cursor: 'pointer', fontSize: 16, padding: '2px 4px' }}
+              title="Back"
+            >
+              ←
+            </button>
+            <div className="ssense-header-info">
+              <div className="ssense-domain">History &amp; Audit Log</div>
+              <div style={{ fontSize: 11, color: 'var(--ssense-text-muted)' }}>{entries.length} sites tracked</div>
+            </div>
           </div>
+          <button
+            onClick={handleClear}
+            style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', color: 'var(--ssense-accent-rose)', fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
+          >
+            Clear All
+          </button>
         </div>
-        <button
-          onClick={handleClear}
-          style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', color: 'var(--ssense-accent-rose)', fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }}
-        >
-          Clear All
-        </button>
       </header>
 
       <div style={{ padding: '10px 16px', display: 'flex', gap: 8, borderBottom: '1px solid var(--ssense-border)' }}>

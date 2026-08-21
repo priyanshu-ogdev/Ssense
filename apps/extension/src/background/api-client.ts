@@ -1,28 +1,74 @@
 // apps/extension/src/background/api-client.ts
 
 import { nativeBridge } from './native-messaging';
-import type { DaemonRequest, DaemonResponse } from '../types/native-protocol';
-
-const DEFAULT_SERVER_URL = 'http://localhost:8080';
+import type { DaemonResponse } from '../types/native-protocol';
+import { LOCAL_SERVER_URL, ONLINE_SERVER_URL, DEFAULT_SERVER_MODE, type ServerMode } from '../config';
 
 export interface RouterConfig {
   url: string;
+  resolvedMode: 'local' | 'online';
   apiKey: string;
   hmacSecret: string;
   offlineMode: boolean;
   configured: boolean;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ENDPOINT RESOLUTION
+// ═══════════════════════════════════════════════════════════════
+// There is no editable "server URL" field anymore. The user only picks
+// a mode — Auto / Local / Online — and we resolve that to one of the
+// two fixed constants in config.ts. In "auto" mode we probe the local
+// server first (short timeout) and fall back to the hosted one; the
+// result is cached briefly so every single request doesn't re-probe.
+
+const LOCAL_PROBE_TIMEOUT_MS = 600;
+const AUTO_RESOLUTION_TTL_MS = 15000;
+
+let cachedResolution: { mode: 'local' | 'online'; expiresAt: number } | null = null;
+
+async function isLocalServerReachable(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LOCAL_PROBE_TIMEOUT_MS);
+    const res = await fetch(`${LOCAL_SERVER_URL}/health`, { method: 'GET', signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveMode(mode: ServerMode): Promise<'local' | 'online'> {
+  if (mode === 'local') return 'local';
+  if (mode === 'online') return 'online';
+
+  // mode === 'auto'
+  const now = Date.now();
+  if (cachedResolution && cachedResolution.expiresAt > now) {
+    return cachedResolution.mode;
+  }
+  const reachable = await isLocalServerReachable();
+  const resolved: 'local' | 'online' = reachable ? 'local' : 'online';
+  cachedResolution = { mode: resolved, expiresAt: now + AUTO_RESOLUTION_TTL_MS };
+  return resolved;
+}
+
 export async function getRouterConfig(): Promise<RouterConfig> {
   const data = await chrome.storage.local.get([
-    'ssense_server_url',
+    'ssense_server_mode',
     'ssense_api_key',
     'ssense_hmac_secret',
     'ssense_offline_mode'
   ]);
 
+  const mode: ServerMode = data.ssense_server_mode || DEFAULT_SERVER_MODE;
+  const resolvedMode = await resolveMode(mode);
+  const url = resolvedMode === 'local' ? LOCAL_SERVER_URL : ONLINE_SERVER_URL;
+
   return {
-    url: data.ssense_server_url || DEFAULT_SERVER_URL,
+    url,
+    resolvedMode,
     apiKey: data.ssense_api_key || '',
     hmacSecret: data.ssense_hmac_secret || '',
     offlineMode: Boolean(data.ssense_offline_mode),
@@ -50,6 +96,41 @@ async function computeHmacSignature(
   return Array.from(new Uint8Array(sigBuffer))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// USER-SAFE ERROR NORMALIZATION
+// ═══════════════════════════════════════════════════════════════
+export type ServiceErrorKind = 'network' | 'server' | 'auth' | 'timeout' | 'model' | 'native' | 'parse' | 'unknown';
+
+export class SsenseServiceError extends Error {
+  readonly kind: ServiceErrorKind;
+  readonly retryable: boolean;
+  readonly status?: number;
+
+  constructor(message: string, kind: ServiceErrorKind = 'unknown', retryable = false, status?: number) {
+    super(message);
+    this.name = 'SsenseServiceError';
+    this.kind = kind;
+    this.retryable = retryable;
+    this.status = status;
+  }
+}
+
+function classifyHttp(status: number, body: string): SsenseServiceError {
+  if (status === 401 || status === 403) return new SsenseServiceError('Cloud authentication failed. Check your API key and HMAC secret in Settings.', 'auth', false, status);
+  if (status === 429) return new SsenseServiceError('Cloud server is rate-limiting requests. Please wait a moment and try again.', 'server', true, status);
+  if (status >= 500) return new SsenseServiceError('Cloud AI service is temporarily unavailable. Your page data was not retried indefinitely.', 'server', true, status);
+  return new SsenseServiceError(body || `Cloud request failed (HTTP ${status}).`, 'unknown', false, status);
+}
+
+function normalizeError(err: unknown, fallback: string): SsenseServiceError {
+  if (err instanceof SsenseServiceError) return err;
+  const e = err as any;
+  if (e?.name === 'AbortError') return new SsenseServiceError('The AI service timed out. Please try again.', 'timeout', true);
+  if (String(e?.message || '').includes('Failed to fetch')) return new SsenseServiceError('The AI server cannot be reached. Check your connection or Server URL.', 'network', true);
+  if (String(e?.message || '').toLowerCase().includes('native')) return new SsenseServiceError(e.message, 'native', true);
+  return new SsenseServiceError(e?.message || fallback, 'unknown', false);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -95,12 +176,12 @@ async function fetchCloudStream(
 
       if (!response.ok || !response.body) {
         const errText = await response.text().catch(() => 'Unknown Cloud Server Error');
-        if (response.status >= 500 && attempt < retries) {
+        if ((response.status >= 500 || response.status === 429) && attempt < retries) {
           clearTimeout(timeoutId);
           await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
           continue; // Trigger retry
         }
-        throw new Error(`HTTP ${response.status}: ${errText}`);
+        throw classifyHttp(response.status, errText);
       }
 
       // If connection succeeds, we process the stream (No retries for mid-stream failures)
@@ -119,9 +200,9 @@ async function fetchCloudStream(
         buffer = events.pop() || '';
 
         for (const rawEvent of events) {
-          const line = rawEvent.trim();
-          if (!line.startsWith('data:')) continue;
-          const payload = line.slice(5).trim();
+          const dataLine = rawEvent.split('\n').map(line => line.trim()).find(line => line.startsWith('data:'));
+          if (!dataLine) continue;
+          const payload = dataLine.slice(5).trim();
 
           if (payload === '[DONE]') {
             if (onChunk) onChunk('', true);
@@ -131,15 +212,22 @@ async function fetchCloudStream(
           let parsed: any;
           try { parsed = JSON.parse(payload); } catch { continue; }
 
-          if (parsed.status === 'error') {
-            streamError = parsed.message || 'Cloud reported a streaming error.';
+          if (parsed.status === 'error' || parsed.event === 'error') {
+            streamError = parsed.message || parsed.data || 'Cloud reported a streaming error.';
             continue;
           }
 
-          const delta = parsed?.choices?.[0]?.delta?.content;
+          if (parsed.event === 'done') {
+            onChunk?.('', true);
+            continue;
+          }
+
+          const delta = typeof parsed.data === 'string'
+            ? parsed.data
+            : parsed?.choices?.[0]?.delta?.content;
           if (typeof delta === 'string') {
             accumulated += delta;
-            if (onChunk) onChunk(delta, false);
+            onChunk?.(delta, false);
           }
         }
       }
@@ -154,10 +242,10 @@ async function fetchCloudStream(
         await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
         continue; // Trigger exponential backoff
       }
-      throw err;
+      throw normalizeError(err, 'Cloud server request failed.');
     }
   }
-  throw new Error('Cloud server request failed after maximum retries.');
+  throw new SsenseServiceError('Cloud server request failed after maximum retries.', 'server', true);
 }
 
 async function fetchCloudJson<T>(endpoint: string, method: 'GET' | 'POST', body: any, config: RouterConfig, retries = 2): Promise<T> {
@@ -193,11 +281,11 @@ async function fetchCloudJson<T>(endpoint: string, method: 'GET' | 'POST', body:
 
       if (!response.ok) {
         const errText = await response.text().catch(() => 'Unknown Cloud Error');
-        if (response.status >= 500 && attempt < retries) {
+        if ((response.status >= 500 || response.status === 429) && attempt < retries) {
           await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
           continue;
         }
-        throw new Error(`HTTP ${response.status}: ${errText}`);
+        throw classifyHttp(response.status, errText);
       }
       return (await response.json()) as T;
     } catch (err: any) {
@@ -206,10 +294,10 @@ async function fetchCloudJson<T>(endpoint: string, method: 'GET' | 'POST', body:
         await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
         continue;
       }
-      throw err;
+      throw normalizeError(err, 'Cloud server request failed.');
     }
   }
-  throw new Error('Cloud JSON request failed after retries.');
+  throw new SsenseServiceError('Cloud JSON request failed after retries.', 'server', true);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -232,14 +320,15 @@ export async function executeHealthCheck(requestId: string): Promise<DaemonRespo
     return {
       type: 'HEALTH_CHECK_RESULT',
       requestId,
-      success: data.status === 'online',
-      modelLoaded: data.modelLoaded ?? true,
+      success: data.status === 'online' && data.rag_ready !== false,
+      modelLoaded: data.modelLoaded ?? (data.rag_ready !== false),
       cacheSize: 0,
       totalInferences: data.totalInferences ?? 0,
       avgTokensPerSecond: data.avgTokensPerSecond ?? 120,
     };
   } catch (err: any) {
-    return { type: 'ERROR', requestId, success: false, error: `Cloud Offline: ${err.message}` };
+    const e = normalizeError(err, 'Cloud health check failed.');
+    return { type: 'ERROR', requestId, success: false, error: e.message, errorKind: e.kind, retryable: e.retryable };
   }
 }
 
@@ -247,17 +336,27 @@ export async function executeAuditPolicy(domain: string, policyText: string, req
   const config = await getRouterConfig();
 
   if (config.offlineMode) {
-    return nativeBridge.sendRequest<DaemonResponse>({ type: 'AUDIT_POLICY', requestId, domain, policyText });
+    try {
+      return await nativeBridge.sendRequest<DaemonResponse>({ type: 'AUDIT_POLICY', requestId, domain, policyText });
+    } catch (err) {
+      const e = normalizeError(err, 'Local AI model is unavailable.');
+      return { type: 'ERROR', requestId, success: false, error: e.message, errorKind: e.kind, retryable: e.retryable };
+    }
+  }
+
+  if (!config.configured) {
+    return { type: 'ERROR', requestId, success: false, error: 'Cloud Server is not configured. Open Settings and add the API credentials.', errorKind: 'auth', retryable: false };
   }
 
   try {
-    const { text, error } = await fetchCloudStream('/v1/audit', { requestId, domain, policyText }, config);
-    if (error) return { type: 'ERROR', requestId, success: false, error: `Cloud Audit Error: ${error}` };
-
-    const report = JSON.parse(text);
-    return { type: 'AUDIT_POLICY_RESULT', requestId, success: true, report, cached: false };
-  } catch (err: any) {
-    return { type: 'ERROR', requestId, success: false, error: `Cloud Audit Error: ${err.message}` };
+    // The production server returns a normal JSON audit response, not SSE.
+    const data = await fetchCloudJson<any>('/v1/audit', 'POST', { requestId, domain, policyText }, config);
+    const report = data?.data ?? data?.report ?? data;
+    if (!report || !Array.isArray(report.violations)) throw new SsenseServiceError('Cloud returned an invalid audit report. No decision was applied.', 'parse', false);
+    return { type: 'AUDIT_POLICY_RESULT', requestId, success: true, report, cached: data?.source === 'memory_cache' };
+  } catch (err) {
+    const e = normalizeError(err, 'Cloud audit failed.');
+    return { type: 'ERROR', requestId, success: false, error: e.message, errorKind: e.kind, retryable: e.retryable };
   }
 }
 
@@ -265,35 +364,41 @@ export async function executeChat(
   domain: string,
   userPrompt: string,
   requestId: string,
-  onChunk: (token: string, isFinal: boolean) => void
-): Promise<void> {
+  onChunk?: (token: string, isFinal: boolean) => void
+): Promise<DaemonResponse> {
   const config = await getRouterConfig();
 
   if (config.offlineMode) {
-    await nativeBridge.sendChatStream({ type: 'CHAT', requestId, domain, userPrompt }, onChunk);
-    return;
+    try {
+      let text = '';
+      await nativeBridge.sendChatStream({ type: 'CHAT', requestId, domain, userPrompt }, (token, isFinal) => {
+        text += token;
+        onChunk?.(token, isFinal);
+      });
+      if (!text) return { type: 'ERROR', requestId, success: false, error: 'Local AI returned no response. The model may be unavailable or malfunctioning.', errorKind: 'model', retryable: true };
+      return { type: 'CHAT_RESULT', requestId, success: true, message: text };
+    } catch (err) {
+      const e = normalizeError(err, 'Local AI service failed.');
+      onChunk?.('', true);
+      return { type: 'ERROR', requestId, success: false, error: e.message, errorKind: e.kind, retryable: e.retryable };
+    }
+  }
+
+  if (!config.configured) {
+    const error = 'Cloud Server is not configured. Open Settings and add the API credentials.';
+    onChunk?.('', true);
+    return { type: 'ERROR', requestId, success: false, error, errorKind: 'auth', retryable: false };
   }
 
   try {
-    const { error } = await fetchCloudStream('/v1/chat', { requestId, domain, userPrompt }, config, 2, onChunk);
-    if (error) throw new Error(error);
-  } catch (err: any) {
-    onChunk(`\n\n[System Error: ${err.message}]`, true);
-  }
-}
-
-export async function executeTrustScore(domain: string, requestId: string): Promise<DaemonResponse> {
-  const config = await getRouterConfig();
-
-  if (config.offlineMode) {
-    return nativeBridge.sendRequest<DaemonResponse>({ type: 'GET_TRUST_SCORE', requestId, domain });
-  }
-
-  try {
-    const data = await fetchCloudJson<any>('/v1/trust-score', 'POST', { requestId, domain }, config);
-    return data as DaemonResponse;
-  } catch (err: any) {
-    return { type: 'ERROR', requestId, success: false, error: `Cloud Trust Score Error: ${err.message}` };
+    const result = await fetchCloudStream('/v1/chat/stream', { requestId, domain, userPrompt }, config, 2, onChunk);
+    if (result.error) throw new SsenseServiceError(result.error, 'server', true);
+    if (!result.text.trim()) throw new SsenseServiceError('Cloud AI returned an empty response. The model may be unhealthy.', 'model', true);
+    return { type: 'CHAT_RESULT', requestId, success: true, message: result.text };
+  } catch (err) {
+    const e = normalizeError(err, 'Chat request failed.');
+    onChunk?.('', true);
+    return { type: 'ERROR', requestId, success: false, error: e.message, errorKind: e.kind, retryable: e.retryable };
   }
 }
 

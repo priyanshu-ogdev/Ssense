@@ -1,10 +1,49 @@
 // apps/extension/src/background/service-worker.ts
-import { getServerConfig, serverHealthCheck, serverAuditPolicy, serverChat, serverTrustScore } from './api-client';
+import {
+  getRouterConfig,
+  executeHealthCheck,
+  executeAuditPolicy,
+  executeChat,
+  executeDownloadModels,
+} from './api-client';
+import { subscribeNativeEvents } from './native-messaging';
 import type { DaemonResponse } from '../types/native-protocol';
 import * as historyStore from './history-store';
 import * as chatStore from './chat-store';
+import * as privacyStore from './privacy-store';
 
-console.log('[Ssense] Service Worker initialized — SLM Server mode only.');
+console.log('[Ssense] Service Worker initialized — Cloud-first / opt-in Offline mode.');
+
+// Native download events are broadcast to the popup/options UI. The popup may
+// close during a download; progress is also persisted so it can recover.
+subscribeNativeEvents(async (event) => {
+  if (event.type === 'DOWNLOAD_PROGRESS') {
+    await chrome.storage.local.set({
+      ssense_download_progress: {
+        file: event.file,
+        pct: event.pct,
+        mbPerSec: event.mbPerSec,
+        requestId: event.requestId,
+        updatedAt: Date.now(),
+      }
+    });
+    chrome.runtime.sendMessage({ ...event, type: 'OFFLINE_DOWNLOAD_PROGRESS' }).catch(() => {});
+  } else if (event.type === 'STATUS' && event.status === 'success') {
+    await chrome.storage.local.set({
+      ssense_offline_mode: true,
+      ssense_download_progress: { file: '', pct: 100, mbPerSec: 0, updatedAt: Date.now() },
+      ssense_offline_error: '',
+    });
+    chrome.runtime.sendMessage({ type: 'OFFLINE_READY', message: event.message }).catch(() => {});
+  } else if (event.type === 'STATUS' && event.status !== 'success') {
+    await chrome.storage.local.set({
+      ssense_offline_mode: false,
+      ssense_offline_error: event.message || 'Offline model preparation failed.',
+      ssense_download_progress: { file: '', pct: 0, mbPerSec: 0, updatedAt: Date.now() },
+    });
+    chrome.runtime.sendMessage({ type: 'OFFLINE_DOWNLOAD_ERROR', error: event.message || 'Offline model preparation failed.' }).catch(() => {});
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════
 // TIME-ON-SITE TRACKING
@@ -106,21 +145,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Single-mode routing: every request goes to the SLM server. No local
-// daemon, no AUTO failover — one code path, one thing to keep secure and
-// correct. If the server is unreachable, callers get a clear ERROR
-// response (see api-client.ts) instead of silently switching backends.
+// Cloud-first routing with explicit Offline/Privacy Mode. The user controls
+// whether inference is sent to the cloud or handled by the local daemon;
+// there is no silent backend failover that could violate the user's privacy choice.
 async function routeRequest(
-  type: 'HEALTH_CHECK' | 'AUDIT_POLICY' | 'CHAT' | 'GET_TRUST_SCORE',
+  type: 'HEALTH_CHECK' | 'AUDIT_POLICY' | 'CHAT',
   payload: any,
   requestId: string
 ): Promise<DaemonResponse> {
   switch (type) {
-    case 'HEALTH_CHECK': return await serverHealthCheck(requestId);
-    case 'AUDIT_POLICY': return await serverAuditPolicy(payload.domain, payload.policyText, requestId);
-    case 'CHAT': return await serverChat(payload.domain, payload.userPrompt, requestId);
-    case 'GET_TRUST_SCORE': return await serverTrustScore(payload.domain, requestId);
+    case 'HEALTH_CHECK': return await executeHealthCheck(requestId);
+    case 'AUDIT_POLICY': return await executeAuditPolicy(payload.domain, payload.policyText, requestId);
+    case 'CHAT': return await executeChat(payload.domain, payload.userPrompt, requestId);
   }
+}
+// NOTE: GET_TRUST_SCORE is intentionally NOT routed here. Trust score is derived
+// locally from the last completed audit stored in IndexedDB (see the
+// GET_TRUST_SCORE case in handleMessage below) — there is no cloud
+// "/v1/trust-score" endpoint on the backend, so routing it through here would
+// always 404 in Cloud Mode.
+
+async function fetchPublicPolicyDocument(initialUrl: string, signal: AbortSignal): Promise<Response> {
+  let current = new URL(initialUrl);
+  for (let hop = 0; hop < 4; hop++) {
+    const host = current.hostname.toLowerCase();
+    if (!['http:', 'https:'].includes(current.protocol)) throw new Error('Only HTTP/HTTPS privacy-policy URLs are allowed.');
+    if (/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host === '::1' || host.startsWith('fe80:') || host.startsWith('fc')) {
+      throw new Error('The privacy-policy URL points to a private or local network address.');
+    }
+
+    const response = await fetch(current.href, { credentials: 'omit', redirect: 'manual', signal });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('The privacy-policy server returned an invalid redirect.');
+      current = new URL(location, current.href);
+      continue;
+    }
+    return response;
+  }
+  throw new Error('The privacy-policy URL redirected too many times.');
 }
 
 async function handleMessage(message: any, sender: chrome.runtime.MessageSender): Promise<any> {
@@ -130,12 +193,20 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
   switch (message.type) {
     case 'PROXY_FETCH': {
       try {
+        const target = new URL(String(message.url || ''));
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s cap
         try {
-          const response = await fetch(message.url, { credentials: 'omit', signal: controller.signal });
+          const response = await fetchPublicPolicyDocument(target.href, controller.signal);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType && !/(text\/html|application\/xhtml\+xml|application\/pdf)/i.test(contentType)) {
+            throw new Error('The privacy-policy URL did not return an HTML or PDF document.');
+          }
+          const declaredLength = Number(response.headers.get('content-length') || 0);
+          if (declaredLength > 8 * 1024 * 1024) throw new Error('Privacy-policy document is larger than the 8 MB safety limit.');
           const html = await response.text();
+          if (html.length > 8 * 1024 * 1024) throw new Error('Privacy-policy document exceeded the 8 MB safety limit.');
           return { success: true, html };
         } finally {
           clearTimeout(timeoutId);
@@ -146,8 +217,32 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
       }
     }
 
+    case 'PRIVACY_SNAPSHOT': {
+      if (!message.domain || !message.policyUrl || !message.policyText) {
+        return { success: false, error: 'Privacy snapshot is incomplete.' };
+      }
+      const snapshot = await privacyStore.saveSnapshot({
+        domain: message.domain,
+        pageUrl: message.pageUrl || '',
+        policyUrl: message.policyUrl,
+        policyText: message.policyText,
+      });
+      return { success: true, snapshot: { ...snapshot, policyText: undefined } };
+    }
+
+    case 'GET_PRIVACY_SNAPSHOT': {
+      const snapshot = await privacyStore.getSnapshot(String(message.domain || ''));
+      if (!snapshot) return { success: false, error: 'No privacy-policy snapshot is available for this site yet.' };
+      return { success: true, snapshot };
+    }
+
+    case 'CLEAR_PRIVACY_SNAPSHOTS': {
+      await privacyStore.clearSnapshots();
+      return { success: true };
+    }
+
     case 'GET_ENGINE_CONFIG': {
-      return await getServerConfig();
+      return await getRouterConfig();
     }
 
     case 'CLEAR_INFERENCE_CACHE': {
@@ -164,6 +259,11 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
     case 'CLEAR_HISTORY': {
       await historyStore.clearAllEntries();
       return { success: true };
+    }
+
+    case 'GET_SITE_HISTORY': {
+      const entry = await historyStore.getEntry(String(message.domain || ''));
+      return { success: true, entry: entry || null };
     }
 
     case 'HEALTH_CHECK': {
@@ -207,6 +307,8 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
           if (response.type === 'AUDIT_POLICY_RESULT' && response.success) {
             completedAuditsCache.set(cacheKey, { timestamp: Date.now(), response });
             await historyStore.recordAudit(message.domain, response.report);
+            const router = await getRouterConfig();
+            await privacyStore.markAudited(message.domain, router.offlineMode ? 'offline' : 'cloud');
             
             chrome.runtime.sendMessage({
               type: 'AUDIT_COMPLETE',
@@ -225,7 +327,9 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
             chrome.runtime.sendMessage({
               type: 'AUDIT_ERROR',
               domain: message.domain,
-              error: response.error
+              error: response.error,
+              errorKind: response.type === 'ERROR' ? response.errorKind : undefined,
+              retryable: response.type === 'ERROR' ? response.retryable : undefined
             }).catch(() => {});
           }
           
@@ -260,13 +364,54 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
       return { success: true };
     }
 
+    case 'DOWNLOAD_OFFLINE': {
+      if (!message.requestId) message.requestId = requestId;
+      if (!navigator.onLine) {
+        return { type: 'ERROR', requestId, success: false, error: 'Internet connection is required for the first offline model download.' };
+      }
+      const response = await executeDownloadModels(message.requestId);
+      if (response.type === 'STATUS' && response.status === 'success') {
+        await chrome.storage.local.set({ ssense_offline_mode: true });
+      }
+      return response;
+    }
+
+    case 'SET_OFFLINE_MODE': {
+      const enabled = Boolean(message.enabled);
+      if (!enabled) {
+        await chrome.storage.local.set({ ssense_offline_mode: false });
+        return { success: true, offlineMode: false };
+      }
+      // Enabling always goes through the explicit download flow.
+      if (!message.startDownload) {
+        return { success: true, offlineMode: false, needsDownload: true };
+      }
+      if (!navigator.onLine) {
+        return { success: false, error: 'Connect to the internet to download Offline Mode models.' };
+      }
+      const response = await executeDownloadModels(requestId);
+      if (response.type === 'STATUS' && response.status === 'success') {
+        await chrome.storage.local.set({ ssense_offline_mode: true });
+        return { success: true, offlineMode: true };
+      }
+      return response;
+    }
+
     case 'OPEN_OPTIONS_PAGE': {
       chrome.runtime.openOptionsPage();
       return { success: true };
     }
 
-    case 'GET_TRUST_SCORE':
-      return await routeRequest('GET_TRUST_SCORE', { domain: message.domain }, requestId);
+    case 'GET_TRUST_SCORE': {
+      // Trust is a property of the last completed local audit. Reading it
+      // from IndexedDB avoids a second network dependency and keeps the
+      // header useful even when the cloud service is temporarily down.
+      const entry = (await historyStore.getAllEntries()).find(e => e.domain === message.domain);
+      if (entry?.lastScore !== null && entry?.lastScore !== undefined) {
+        return { type: 'TRUST_SCORE_RESULT', requestId, success: true, score: entry.lastScore };
+      }
+      return { type: 'TRUST_SCORE_RESULT', requestId, success: true, score: null };
+    }
 
     default:
       throw new Error(`Unknown message type: ${message.type}`);

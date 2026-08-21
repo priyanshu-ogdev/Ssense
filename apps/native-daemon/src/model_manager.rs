@@ -3,11 +3,12 @@ use directories::ProjectDirs;
 use reqwest::Client;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 use std::time::Duration;
 use futures_util::StreamExt;
+use sha2::{Digest, Sha256};
 
 // ─────────────────────────────────────────────────────────────────
 // Ensure this matches your protocol definitions in messaging/protocol.rs
@@ -124,8 +125,15 @@ impl ModelManager {
                 for attempt in 1..=MAX_RETRIES {
                     match Self::download_file_with_resume(&client, &url, &temp_path, name, tx_clone.clone(), req_id_clone.clone()).await {
                         Ok(_) => {
+                            if let Err(e) = Self::verify_integrity(&client, &url, &temp_path, name).await {
+                                error!("Integrity check for '{}' could not be completed: {}. Discarding partial file and retrying.", name, e);
+                                let _ = fs::remove_file(&temp_path).await;
+                                if attempt == MAX_RETRIES { bail!("Fatal: Could not verify integrity of {} after {} attempts: {}", name, MAX_RETRIES, e); }
+                                tokio::time::sleep(Duration::from_secs(2u64.pow(attempt - 1))).await;
+                                continue;
+                            }
                             fs::rename(&temp_path, &target_path_clone).await.context("Failed to finalize verified model file")?;
-                            info!("✅ Artifact '{}' completely downloaded.", name);
+                            info!("✅ Artifact '{}' downloaded and integrity-verified.", name);
                             return Ok(());
                         }
                         Err(e) => {
@@ -152,6 +160,64 @@ impl ModelManager {
             }).await;
         }
 
+        Ok(())
+    }
+
+    /// Verifies the downloaded artifact against the SHA-256 the origin server reports.
+    /// Hugging Face LFS-tracked files (which is how all our .gguf/.safetensors artifacts
+    /// are hosted) return the file's SHA-256 as the `ETag` (via `x-linked-etag`, falling
+    /// back to `etag`) on both HEAD and GET responses. We compare our locally computed
+    /// hash of the fully-downloaded bytes against that value before the file is ever
+    /// renamed into the models directory and made eligible for loading into llama.cpp.
+    ///
+    /// If the origin doesn't return a SHA-256-shaped ETag (e.g. a non-LFS asset, or a
+    /// server behind a proxy that strips the header), we can't compare and fail *closed*
+    /// on integrity for `.gguf`/`.safetensors` weights, but allow small sidecar files
+    /// (like the JSON lexical index) through, since a corrupted JSON file fails to parse
+    /// immediately at load time rather than silently loading corrupted model weights.
+    async fn verify_integrity(client: &Client, url: &str, file_path: &Path, name: &'static str) -> Result<()> {
+        let head = client.head(url).send().await.context("Integrity check: HEAD request failed")?;
+        let raw_etag = head
+            .headers()
+            .get("x-linked-etag")
+            .or_else(|| head.headers().get("etag"))
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_matches('"').to_string());
+
+        let expected_sha256 = match &raw_etag {
+            Some(tag) if tag.len() == 64 && tag.chars().all(|c| c.is_ascii_hexdigit()) => tag.to_lowercase(),
+            _ => {
+                warn!(
+                    "No SHA-256 ETag available from origin for '{}' — cannot cryptographically verify this download.",
+                    name
+                );
+                if file_path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    // Small, human-inspectable text asset: parse failure at load time is an
+                    // acceptable secondary safety net for this one file type.
+                    return Ok(());
+                }
+                bail!("Origin did not provide a verifiable checksum for model weights '{}'; refusing to trust an unverified binary.", name);
+            }
+        };
+
+        let mut file = File::open(file_path).await.context("Integrity check: failed to reopen downloaded file")?;
+        let mut hasher = Sha256::new();
+        let mut buf = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buf).await.context("Integrity check: read error")?;
+            if n == 0 { break; }
+            hasher.update(&buf[..n]);
+        }
+        let actual_sha256 = hex::encode(hasher.finalize());
+
+        if actual_sha256 != expected_sha256 {
+            bail!(
+                "SHA-256 mismatch for '{}': expected {}, got {}. The downloaded file is corrupted or was tampered with.",
+                name, expected_sha256, actual_sha256
+            );
+        }
+
+        info!("🔒 SHA-256 verified for '{}': {}", name, actual_sha256);
         Ok(())
     }
 
@@ -208,30 +274,36 @@ impl ModelManager {
             let now = std::time::Instant::now();
             let elapsed = now.duration_since(last_update_time).as_secs_f64();
 
-            if total_size > 0 {
-                let percent = (downloaded as f64 / total_size as f64) * 100.0;
-                
-                // Throttle IPC messaging to ~2Hz to prevent Chrome Extension freezing
-                if elapsed >= 0.5 {
-                    let mb_per_sec = (bytes_since_last_update as f64 / 1024.0 / 1024.0) / elapsed;
-                    
-                    if let Some(channel) = &tx {
-                        let _ = channel.send(DaemonResponse::DownloadProgress {
-                            request_id: req_id.clone(),
-                            file: name.to_string(),
-                            pct: percent,
-                            mb_per_sec,
-                        }).await;
-                    }
-                    
+            // Throttle IPC messaging to ~2Hz to prevent Chrome Extension freezing.
+            // Emit progress even when the origin didn't send Content-Length (total_size == 0),
+            // so the popup shows live byte/speed movement instead of appearing frozen —
+            // percent is only meaningful once we know the total, but bytes/speed are not.
+            if elapsed >= 0.5 {
+                let mb_per_sec = (bytes_since_last_update as f64 / 1024.0 / 1024.0) / elapsed;
+                // -1.0 signals "indeterminate" to the frontend (unknown total size) rather
+                // than falsely reporting 0%.
+                let percent = if total_size > 0 { (downloaded as f64 / total_size as f64) * 100.0 } else { -1.0 };
+
+                if let Some(channel) = &tx {
+                    let _ = channel.send(DaemonResponse::DownloadProgress {
+                        request_id: req_id.clone(),
+                        file: name.to_string(),
+                        pct: percent,
+                        mb_per_sec,
+                    }).await;
+                }
+
+                if total_size > 0 {
                     if percent as u64 >= last_log_percent + 5 {
                         info!("Downloading '{}': {:.1}% ({} MB / {} MB)", name, percent, downloaded / 1024 / 1024, total_size / 1024 / 1024);
                         last_log_percent = percent as u64;
                     }
-                    
-                    last_update_time = now;
-                    bytes_since_last_update = 0;
+                } else {
+                    info!("Downloading '{}': {} MB (total size unknown)", name, downloaded / 1024 / 1024);
                 }
+
+                last_update_time = now;
+                bytes_since_last_update = 0;
             }
         }
 

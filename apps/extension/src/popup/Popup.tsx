@@ -1,255 +1,403 @@
 import React, { useEffect, useState } from 'react';
 
-// ═══════════════════════════════════════════════════════════════
-// Ssense Popup — quick-glance compliance status for the active tab.
-//
-// DESIGN NOTE: this is a statutory audit tool, not a generic dashboard.
-// The signature element is a stamped "audit seal" — a notched ring with
-// tick marks, like an official document stamp — around the trust score,
-// rather than a generic circular progress bar. Tick density and arc fill
-// both encode the score, so the shape itself communicates "certified /
-// under review / flagged" before any number is read.
-//
-// Palette matches the existing sidebar tokens (deep near-black, cyan/blue
-// accent) for brand consistency across popup/options/sidebar — one product,
-// one identity — with two additions specific to this surface: an amber for
-// "under review" and a stamp-ink red for statutory violations, distinct
-// from a generic UI error red.
-// ═══════════════════════════════════════════════════════════════
+type Mode = 'cloud' | 'offline';
+type DownloadState = 'idle' | 'downloading' | 'ready' | 'error';
 
-type Status = 'loading' | 'unconfigured' | 'no-report' | 'ready' | 'error';
-
-const COLORS = {
-  bg: '#09090B',
-  surface: 'rgba(255,255,255,0.03)',
-  border: 'rgba(255,255,255,0.08)',
-  textPrimary: '#F4F4F5',
-  textMuted: '#A1A1AA',
-  textFaint: '#71717A',
-  cyan: '#06B6D4',
-  blue: '#3B82F6',
-  amber: '#F5A623',
-  stampRed: '#D64545',
-  success: '#4ADE80',
-};
-
-function tierFor(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: 'CERTIFIED COMPLIANT', color: COLORS.success };
-  if (score >= 50) return { label: 'UNDER REVIEW', color: COLORS.amber };
-  return { label: 'VIOLATIONS FLAGGED', color: COLORS.stampRed };
+interface Progress {
+  file: string;
+  pct: number;
+  mbPerSec: number;
+  updatedAt?: number;
 }
 
-// The seal: a ring of 40 tick marks. Ticks fill clockwise proportional to
-// score, colored by tier — reads like a dial being certified, not a loading
-// spinner.
-function AuditSeal({ score, color }: { score: number; color: string }) {
-  const TICKS = 40;
-  const filled = Math.round((score / 100) * TICKS);
-  const radius = 44;
-  const center = 52;
+const C = {
+  bg: '#09090B',
+  panel: '#111113',
+  border: 'rgba(255,255,255,.09)',
+  text: '#F4F4F5',
+  muted: '#A1A1AA',
+  faint: '#71717A',
+  cyan: '#22D3EE',
+  blue: '#3B82F6',
+  green: '#4ADE80',
+  amber: '#FBBF24',
+  red: '#FB7185',
+};
 
-  const ticks = Array.from({ length: TICKS }, (_, i) => {
-    const angle = (i / TICKS) * 2 * Math.PI - Math.PI / 2;
-    const isFilled = i < filled;
-    const len = isFilled ? 9 : 6;
-    const x1 = center + (radius - len) * Math.cos(angle);
-    const y1 = center + (radius - len) * Math.sin(angle);
-    const x2 = center + radius * Math.cos(angle);
-    const y2 = center + radius * Math.sin(angle);
-    return (
-      <line
-        key={i}
-        x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={isFilled ? color : 'rgba(255,255,255,0.12)'}
-        strokeWidth={isFilled ? 2.4 : 1.6}
-        strokeLinecap="round"
-      />
-    );
-  });
+function requestId() {
+  return crypto.randomUUID();
+}
 
-  return (
-    <svg width={104} height={104} viewBox="0 0 104 104">
-      {ticks}
-      <circle cx={center} cy={center} r={radius - 16} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-      <text
-        x={center} y={center - 2} textAnchor="middle"
-        fontSize={26} fontWeight={700} fill={COLORS.textPrimary}
-        fontFamily="ui-monospace, 'SF Mono', Menlo, monospace"
-      >
-        {score}
-      </text>
-      <text
-        x={center} y={center + 16} textAnchor="middle"
-        fontSize={8} fontWeight={600} fill={COLORS.textFaint}
-        fontFamily="ui-monospace, 'SF Mono', Menlo, monospace"
-        letterSpacing={1}
-      >
-        / 100
-      </text>
-    </svg>
-  );
+function pctText(n: number) {
+  // -1 is the daemon's "indeterminate" signal (origin didn't send Content-Length),
+  // not a literal negative percent.
+  if (n < 0) return 'Downloading…';
+  return `${Math.max(0, Math.min(100, n)).toFixed(0)}%`;
 }
 
 export default function Popup() {
-  const [status, setStatus] = useState<Status>('loading');
-  const [domain, setDomain] = useState<string>('');
-  const [score, setScore] = useState<number | null>(null);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [domain, setDomain] = useState('');
+  const [mode, setMode] = useState<Mode>('cloud');
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle');
+  const [progress, setProgress] = useState<Progress>({ file: '', pct: 0, mbPerSec: 0 });
+  const [error, setError] = useState('');
+  const [checking, setChecking] = useState(true);
+  const [serviceStatus, setServiceStatus] = useState<'checking' | 'online' | 'offline' | 'not-configured'>('checking');
+  const [lastError, setLastError] = useState('');
 
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const url = tab?.url || '';
-      let host = '';
-      try { host = new URL(url).hostname; } catch { /* system page (chrome://, etc.) */ }
+      if (!mounted) return;
+      try { setDomain(tab?.url?.startsWith('http') ? new URL(tab.url).hostname : ''); } catch { setDomain(''); }
 
-      if (!host) {
-        setStatus('no-report');
-        return;
+      const data = await chrome.storage.local.get([
+        'ssense_offline_mode',
+        'ssense_download_progress',
+        'ssense_offline_error',
+      ]);
+      if (!mounted) return;
+
+      setMode(data.ssense_offline_mode ? 'offline' : 'cloud');
+      if (data.ssense_offline_error) { setDownloadState('error'); setError(String(data.ssense_offline_error)); }
+      if (data.ssense_download_progress) {
+        const p = data.ssense_download_progress as Progress;
+        setProgress(p);
+        if (p.pct !== 0 && p.pct < 100) setDownloadState('downloading');
+        if (p.pct >= 100) setDownloadState('ready');
       }
-      setDomain(host);
-
-      const config = await chrome.runtime.sendMessage({ type: 'GET_ENGINE_CONFIG' });
-      if (!config?.configured) {
-        setStatus('unconfigured');
-        return;
-      }
-
+      setChecking(false);
       try {
-        const res = await chrome.runtime.sendMessage({ type: 'GET_TRUST_SCORE', domain: host });
-        if (res?.success && typeof res.score === 'number') {
-          setScore(res.score);
-          setStatus('ready');
-        } else {
-          setStatus('error');
-          setErrorMsg(res?.error || 'No audit on record for this site yet.');
-        }
-      } catch (err: any) {
-        setStatus('error');
-        setErrorMsg(err?.message || 'Could not reach the audit service.');
-      }
+        const health = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK', requestId: requestId() });
+        if (data.ssense_offline_mode) setServiceStatus(health?.success ? 'online' : 'offline');
+        else if (health?.errorKind === 'auth') setServiceStatus('not-configured');
+        else setServiceStatus(health?.success ? 'online' : 'offline');
+      } catch { setServiceStatus('offline'); }
     })();
+
+    const listener = (message: any) => {
+      if (message.type === 'OFFLINE_DOWNLOAD_PROGRESS') {
+        setDownloadState('downloading');
+        setProgress({
+          file: message.file,
+          pct: message.pct,
+          mbPerSec: message.mbPerSec,
+          updatedAt: Date.now(),
+        });
+      }
+      if (message.type === 'OFFLINE_DOWNLOAD_ERROR') {
+        setDownloadState('error');
+        setError(message.error || 'Offline model download failed.');
+        setLastError(message.error || 'Offline model download failed.');
+      }
+      if (message.type === 'OFFLINE_READY') {
+        setMode('offline');
+        setDownloadState('ready');
+        setProgress({ file: '', pct: 100, mbPerSec: 0 });
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(listener);
+    return () => {
+      mounted = false;
+      chrome.runtime.onMessage.removeListener(listener);
+    };
   }, []);
 
-  const openFullReport = async () => {
+  const enableOffline = async () => {
+    setError('');
+    setLastError('');
+    setDownloadState('downloading');
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_OFFLINE_MODE',
+        enabled: true,
+        startDownload: true,
+        requestId: requestId(),
+      });
+
+      if (response?.success && response?.offlineMode) {
+        setMode('offline');
+        setDownloadState('ready');
+      } else if (response?.type === 'ERROR' || response?.success === false) {
+        setDownloadState('error');
+        setError(response?.error || 'Could not enable Offline Mode.');
+      }
+    } catch (err: any) {
+      setDownloadState('error');
+      setError(err?.message || 'The extension could not start Offline Mode.');
+    }
+  };
+
+  const disableOffline = async () => {
+    setError('');
+    setLastError('');
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_OFFLINE_MODE',
+        enabled: false,
+      });
+      if (response?.success) {
+        setMode('cloud');
+        setDownloadState('idle');
+      } else {
+        setError(response?.error || 'Could not switch to Cloud Mode.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'The extension could not switch to Cloud Mode.');
+    }
+  };
+
+  const openSidePanel = async (view: 'audit' | 'history' | 'privacy' = 'audit') => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    await chrome.storage.local.set({ ssense_sidepanel_view: view });
     if (tab?.id) await chrome.sidePanel.open({ tabId: tab.id });
     window.close();
   };
+
+  const openFullReport = () => openSidePanel('audit');
 
   const openSettings = () => {
     chrome.runtime.openOptionsPage();
     window.close();
   };
 
+  const offlineBusy = downloadState === 'downloading';
+
   return (
     <div style={styles.root}>
-      <div style={styles.header}>
-        <div style={styles.headerIcon}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.4">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6-8 10-8 10" />
           </svg>
         </div>
-        <div style={styles.headerText}>Ssense</div>
-        <div style={styles.domainChip}>{domain || '—'}</div>
-      </div>
+        <div>
+          <div style={styles.brand}>Ssense</div>
+          <div style={styles.sub}>DPDP Compliance Shield</div>
+        </div>
+        <div style={styles.domain}>{domain || 'Browser page'}</div>
+      </header>
 
-      <div style={styles.body}>
-        {status === 'loading' && <div style={styles.centerNote}>Checking this site…</div>}
+      <main style={styles.body}>
+        <section style={styles.modeCard}>
+          <div style={styles.modeTop}>
+            <div>
+              <div style={styles.eyebrow}>AI ENGINE</div>
+              <div style={styles.modeTitle}>
+                {mode === 'offline' ? 'Private · Offline' : 'Cloud · Fast'}
+              </div>
+              <div style={styles.modeDescription}>
+                {mode === 'offline'
+                  ? 'Inference stays on this device. No policy text is sent to the cloud.'
+                  : 'Fast server inference is enabled by default. Offline models are optional.'}
+              </div>
+            </div>
 
-        {status === 'unconfigured' && (
-          <div style={styles.centerBlock}>
-            <div style={styles.centerNote}>Set up your server connection to start auditing sites.</div>
-            <button style={styles.primaryBtn} onClick={openSettings}>Open Settings</button>
+            <button
+              aria-label={mode === 'offline' ? 'Disable Offline Mode' : 'Enable Offline Privacy Mode'}
+              disabled={checking || offlineBusy}
+              onClick={mode === 'offline' ? disableOffline : enableOffline}
+              style={{
+                ...styles.switch,
+                ...(mode === 'offline' ? styles.switchOn : {}),
+                opacity: offlineBusy ? 0.55 : 1,
+              }}
+            >
+              <span style={{ ...styles.knob, ...(mode === 'offline' ? styles.knobOn : {}) }} />
+            </button>
           </div>
-        )}
 
-        {status === 'no-report' && (
-          <div style={styles.centerNote}>Ssense doesn't audit browser or system pages.</div>
-        )}
+          {offlineBusy && (
+            <div style={styles.downloadBox}>
+              <div style={styles.downloadHeader}>
+                <span>Preparing Offline Mode</span>
+                <strong>{pctText(progress.pct)}</strong>
+              </div>
+              <div style={styles.progressTrack}>
+                <div style={{ ...styles.progressBar, width: `${Math.max(1, progress.pct)}%` }} />
+              </div>
+              <div style={styles.downloadMeta}>
+                <span>{progress.file || 'Connecting to model storage…'}</span>
+                <span>{progress.mbPerSec > 0 ? `${progress.mbPerSec.toFixed(1)} MB/s` : 'Starting…'}</span>
+              </div>
+              <div style={styles.note}>
+                Large model files download once and resume automatically if interrupted.
+              </div>
+            </div>
+          )}
 
-        {status === 'error' && (
-          <div style={styles.centerBlock}>
-            <div style={{ ...styles.centerNote, color: COLORS.amber }}>{errorMsg}</div>
-            <button style={styles.secondaryBtn} onClick={openFullReport}>Run audit in full panel</button>
+          {downloadState === 'ready' && mode === 'offline' && (
+            <div style={styles.ready}>
+              <span style={styles.readyDot}>✓</span>
+              Offline models are installed and ready.
+            </div>
+          )}
+
+          {error && <div style={styles.error}>⚠ {error}{lastError && <div style={{ marginTop: 4, color: C.faint }}>Your Cloud/Offline selection was not changed.</div>}</div>}
+        </section>
+
+        <div style={styles.statusRow}>
+          <span style={{ ...styles.statusDot, background: serviceStatus === 'online' ? C.green : serviceStatus === 'checking' ? C.amber : C.red }} />
+          <span style={styles.statusLabel}>{serviceStatus === 'online' ? 'AI service ready' : serviceStatus === 'checking' ? 'Checking AI service…' : serviceStatus === 'not-configured' ? 'Cloud needs setup' : 'AI service unavailable'}</span>
+          {mode === 'offline' && <span style={styles.statusMode}>LOCAL</span>}
+        </div>
+
+        <section style={styles.quickGrid}>
+          <button style={styles.quickButton} onClick={() => openSidePanel('privacy')} disabled={!domain}>
+            <span>🔎</span><span>Privacy</span>
+          </button>
+          <button style={styles.quickButton} onClick={() => openSidePanel('history')}>
+            <span>◷</span><span>Site&nbsp;history</span>
+          </button>
+        </section>
+
+        <section style={styles.privacy}>
+          <div style={styles.privacyIcon}>↯</div>
+          <div>
+            <div style={styles.privacyTitle}>Privacy-first by choice</div>
+            <div style={styles.privacyText}>
+              Cloud Mode is the default for speed. Offline Mode is opt-in and requires an explicit model download.
+            </div>
           </div>
-        )}
+        </section>
 
-        {status === 'ready' && score !== null && (
-          <>
-            <div style={styles.sealRow}>
-              <AuditSeal score={score} color={tierFor(score).color} />
-            </div>
-            <div style={{ ...styles.tierLabel, color: tierFor(score).color }}>
-              {tierFor(score).label}
-            </div>
-            <div style={styles.actions}>
-              <button style={styles.primaryBtn} onClick={openFullReport}>View Full Report</button>
-              <button style={styles.secondaryBtn} onClick={openSettings}>Settings</button>
-            </div>
-          </>
+        {domain && (
+          <button style={styles.primary} onClick={openFullReport}>
+            View {domain} Report
+            <span>→</span>
+          </button>
         )}
-      </div>
+        <button style={styles.secondary} onClick={openSettings}>Settings</button>
+      </main>
 
-      <div style={styles.footer}>Audited locally via your SLM server</div>
+      <footer style={styles.footer}>
+        <span>SSENSE EDGE</span>
+        <span>•</span>
+        <span>{mode === 'offline' ? 'Local inference' : 'Cloud inference'}</span>
+      </footer>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
-    background: COLORS.bg,
-    color: COLORS.textPrimary,
+    width: '100%',
+    maxWidth: 380,
+    minHeight: 420,
+    maxHeight: 600,
+    overflowY: 'auto',
+    background: C.bg,
+    color: C.text,
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    display: 'flex',
-    flexDirection: 'column',
+    WebkitFontSmoothing: 'antialiased',
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '12px 14px',
-    borderBottom: `1px solid ${COLORS.border}`,
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '14px 16px', borderBottom: `1px solid ${C.border}`,
   },
-  headerIcon: {
-    width: 22, height: 22, borderRadius: 6,
-    background: `linear-gradient(135deg, ${COLORS.cyan}, ${COLORS.blue})`,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  logo: {
+    width: 28, height: 28, borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: `linear-gradient(135deg, ${C.cyan}, ${C.blue})`,
+    flexShrink: 0,
   },
-  headerText: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  domainChip: {
-    marginLeft: 'auto', fontSize: 10.5, color: COLORS.textMuted,
-    fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
-    maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  brand: { fontSize: 14, fontWeight: 750 },
+  sub: { fontSize: 9.5, color: C.faint, marginTop: 1, letterSpacing: .35 },
+  domain: {
+    marginLeft: 'auto', maxWidth: 130, overflow: 'hidden',
+    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    fontSize: 10, color: C.muted, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   },
-  body: {
-    padding: '20px 18px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    minHeight: 150,
-    justifyContent: 'center',
+  body: { padding: 16 },
+  modeCard: {
+    background: C.panel, border: `1px solid ${C.border}`,
+    borderRadius: 13, padding: 15,
   },
-  sealRow: { display: 'flex', justifyContent: 'center', marginBottom: 10 },
-  tierLabel: {
-    fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2,
-    fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
-    marginBottom: 16,
+  modeTop: { display: 'flex', gap: 12, alignItems: 'flex-start' },
+  eyebrow: { fontSize: 9, letterSpacing: 1.3, color: C.faint, fontWeight: 700, marginBottom: 4 },
+  modeTitle: { fontSize: 16, fontWeight: 750 },
+  modeDescription: { fontSize: 11, color: C.muted, lineHeight: 1.45, marginTop: 5, maxWidth: 260 },
+  switch: {
+    marginLeft: 'auto', width: 44, height: 25, borderRadius: 20, border: 'none',
+    padding: 3, background: '#27272A', cursor: 'pointer', flexShrink: 0,
   },
-  actions: { display: 'flex', gap: 8, width: '100%' },
-  centerBlock: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
-  centerNote: { fontSize: 12, color: COLORS.textMuted, textAlign: 'center', lineHeight: 1.5, maxWidth: 240 },
-  primaryBtn: {
-    flex: 1, background: COLORS.cyan, color: COLORS.bg, border: 'none',
-    borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  switchOn: { background: 'linear-gradient(90deg, #0891B2, #2563EB)' },
+  knob: {
+    display: 'block', width: 19, height: 19, borderRadius: '50%',
+    background: '#F4F4F5', transition: 'transform .18s ease',
   },
-  secondaryBtn: {
-    flex: 1, background: 'rgba(255,255,255,0.06)', color: COLORS.textPrimary,
-    border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: '8px 12px',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  knobOn: { transform: 'translateX(19px)' },
+  downloadBox: {
+    marginTop: 14, padding: 12, borderRadius: 10,
+    background: 'rgba(255,255,255,.035)', border: `1px solid ${C.border}`,
+  },
+  downloadHeader: { display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 650 },
+  progressTrack: { height: 6, borderRadius: 6, background: '#27272A', marginTop: 9, overflow: 'hidden' },
+  progressBar: {
+    height: '100%', borderRadius: 6,
+    background: `linear-gradient(90deg, ${C.cyan}, ${C.blue})`,
+    transition: 'width .25s ease',
+  },
+  downloadMeta: {
+    display: 'flex', justifyContent: 'space-between', gap: 8,
+    marginTop: 7, fontSize: 9.5, color: C.muted,
+  },
+  note: { marginTop: 8, fontSize: 9.5, color: C.faint, lineHeight: 1.4 },
+  ready: { marginTop: 12, fontSize: 10.5, color: C.green, display: 'flex', gap: 7, alignItems: 'center' },
+  readyDot: {
+    width: 18, height: 18, borderRadius: '50%', background: 'rgba(74,222,128,.12)',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800,
+  },
+  error: { marginTop: 11, color: C.red, fontSize: 10.5, lineHeight: 1.4 },
+  statusRow: {
+    display: 'flex', alignItems: 'center', gap: 7,
+    marginTop: 12, padding: '8px 11px', borderRadius: 9,
+    background: 'rgba(255,255,255,.03)', border: `1px solid ${C.border}`,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: '50%', flexShrink: 0 },
+  statusLabel: { fontSize: 11, color: C.muted, fontWeight: 600, flex: 1 },
+  statusMode: {
+    fontSize: 8.5, fontWeight: 800, letterSpacing: .6, color: C.blue,
+    background: 'rgba(59,130,246,.12)', padding: '2px 7px', borderRadius: 5,
+  },
+  quickGrid: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+    marginTop: 12,
+  },
+  quickButton: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+    padding: '10px 12px', borderRadius: 9,
+    background: 'rgba(255,255,255,.04)', border: `1px solid ${C.border}`,
+    color: C.text, fontSize: 11.5, fontWeight: 650, cursor: 'pointer',
+    transition: 'background 0.15s ease, border-color 0.15s ease',
+  },
+  privacy: {
+    display: 'flex', gap: 10, marginTop: 12, padding: 12,
+    border: `1px solid ${C.border}`, borderRadius: 11, background: 'rgba(34,211,238,.025)',
+  },
+  privacyIcon: {
+    width: 25, height: 25, borderRadius: 7, background: 'rgba(34,211,238,.1)',
+    color: C.cyan, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800,
+  },
+  privacyTitle: { fontSize: 10.5, fontWeight: 700 },
+  privacyText: { fontSize: 9.5, color: C.faint, lineHeight: 1.4, marginTop: 2 },
+  primary: {
+    width: '100%', marginTop: 14, border: 'none', borderRadius: 9,
+    padding: '10px 12px', background: C.cyan, color: C.bg,
+    fontWeight: 750, fontSize: 11.5, cursor: 'pointer',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  },
+  secondary: {
+    width: '100%', marginTop: 8, border: `1px solid ${C.border}`, borderRadius: 9,
+    padding: '9px 12px', background: 'rgba(255,255,255,.04)', color: C.text,
+    fontWeight: 600, fontSize: 11, cursor: 'pointer',
   },
   footer: {
-    padding: '9px 14px', borderTop: `1px solid ${COLORS.border}`,
-    fontSize: 10, color: COLORS.textFaint, textAlign: 'center',
+    padding: '9px 16px', borderTop: `1px solid ${C.border}`,
+    display: 'flex', justifyContent: 'center', gap: 7,
+    color: C.faint, fontSize: 8.5, letterSpacing: .7,
   },
 };
