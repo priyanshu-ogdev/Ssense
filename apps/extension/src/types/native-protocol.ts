@@ -18,7 +18,8 @@ export type DaemonRequest =
   | ChatRequest
   | GetTrustScoreRequest
   | HealthCheckRequest
-  | DownloadModelsRequest;
+  | DownloadModelsRequest
+  | PauseDownloadRequest;
 
 export interface AuditPolicyRequest {
   type: "AUDIT_POLICY";
@@ -47,6 +48,11 @@ export interface HealthCheckRequest {
 
 export interface DownloadModelsRequest {
   type: "DOWNLOAD_MODELS";
+  requestId: string;
+}
+
+export interface PauseDownloadRequest {
+  type: "PAUSE_DOWNLOAD";
   requestId: string;
 }
 
@@ -104,6 +110,7 @@ export interface HealthCheckResponse {
   cacheSize: number;
   totalInferences: number;
   avgTokensPerSecond: number;
+  hasGpuAcceleration: boolean;
 }
 
 export interface StatusResponse {

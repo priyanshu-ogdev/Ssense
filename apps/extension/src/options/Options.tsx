@@ -1,56 +1,49 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LOCAL_SERVER_URL, ONLINE_SERVER_URL, DEFAULT_SERVER_MODE, type ServerMode } from '../config';
 
 // ═══════════════════════════════════════════════════════════════
 // Ssense Options — configures the ONLY backend this extension talks
-// to: the SLM server. The endpoint is no longer a free-text field —
-// it is always one of two fixed, known-good addresses defined in
-// config.ts. The user picks a *mode*:
+// to: the SLM server. There is no local-daemon mode anymore, so this
+// page just needs three fields: server URL, API key, HMAC secret.
 //
-//   Auto    probe localhost first, fall back to the hosted server
-//   Local   force LOCAL_SERVER_URL
-//   Online  force ONLINE_SERVER_URL
-//
-// This removes an entire class of support tickets and phishing risk
-// (typo'd or malicious "server URL" values) at the cost of zero
-// flexibility a normal user actually needs. api-client.ts resolves
-// the mode into a URL at request time — see resolveMode().
+// These credentials must match what the SLM server was booted with
+// (SSENSE_API_KEYS / SSENSE_HMAC_SECRET in its .env). Nothing here is
+// pre-filled with a default — api-client.ts refuses to send requests
+// until both fields are non-empty (see `configured` in getServerConfig).
 // ═══════════════════════════════════════════════════════════════
 
 type SavedState = 'idle' | 'saving' | 'saved' | 'error';
 type TestState = 'idle' | 'testing' | 'ok' | 'fail';
-type ProbeState = 'checking' | 'reachable' | 'unreachable';
 
-const STORAGE_KEYS = ['ssense_server_mode', 'ssense_api_key', 'ssense_hmac_secret'] as const;
-const PROBE_TIMEOUT_MS = 1200;
+const STORAGE_KEYS = ['ssense_server_url', 'ssense_api_key', 'ssense_hmac_secret'] as const;
 
-async function probeLocal(): Promise<boolean> {
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+
+function classifyUrl(raw: string): { kind: 'local' | 'remote' | 'invalid' | 'empty'; host?: string; secure?: boolean } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { kind: 'empty' };
   try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    const res = await fetch(`${LOCAL_SERVER_URL}/health`, { method: 'GET', signal: controller.signal });
-    clearTimeout(t);
-    return res.ok;
+    const u = new URL(trimmed);
+    const host = u.hostname.toLowerCase();
+    const isPrivate =
+      LOCAL_HOSTS.has(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+      host.endsWith('.local');
+    return { kind: isPrivate ? 'local' : 'remote', host: u.host, secure: u.protocol === 'https:' };
   } catch {
-    return false;
+    return { kind: 'invalid' };
   }
 }
 
-const MODES: { id: ServerMode; label: string; hint: string }[] = [
-  { id: 'auto', label: 'Auto', hint: 'Detect automatically' },
-  { id: 'local', label: 'Local', hint: LOCAL_SERVER_URL },
-  { id: 'online', label: 'Online', hint: ONLINE_SERVER_URL },
-];
-
 export default function Options() {
-  const [mode, setMode] = useState<ServerMode>(DEFAULT_SERVER_MODE);
+  const [serverUrl, setServerUrl] = useState('http://localhost:8080');
   const [apiKey, setApiKey] = useState('');
   const [hmacSecret, setHmacSecret] = useState('');
   const [showSecrets, setShowSecrets] = useState(false);
   const [saveState, setSaveState] = useState<SavedState>('idle');
   const [testState, setTestState] = useState<TestState>('idle');
   const [testDetail, setTestDetail] = useState<string>('');
-  const [probeState, setProbeState] = useState<ProbeState>('checking');
 
   useEffect(() => {
     const styleTag = document.createElement('style');
@@ -61,47 +54,23 @@ export default function Options() {
 
   useEffect(() => {
     chrome.storage.local.get(STORAGE_KEYS, (data) => {
-      if (data.ssense_server_mode) setMode(data.ssense_server_mode);
+      if (data.ssense_server_url) setServerUrl(data.ssense_server_url);
       if (data.ssense_api_key) setApiKey(data.ssense_api_key);
       if (data.ssense_hmac_secret) setHmacSecret(data.ssense_hmac_secret);
     });
   }, []);
 
-  // Re-probe the local server whenever the mode changes to "auto" (or on mount),
-  // purely to drive the resolved-endpoint indicator — the actual runtime
-  // resolution happens independently inside api-client.ts.
-  useEffect(() => {
-    if (mode !== 'auto') return;
-    let cancelled = false;
-    setProbeState('checking');
-    probeLocal().then((reachable) => {
-      if (!cancelled) setProbeState(reachable ? 'reachable' : 'unreachable');
-    });
-    return () => { cancelled = true; };
-  }, [mode]);
-
-  const resolvedUrl = useMemo(() => {
-    if (mode === 'local') return LOCAL_SERVER_URL;
-    if (mode === 'online') return ONLINE_SERVER_URL;
-    return probeState === 'reachable' ? LOCAL_SERVER_URL : ONLINE_SERVER_URL;
-  }, [mode, probeState]);
-
-  const resolvedKind: 'local' | 'online' = resolvedUrl === LOCAL_SERVER_URL ? 'local' : 'online';
-
-  const isValid = apiKey.trim().length > 0 && hmacSecret.trim().length > 0;
-
-  const persist = async () => {
-    await chrome.storage.local.set({
-      ssense_server_mode: mode,
-      ssense_api_key: apiKey.trim(),
-      ssense_hmac_secret: hmacSecret.trim(),
-    });
-  };
+  const urlInfo = useMemo(() => classifyUrl(serverUrl), [serverUrl]);
+  const isValid = serverUrl.trim().length > 0 && apiKey.trim().length > 0 && hmacSecret.trim().length > 0 && urlInfo.kind !== 'invalid';
 
   const handleSave = async () => {
     setSaveState('saving');
     try {
-      await persist();
+      await chrome.storage.local.set({
+        ssense_server_url: serverUrl.trim().replace(/\/$/, ''),
+        ssense_api_key: apiKey.trim(),
+        ssense_hmac_secret: hmacSecret.trim(),
+      });
       setSaveState('saved');
       setTestState('idle');
       setTimeout(() => setSaveState('idle'), 2000);
@@ -114,7 +83,7 @@ export default function Options() {
     await chrome.storage.local.remove(STORAGE_KEYS as unknown as string[]);
     setApiKey('');
     setHmacSecret('');
-    setMode(DEFAULT_SERVER_MODE);
+    setServerUrl('http://localhost:8080');
     setSaveState('idle');
     setTestState('idle');
   };
@@ -123,9 +92,13 @@ export default function Options() {
     setTestState('testing');
     setTestDetail('');
     try {
-      // Save first so the service worker reads the mode currently on screen,
+      // Save first so the service worker reads the values currently on screen,
       // not whatever was previously persisted.
-      await persist();
+      await chrome.storage.local.set({
+        ssense_server_url: serverUrl.trim().replace(/\/$/, ''),
+        ssense_api_key: apiKey.trim(),
+        ssense_hmac_secret: hmacSecret.trim(),
+      });
       const res = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' });
       if (res?.success) {
         setTestState('ok');
@@ -140,21 +113,26 @@ export default function Options() {
     }
   };
 
+  const envBadge = () => {
+    if (urlInfo.kind === 'empty') return null;
+    if (urlInfo.kind === 'invalid') {
+      return <span className="opt-badge opt-badge--invalid"><span className="opt-badge-dot" />Invalid URL</span>;
+    }
+    if (urlInfo.kind === 'local') {
+      return <span className="opt-badge opt-badge--local"><span className="opt-badge-dot" />Local · Dev</span>;
+    }
+    return (
+      <span className={`opt-badge ${urlInfo.secure ? 'opt-badge--remote' : 'opt-badge--warn'}`}>
+        <span className="opt-badge-dot" />
+        {urlInfo.secure ? 'Online · Production' : 'Online · Insecure (HTTP)'}
+      </span>
+    );
+  };
+
   return (
     <div className="opt-page">
       <div className="opt-shell">
         <header className="opt-masthead">
-          <button
-            type="button"
-            className="opt-back-btn"
-            onClick={() => { if (window.history.length > 1) window.history.back(); else window.close(); }}
-            title="Back"
-            aria-label="Back"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-          </button>
           <div className="opt-masthead-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -172,46 +150,22 @@ export default function Options() {
               <div className="opt-eyebrow">Connection</div>
               <div className="opt-card-title">SLM Server</div>
             </div>
-            <span className={`opt-badge opt-badge--${resolvedKind}`}>
-              <span className="opt-badge-dot" />
-              {resolvedKind === 'local' ? 'Local · Dev' : 'Online · Production'}
-            </span>
+            {envBadge()}
           </div>
 
           <div className="opt-field">
-            <label className="opt-label">Server</label>
-
-            <div className="opt-segmented" role="radiogroup" aria-label="Server mode">
-              {MODES.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={mode === m.id}
-                  className={`opt-segment ${mode === m.id ? 'opt-segment--active' : ''}`}
-                  onClick={() => setMode(m.id)}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="opt-resolved">
-              <span className="opt-resolved-label">Resolved endpoint</span>
-              <code className="opt-resolved-url">{resolvedUrl}</code>
-              {mode === 'auto' && (
-                <span className={`opt-probe opt-probe--${probeState}`}>
-                  {probeState === 'checking' && 'Checking local server…'}
-                  {probeState === 'reachable' && 'Local server detected'}
-                  {probeState === 'unreachable' && 'Local server not found — using Online'}
-                </span>
-              )}
-            </div>
-
+            <label className="opt-label">Server URL</label>
+            <input
+              className={`opt-input opt-input--mono ${urlInfo.kind === 'invalid' ? 'opt-input--error' : ''}`}
+              type="text"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              placeholder="http://localhost:8080"
+              spellCheck={false}
+            />
             <div className="opt-help">
-              The endpoint is fixed and cannot be typed in — pick <strong>Auto</strong> to
-              detect the local server automatically, or force <strong>Local</strong> /
-              <strong> Online</strong> explicitly.
+              Use <code>http://localhost:8080</code> for local development, or your production domain
+              (e.g. <code>https://api.yourdomain.example.com</code>) served behind Nginx/TLS.
             </div>
           </div>
 
@@ -275,7 +229,7 @@ export default function Options() {
 
           {!isValid && (
             <div className="opt-hint">
-              API key and HMAC secret are required. They must match <code>SSENSE_API_KEYS</code> /
+              All three fields are required. Key and secret must match <code>SSENSE_API_KEYS</code> /
               <code> SSENSE_HMAC_SECRET</code> configured on the server's own <code>.env</code> — there is
               no default or development key.
             </div>
@@ -332,15 +286,6 @@ const OPTIONS_CSS = `
   .opt-shell { width: 100%; max-width: 460px; }
 
   .opt-masthead { display: flex; align-items: center; gap: 13px; margin-bottom: 22px; }
-  .opt-back-btn {
-    flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    background: transparent; border: 1px solid var(--opt-border);
-    color: var(--opt-text-secondary); cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  }
-  .opt-back-btn:hover { background: rgba(255,255,255,0.06); color: var(--opt-text-primary); border-color: var(--opt-border-strong); }
-  .opt-back-btn:active { transform: scale(0.94); }
   .opt-masthead-icon {
     width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
     background: var(--opt-gradient);
@@ -371,41 +316,16 @@ const OPTIONS_CSS = `
   .opt-badge-dot { width: 6px; height: 6px; border-radius: 50%; }
   .opt-badge--local { background: rgba(59,130,246,0.12); color: #93C5FD; border-color: rgba(59,130,246,0.28); }
   .opt-badge--local .opt-badge-dot { background: var(--opt-blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
-  .opt-badge--online { background: rgba(52,211,153,0.12); color: #6EE7B7; border-color: rgba(52,211,153,0.28); }
-  .opt-badge--online .opt-badge-dot { background: var(--opt-green); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); }
+  .opt-badge--remote { background: rgba(52,211,153,0.12); color: #6EE7B7; border-color: rgba(52,211,153,0.28); }
+  .opt-badge--remote .opt-badge-dot { background: var(--opt-green); box-shadow: 0 0 0 3px rgba(52,211,153,0.18); }
+  .opt-badge--warn { background: rgba(251,191,36,0.12); color: #FCD34D; border-color: rgba(251,191,36,0.28); }
+  .opt-badge--warn .opt-badge-dot { background: var(--opt-amber); box-shadow: 0 0 0 3px rgba(251,191,36,0.18); }
+  .opt-badge--invalid { background: rgba(251,113,133,0.12); color: #FDA4AF; border-color: rgba(251,113,133,0.28); }
+  .opt-badge--invalid .opt-badge-dot { background: var(--opt-red); box-shadow: 0 0 0 3px rgba(251,113,133,0.18); }
 
   .opt-field { margin-bottom: 18px; }
   .opt-field--last { margin-bottom: 4px; }
   .opt-label { display: block; font-size: 11.5px; font-weight: 650; color: var(--opt-text-secondary); margin-bottom: 7px; letter-spacing: 0.01em; }
-
-  .opt-segmented {
-    display: flex; gap: 4px; padding: 4px;
-    background: rgba(255,255,255,0.035); border: 1px solid var(--opt-border);
-    border-radius: 11px;
-  }
-  .opt-segment {
-    flex: 1; border: none; border-radius: 8px; padding: 9px 10px;
-    font-family: inherit; font-size: 12.5px; font-weight: 650;
-    color: var(--opt-text-secondary); background: transparent; cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-  }
-  .opt-segment:hover:not(.opt-segment--active) { color: var(--opt-text-primary); background: rgba(255,255,255,0.04); }
-  .opt-segment--active {
-    color: #0A0A0C; background: var(--opt-gradient);
-    box-shadow: 0 4px 14px -4px rgba(34,211,238,0.4);
-  }
-
-  .opt-resolved {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    margin-top: 12px; padding: 10px 12px;
-    background: rgba(255,255,255,0.03); border: 1px solid var(--opt-border);
-    border-radius: 9px;
-  }
-  .opt-resolved-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--opt-text-muted); }
-  .opt-resolved-url { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--opt-text-primary); }
-  .opt-probe { font-size: 11px; color: var(--opt-text-muted); margin-left: auto; }
-  .opt-probe--reachable { color: #6EE7B7; }
-  .opt-probe--unreachable { color: var(--opt-text-muted); }
 
   .opt-input {
     width: 100%; background: rgba(255,255,255,0.04);
@@ -417,10 +337,11 @@ const OPTIONS_CSS = `
   .opt-input:hover { border-color: var(--opt-border-strong); }
   .opt-input:focus { border-color: var(--opt-cyan); background: rgba(34,211,238,0.045); box-shadow: 0 0 0 3px rgba(34,211,238,0.12); }
   .opt-input--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .opt-input--error { border-color: var(--opt-red); }
+  .opt-input--error:focus { box-shadow: 0 0 0 3px rgba(251,113,133,0.14); }
 
-  .opt-help { font-size: 11px; color: var(--opt-text-muted); line-height: 1.55; margin-top: 10px; }
-  .opt-help code, .opt-hint code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--opt-text-secondary); }
-  .opt-help strong { color: var(--opt-text-secondary); font-weight: 650; }
+  .opt-help { font-size: 11px; color: var(--opt-text-muted); line-height: 1.55; margin-top: 8px; }
+  .opt-help code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--opt-text-secondary); }
 
   .opt-divider { height: 1px; background: var(--opt-border); margin: 4px 0 20px; }
 
@@ -458,6 +379,7 @@ const OPTIONS_CSS = `
   }
 
   .opt-hint { margin-top: 16px; font-size: 11px; color: var(--opt-text-muted); line-height: 1.6; }
+  .opt-hint code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--opt-text-secondary); }
 
   .opt-footer {
     display: flex; align-items: center; justify-content: center; gap: 8px;

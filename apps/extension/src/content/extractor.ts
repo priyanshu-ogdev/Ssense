@@ -1,5 +1,19 @@
 // apps/extension/src/content/extractor.ts
 
+export {}; // marks this file as an ES module so `declare global` below is valid
+
+declare global {
+  interface Window {
+    __ssenseExtractorLoaded?: boolean;
+  }
+}
+
+// Guard the whole file against re-injection into an already-loaded page
+// realm (see the identical guard + comment in dark-pattern-blocker.ts for
+// why this happens and what it fixes).
+if (!window.__ssenseExtractorLoaded) {
+window.__ssenseExtractorLoaded = true;
+
 console.log('[Ssense] Policy Extractor injected.');
 
 // 🚀 SOTA FIX: Safely resolves relative paths while preventing Protocol Smuggling
@@ -273,3 +287,4 @@ async function extractPolicyText(url: string): Promise<string | null> {
     console.error('[Ssense] Failed to send policy to Service Worker:', err);
   }
 })();
+} // end __ssenseExtractorLoaded guard

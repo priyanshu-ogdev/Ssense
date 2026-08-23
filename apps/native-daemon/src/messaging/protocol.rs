@@ -12,6 +12,7 @@ pub enum DaemonRequest {
     GetTrustScore(GetTrustScoreRequest),
     HealthCheck(HealthCheckRequest),
     DownloadModels(DownloadModelsRequest), // SOTA FIX: Explicit UI control over network usage
+    PauseDownload(PauseDownloadRequest), // Lets the user pause an in-flight download; partial files are kept for resume
 }
 
 impl DaemonRequest {
@@ -22,6 +23,7 @@ impl DaemonRequest {
             Self::GetTrustScore(r) => &r.request_id,
             Self::HealthCheck(r) => &r.request_id,
             Self::DownloadModels(r) => &r.request_id,
+            Self::PauseDownload(r) => &r.request_id,
         }
     }
 }
@@ -68,6 +70,12 @@ pub struct DownloadModelsRequest {
     pub request_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PauseDownloadRequest {
+    pub request_id: String,
+}
+
 // ═══════════════════════════════════════════════════════════════
 // RESPONSES (Rust Daemon -> Chrome Extension)
 // ═══════════════════════════════════════════════════════════════
@@ -99,6 +107,7 @@ pub enum DaemonResponse {
         #[serde(rename = "cacheSize")] cache_size: usize,
         #[serde(rename = "totalInferences")] total_inferences: u64,
         #[serde(rename = "avgTokensPerSecond")] avg_tokens_per_second: u32,
+        #[serde(rename = "hasGpuAcceleration")] has_gpu_acceleration: bool,
     },
     Status {
         #[serde(rename = "requestId")] request_id: Option<String>,

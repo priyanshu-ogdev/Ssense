@@ -5,13 +5,13 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::AddBos;
-use llama_cpp_2::grammar::LlamaGrammar;
-use llama_cpp_2::token::LlamaToken;
+use llama_cpp_2::model::Special;
+use llama_cpp_2::sampling::LlamaSampler;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tracing::{error, info, warn};
+use tracing::{info, trace};
 
 use crate::messaging::protocol::DpdpAuditReport;
 use super::grammar::{DPDP_AUDIT_GRAMMAR, validate_grammar};
@@ -80,6 +80,10 @@ impl LocalEngine {
         self.current_model_type.lock().map(|guard| *guard != ModelType::None).unwrap_or(false)
     }
 
+    pub fn get_metrics(&self) -> InferenceMetrics {
+        self.metrics.lock().map(|guard| guard.clone()).unwrap_or_default()
+    }
+
     pub fn switch_context(&self, required_model: ModelType) -> Result<()> {
         let mut type_guard = self.current_model_type.lock().map_err(|_| anyhow::anyhow!("Type mutex poisoned"))?;
         
@@ -101,10 +105,8 @@ impl LocalEngine {
                 return Err(anyhow::anyhow!("Model file missing at {:?}", path));
             }
 
-            let mut model_params = LlamaModelParams::default();
-            model_params.with_n_gpu_layers(self.dynamic_gpu_layers);
-            model_params.with_use_mmap(true);
-            model_params.with_use_mlock(false);
+            let model_params = LlamaModelParams::default()
+                .with_n_gpu_layers(self.dynamic_gpu_layers.try_into().unwrap_or(0));
 
             let model = LlamaModel::load_from_file(&self.backend, path, &model_params)
                 .context("Failed to map GGUF to memory.")?;
@@ -127,10 +129,8 @@ impl LocalEngine {
         let truncated_policy = Self::truncate_to_token_limit(policy_text, MAX_POLICY_CHARS);
         let prompt = self.build_audit_prompt(domain, truncated_policy);
 
-        let grammar = LlamaGrammar::from_str(DPDP_AUDIT_GRAMMAR).context("Failed to parse grammar")?;
-        
         // Audit requires low temp to prevent JSON structural drift
-        let output = self.run_inference(prompt, 0.1, 1.1, Some(grammar))?;
+        let output = self.run_inference(prompt, 0.1, 1.1, Some(DPDP_AUDIT_GRAMMAR))?;
         
         let report = self.parse_audit_response(&output)?;
 
@@ -145,7 +145,7 @@ impl LocalEngine {
         domain: &str,
         user_prompt: &str,
         audit_context: &DpdpAuditReport,
-        rag_engine: Option<&RagEngine>,
+        rag_engine: Option<&mut RagEngine>,
     ) -> Result<String> {
         let start_time = Instant::now();
 
@@ -174,60 +174,58 @@ impl LocalEngine {
     // ─────────────────────────────────────────────────────────────────
     // SOTA SENSE: Hallucination-Protected Inference Loop
     // ─────────────────────────────────────────────────────────────────
-    fn run_inference(&self, prompt: String, temp: f32, rep_pen: f32, grammar: Option<LlamaGrammar>) -> Result<String> {
+    fn run_inference(&self, prompt: String, temp: f32, rep_pen: f32, grammar: Option<&str>) -> Result<String> {
         let model_guard = self.model.lock().map_err(|_| anyhow::anyhow!("Mutex poisoned"))?;
         let model = model_guard.as_ref().ok_or_else(|| anyhow::anyhow!("Model not mapped"))?;
 
-        let mut ctx_params = LlamaContextParams::default();
-        ctx_params.with_n_ctx(MAX_CONTEXT_TOKENS.try_into().unwrap());
-        ctx_params.with_n_threads(self.optimal_threads as u32);
+        let ctx_params = LlamaContextParams::default()
+            .with_n_ctx(std::num::NonZeroU32::new(MAX_CONTEXT_TOKENS))
+            .with_n_threads(self.optimal_threads);
         
-        let mut ctx = model.create_context(&self.backend, ctx_params)
+        let mut ctx = model.new_context(&self.backend, ctx_params)
             .context("Failed to create context")?;
 
         let tokens = model.str_to_token(&prompt, AddBos::Always)?;
         let mut batch = LlamaBatch::new(MAX_CONTEXT_TOKENS as usize, 1);
         
         for (i, &token) in tokens.iter().enumerate() {
-            batch.add(token, i as i32, &[0], i == tokens.len() - 1);
+            batch.add(token, i as i32, &[0], i == tokens.len() - 1)
+                .context("Failed to add token to prefill batch (context window may be too small for this prompt)")?;
         }
 
         ctx.decode(&mut batch).context("Prefill decode failed")?;
 
+        // Build the sampler chain: grammar (optional) -> repetition penalty -> temperature -> top-p -> final draw
+        let mut chain_parts: Vec<LlamaSampler> = Vec::new();
+        if let Some(gbnf) = grammar {
+            let grammar_sampler = LlamaSampler::grammar(model, gbnf, "root");
+            chain_parts.push(grammar_sampler);
+        }
+        // penalties_simple derives n_vocab / eos / newline token ids from the model itself
+        // (mirrors the legacy 9-arg llama_sampler_init_penalties C API that 0.1.86 is pinned to).
+        chain_parts.push(LlamaSampler::penalties_simple(model, 64, rep_pen, 0.0, 0.0));
+        chain_parts.push(LlamaSampler::temp(temp));
+        chain_parts.push(LlamaSampler::top_p(0.9, 1));
+        chain_parts.push(LlamaSampler::dist(1234));
+        let mut sampler = LlamaSampler::chain_simple(chain_parts);
+
         let mut output_text = String::new();
         let mut current_pos = tokens.len() as i32;
-        let mut history: Vec<LlamaToken> = Vec::new();
+        let prefill_len = tokens.len();
 
-        for _ in 0..MAX_GENERATE_TOKENS {
-            let mut candidates = ctx.candidates_ith(batch.n_tokens() - 1);
-            
-            // 1. Apply Repetition Penalty to prevent Hallucination Loops
-            if !history.is_empty() {
-                ctx.sample_repetition_penalties(&mut candidates, &history, history.len(), rep_pen, 0.0, 0.0);
-            }
+        trace!("Prefill: {} tokens decoded, generation starting at position {}", prefill_len, current_pos);
 
-            // 2. Apply Grammar (JSON Enforcement)
-            if let Some(ref g) = grammar {
-                ctx.sample_grammar(&mut candidates, g);
-            }
+        for step in 0..MAX_GENERATE_TOKENS {
+            let id = sampler.sample(&ctx, batch.n_tokens() - 1);
+            sampler.accept(id);
 
-            // 3. Apply Temperature Scaling
-            ctx.sample_temp(&mut candidates, temp);
-
-            // 4. Sample Token (Top-P = 0.9)
-            ctx.sample_top_p(&mut candidates, 0.9, 1);
-            let id = ctx.sample_token(&mut candidates);
-            
-            if let Some(ref g) = grammar {
-                ctx.grammar_accept_token(g, id);
-            }
-
-            if id == model.token_eos() || id == model.token_eot() {
+            if model.is_eog_token(id) {
+                trace!("Step {}: token {} is end-of-generation, stopping", step, id.0);
                 break;
             }
 
-            history.push(id);
-            let text = model.token_to_str(id).unwrap_or_default();
+            let text = model.token_to_str(id, Special::Tokenize).unwrap_or_default();
+            trace!("Step {}: token_id={} -> {:?} (pos={})", step, id.0, text, current_pos);
             output_text.push_str(&text);
 
             if output_text.ends_with("<|im_end|>") {
@@ -236,7 +234,8 @@ impl LocalEngine {
             }
 
             batch.clear();
-            batch.add(id, current_pos, &[0], true);
+            batch.add(id, current_pos, &[0], true)
+                .context("Failed to add generated token to batch")?;
             ctx.decode(&mut batch).context("Token decode failed")?;
             current_pos += 1;
         }
@@ -274,7 +273,7 @@ Audit domain: {}\n\n[PRIVACY POLICY TEXT]\n{}\n<|im_end|>\n\
         } else {
             translated_audit.push_str("Identified DPDP Violations:\n");
             for (i, v) in audit_context.violations.iter().enumerate() {
-                translated_audit.push_str(&format!("{}. {} (Reference: {})\n", i+1, v.violation_type, v.statute_reference));
+                translated_audit.push_str(&format!("{}. {:?} (Reference: {})\n", i+1, v.violation_type, v.statute_reference));
             }
         }
 

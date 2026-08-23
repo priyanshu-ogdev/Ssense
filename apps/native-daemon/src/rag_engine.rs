@@ -7,7 +7,7 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES & SERIALIZATION
@@ -86,11 +86,10 @@ impl RagEngine {
 
         info!("🧠 [RAGEngine] Initializing local fastembed ONNX engine...");
         // SOTA FIX: Force FastEmbed to use BGESmallENV15 offline to match the 384-dimensional DGX safetensors.
-        let embed_model = TextEmbedding::try_new(InitOptions {
-            model_name: EmbeddingModel::BGESmallENV15, 
-            show_download_progress: false,
-            ..Default::default()
-        }).context("Failed to initialize FastEmbed ONNX engine")?;
+        let embed_model = TextEmbedding::try_new(
+            InitOptions::new(EmbeddingModel::BGESmallENV15)
+                .with_show_download_progress(false)
+        ).context("Failed to initialize FastEmbed ONNX engine")?;
 
         info!("⚡ [RAGEngine] Precomputing BM25 Token Frequencies (Rayon SIMD)...");
         let doc_freqs: Vec<HashMap<String, u32>> = index.chunks.par_iter().map(|chunk| {
@@ -112,7 +111,7 @@ impl RagEngine {
         })
     }
 
-    pub fn search(&self, query: &str, is_state_query: bool) -> Result<Vec<SearchHit>> {
+    pub fn search(&mut self, query: &str, is_state_query: bool) -> Result<Vec<SearchHit>> {
         let q_tokens = Self::tokenize(query);
         
         // FastEmbed expects a vector of strings
@@ -127,11 +126,15 @@ impl RagEngine {
         }).collect();
 
         // 2. Dense Semantic Scoring (Zero-Copy Pointer Math)
+        // SAFETY: capture the pointer as a plain usize so rayon's closure capture
+        // doesn't pull out the raw *const f32 directly (which isn't Sync on its own).
+        let dense_matrix_addr = self.dense_matrix_ptr as usize;
         let dense_scores: Vec<f32> = (0..self.chunk_count).into_par_iter().map(|i| {
             unsafe {
                 let start = i * dim;
+                let ptr = dense_matrix_addr as *const f32;
                 // Reconstruct the slice directly from the raw mmap pointer for zero overhead
-                let doc_emb = std::slice::from_raw_parts(self.dense_matrix_ptr.add(start), dim);
+                let doc_emb = std::slice::from_raw_parts(ptr.add(start), dim);
                 Self::simd_dot_product(&q_emb, doc_emb)
             }
         }).collect();
@@ -166,7 +169,9 @@ impl RagEngine {
             if score > 0.0 {
                 let meta = &self.index.metadatas[idx];
                 // SOTA FIX: Build XML-Style structured context to match the Cloud Server's hallucination defenses
-                let meta_str = format!("[{} {} | Applies to: {}]", meta.doc_type, meta.number, meta.applies_to);
+                let sub_section = if meta.sub_section.is_empty() { String::new() } else { format!(" > {}", meta.sub_section) };
+                let parent_act = if meta.parent_act.is_empty() { String::new() } else { format!(" of the {}", meta.parent_act) };
+                let meta_str = format!("[{} {}{}{} | Applies to: {}]", meta.doc_type, meta.number, sub_section, parent_act, meta.applies_to);
                 hits.push(SearchHit {
                     chunk_id: idx,
                     score,

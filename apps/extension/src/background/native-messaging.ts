@@ -58,6 +58,7 @@ function getPort(): chrome.runtime.Port {
         pending.reject(new Error(message));
       }
       pendingRequests.clear();
+      stopKeepaliveIfIdle();
     });
   }
   return port;
@@ -68,28 +69,66 @@ export function subscribeNativeEvents(listener: (message: DaemonResponse) => voi
   return () => eventListeners.delete(listener);
 }
 
+// ── Service worker keepalive ──
+// Chrome can terminate an MV3 service worker after ~30s of apparent idleness,
+// even mid-native-messaging-request — CHAT and AUDIT_POLICY routinely take
+// longer than that (cold-start model loading alone can take well over a
+// minute). If the worker dies while a request is still pending, the promise
+// the UI is awaiting simply never settles: no error, no timeout firing, just
+// a permanent "Formatting legal response..." spinner. A trivial extension API
+// call resets Chrome's idle-eviction clock, so we tick one every 20s for as
+// long as there's at least one request genuinely in flight.
+let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+
+function startKeepaliveIfNeeded() {
+  if (keepaliveInterval) return;
+  keepaliveInterval = setInterval(() => {
+    // Any real chrome.* API call resets the idle timer; getPlatformInfo is
+    // cheap and side-effect-free.
+    chrome.runtime.getPlatformInfo(() => { /* no-op, just resets the idle clock */ });
+  }, 20000);
+}
+
+function stopKeepaliveIfIdle() {
+  if (pendingRequests.size === 0 && keepaliveInterval) {
+    clearInterval(keepaliveInterval);
+    keepaliveInterval = null;
+  }
+}
+
 export function sendToNativeDaemon(
   request: DaemonRequest,
   timeoutMs = request.type === 'DOWNLOAD_MODELS' ? 30 * 60 * 1000 : 180 * 1000
 ): Promise<DaemonResponse> {
   return new Promise((resolve, reject) => {
+    startKeepaliveIfNeeded();
+
+    const settle = (fn: (v: any) => void, value: any) => {
+      fn(value);
+      stopKeepaliveIfIdle();
+    };
+
     const timeoutId = setTimeout(() => {
       if (pendingRequests.has(request.requestId)) {
         pendingRequests.delete(request.requestId);
-        reject(new Error('Native daemon request timed out.'));
+        settle(reject, new Error('Native daemon request timed out.'));
       }
     }, timeoutMs);
 
     try {
       const p = getPort();
-      pendingRequests.set(request.requestId, { resolve, reject, timeout: timeoutId });
+      pendingRequests.set(request.requestId, {
+        resolve: (v) => settle(resolve, v),
+        reject: (e) => settle(reject, e),
+        timeout: timeoutId,
+      });
       p.postMessage(request);
     } catch (err: any) {
       clearTimeout(timeoutId);
       pendingRequests.delete(request.requestId);
       try { port?.disconnect(); } catch { /* ignore */ }
       port = null;
-      reject(new Error(`Native IPC failed: ${err?.message || String(err)}`));
+      settle(reject, new Error(`Native IPC failed: ${err?.message || String(err)}`));
     }
   });
 }

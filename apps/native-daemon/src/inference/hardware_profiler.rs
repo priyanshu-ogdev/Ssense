@@ -29,7 +29,7 @@ impl HardwareProfiler {
             bail!("Fatal: 32-bit architecture detected. Ssense requires a 64-bit OS to map the neural network into virtual memory.");
         }
 
-        let refresh_kind = RefreshKind::nothing()
+        let refresh_kind = RefreshKind::new()
             .with_memory(MemoryRefreshKind::everything()) 
             .with_cpu(CpuRefreshKind::everything());
             
@@ -123,30 +123,6 @@ impl HardwareProfiler {
         
         Ok(HardwareProfile { optimal_threads, has_gpu_acceleration })
     }
-
-    /// Quick check for UI display (non-blocking, returns status)
-    pub fn get_system_status() -> SystemStatus {
-        let refresh_kind = RefreshKind::nothing().with_memory(MemoryRefreshKind::everything());
-        let sys = System::new_with_specifics(refresh_kind);
-
-        let available_ram_mb = sys.available_memory() / 1024 / 1024;
-        let has_gpu = cfg!(feature = "cublas") || cfg!(feature = "metal");
-        
-        SystemStatus {
-            can_load_model: available_ram_mb >= MIN_REQUIRED_RAM_MB,
-            available_ram_mb,
-            required_ram_mb: MIN_REQUIRED_RAM_MB, 
-            has_gpu,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SystemStatus {
-    pub can_load_model: bool,
-    pub available_ram_mb: u64,
-    pub required_ram_mb: u64,
-    pub has_gpu: bool,
 }
 
 #[cfg(target_os = "linux")]

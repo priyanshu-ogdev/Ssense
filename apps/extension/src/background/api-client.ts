@@ -2,73 +2,27 @@
 
 import { nativeBridge } from './native-messaging';
 import type { DaemonResponse } from '../types/native-protocol';
-import { LOCAL_SERVER_URL, ONLINE_SERVER_URL, DEFAULT_SERVER_MODE, type ServerMode } from '../config';
+
+const DEFAULT_SERVER_URL = 'http://localhost:8080';
 
 export interface RouterConfig {
   url: string;
-  resolvedMode: 'local' | 'online';
   apiKey: string;
   hmacSecret: string;
   offlineMode: boolean;
   configured: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ENDPOINT RESOLUTION
-// ═══════════════════════════════════════════════════════════════
-// There is no editable "server URL" field anymore. The user only picks
-// a mode — Auto / Local / Online — and we resolve that to one of the
-// two fixed constants in config.ts. In "auto" mode we probe the local
-// server first (short timeout) and fall back to the hosted one; the
-// result is cached briefly so every single request doesn't re-probe.
-
-const LOCAL_PROBE_TIMEOUT_MS = 600;
-const AUTO_RESOLUTION_TTL_MS = 15000;
-
-let cachedResolution: { mode: 'local' | 'online'; expiresAt: number } | null = null;
-
-async function isLocalServerReachable(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), LOCAL_PROBE_TIMEOUT_MS);
-    const res = await fetch(`${LOCAL_SERVER_URL}/health`, { method: 'GET', signal: controller.signal });
-    clearTimeout(timeoutId);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveMode(mode: ServerMode): Promise<'local' | 'online'> {
-  if (mode === 'local') return 'local';
-  if (mode === 'online') return 'online';
-
-  // mode === 'auto'
-  const now = Date.now();
-  if (cachedResolution && cachedResolution.expiresAt > now) {
-    return cachedResolution.mode;
-  }
-  const reachable = await isLocalServerReachable();
-  const resolved: 'local' | 'online' = reachable ? 'local' : 'online';
-  cachedResolution = { mode: resolved, expiresAt: now + AUTO_RESOLUTION_TTL_MS };
-  return resolved;
-}
-
 export async function getRouterConfig(): Promise<RouterConfig> {
   const data = await chrome.storage.local.get([
-    'ssense_server_mode',
+    'ssense_server_url',
     'ssense_api_key',
     'ssense_hmac_secret',
     'ssense_offline_mode'
   ]);
 
-  const mode: ServerMode = data.ssense_server_mode || DEFAULT_SERVER_MODE;
-  const resolvedMode = await resolveMode(mode);
-  const url = resolvedMode === 'local' ? LOCAL_SERVER_URL : ONLINE_SERVER_URL;
-
   return {
-    url,
-    resolvedMode,
+    url: data.ssense_server_url || DEFAULT_SERVER_URL,
     apiKey: data.ssense_api_key || '',
     hmacSecret: data.ssense_hmac_secret || '',
     offlineMode: Boolean(data.ssense_offline_mode),
@@ -325,6 +279,9 @@ export async function executeHealthCheck(requestId: string): Promise<DaemonRespo
       cacheSize: 0,
       totalInferences: data.totalInferences ?? 0,
       avgTokensPerSecond: data.avgTokensPerSecond ?? 120,
+      // GPU acceleration is a property of the local native daemon's hardware, not
+      // applicable to Cloud Mode (inference happens server-side).
+      hasGpuAcceleration: false,
     };
   } catch (err: any) {
     const e = normalizeError(err, 'Cloud health check failed.');
@@ -412,4 +369,13 @@ export async function executeDownloadModels(requestId: string): Promise<DaemonRe
     };
   }
   return nativeBridge.sendRequest<DaemonResponse>({ type: 'DOWNLOAD_MODELS', requestId });
+}
+
+// Cooperative pause: the daemon acks this quickly on its own requestId (see
+// main.rs), then separately stops the streaming download and reports a
+// terminal "paused" Status on the *original* DOWNLOAD_MODELS requestId. The
+// `.part` file is left on disk, so a later DOWNLOAD_MODELS call resumes it
+// via HTTP Range instead of restarting from 0.
+export async function executePauseDownload(requestId: string): Promise<DaemonResponse> {
+  return nativeBridge.sendRequest<DaemonResponse>({ type: 'PAUSE_DOWNLOAD', requestId });
 }

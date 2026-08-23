@@ -1,13 +1,26 @@
 // apps/extension/src/content/dark-pattern-blocker.ts
 import type { DpdpAuditReport, NetworkAction, Violation } from '../types/native-protocol';
 
-console.log('[Ssense] DOM Enforcer injected and listening.');
-
 declare global {
   interface Window {
     __ssenseObserverAttached?: boolean;
+    __ssenseDarkPatternBlockerLoaded?: boolean;
   }
 }
+
+// Guard the ENTIRE file body against re-injection into an already-loaded page
+// realm. Chrome re-runs a matching content script into a tab's *existing* JS
+// realm (not a fresh one) whenever the extension reloads — a dev rebuild, or
+// Chrome auto-updating the extension — while that tab is already open and
+// hasn't navigated since. Without this guard, the second run's top-level
+// `const`/`let` (e.g. MAX_DESCENDANTS_FOR_TEXT_SCAN below) collides with the
+// binding the first run already created in that realm and throws "Identifier
+// '...' has already been declared", aborting the whole script before it can
+// attach its listener — which is exactly the error being reported.
+if (!window.__ssenseDarkPatternBlockerLoaded) {
+window.__ssenseDarkPatternBlockerLoaded = true;
+
+console.log('[Ssense] DOM Enforcer injected and listening.');
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'ENFORCE_DPDP_RULES' && message.report) {
@@ -280,3 +293,4 @@ function highlightViolationsInNodes(nodes: Element[], quotes: string[]) {
     console.error('[Ssense] Error highlighting violations:', err);
   }
 }
+} // end __ssenseDarkPatternBlockerLoaded guard

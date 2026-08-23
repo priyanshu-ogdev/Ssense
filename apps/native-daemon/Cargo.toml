@@ -5,6 +5,15 @@ edition = "2021"
 authors = ["Ssense Engineering <admin@ssense.local>"]
 description = "SOTA Zero-Hop Native Messaging Daemon for DPDP Edge Inference"
 
+[features]
+default = []
+# Enable to build llama-cpp-2 with NVIDIA CUDA acceleration.
+# Named "cublas" locally (matches the cfg!(feature = "cublas") checks in src/inference/)
+# even though the upstream llama-cpp-2 crate's own feature is called "cuda".
+cublas = ["llama-cpp-2/cuda"]
+# Enable to build llama-cpp-2 with Apple Metal acceleration (macOS only).
+metal = ["llama-cpp-2/metal"]
+
 [dependencies]
 # 1. Async Runtime & Native Messaging IO
 tokio = { version = "1.38", features = ["full", "fs"] }
@@ -29,34 +38,16 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.24"
 sysinfo = "0.30" # Hardware profiling for VRAM Airlock
 
-# 5. Model Sync (Direct HTTP Auto-Downloader)
-# NOTE: hf-hub was previously listed here but is never imported anywhere in
-# src/ (model_manager.rs downloads GGUF files with plain reqwest). It pulled
-# in its own tokenizers/native-tls stack for zero benefit and was a common
-# source of unrelated build breakage, so it has been removed.
+# 5. Model Sync (HuggingFace Auto-Downloader)
 reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
+hf-hub = { version = "0.3.2", features = ["tokio"] }
 
 # 6. SOTA Edge ML & RAG Engines
-llama-cpp-2 = "0.1.154"  # The modern, active Rust binding for GGUF/llama.cpp
-                          # Builds llama.cpp from source via `cmake` — requires
-                          # `cmake` + a C/C++ toolchain on PATH. This is a system
-                          # prerequisite, not something fixable from Cargo.toml.
-                          # Debian/Ubuntu: apt install -y cmake build-essential
-                          # macOS:         xcode-select --install
-                          # Windows:       Visual Studio "Desktop C++" workload
-
-# fastembed wraps `ort` (ONNX Runtime). Pinned to 5.x (not the old 3.2, which
-# resolved to a stale ort release with dead binary-download URLs — the exact
-# "ort"/build error this used to throw) and locked to `default-features =
-# false` with an explicit feature list so it NEVER tries the `system` ORT
-# strategy (which needs onnxruntime pre-installed and correctly on your
-# linker path) or native-tls (which needs OpenSSL headers). Instead:
-#   - ort-download-binaries -> ort fetches a prebuilt ONNX Runtime archive
-#     for your OS/arch at build time and links against that. No local ONNX
-#     Runtime install, no cmake step for this crate.
-#   - hf-hub-rustls-tls      -> same rustls stack as reqwest above, so no
-#     OpenSSL / native-tls dependency anywhere in the tree.
-fastembed = { version = "5", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries"] }
+llama-cpp-2 = "=0.1.86"  # Pinned: code uses the pre-rewrite candidates/grammar sampling API
+llama-cpp-sys-2 = "=0.1.86"  # MUST match llama-cpp-2's version exactly (old model-based vocab API, not the newer llama_vocab split)
+fastembed = "5"          # Updated: 3.2 was incompatible with ort 2.0-rc; v5 matches our pinned ort/ndarray versions
+ort = { version = "2.0.0-rc.13", default-features = false, features = ["download-binaries", "tls-rustls"] } # Pin TLS backend to fix ort-sys build error
+ndarray = { version = "0.17", features = ["std"] } # Fix: ort needs ndarray's std feature (NdFloat) enabled explicitly
 safetensors = "0.4"
 memmap2 = "0.9"          # Forces OS to page vectors to SSD
 rayon = "1.10"           # CPU SIMD parallelization for vector math

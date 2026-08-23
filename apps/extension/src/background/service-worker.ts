@@ -5,6 +5,7 @@ import {
   executeAuditPolicy,
   executeChat,
   executeDownloadModels,
+  executePauseDownload,
 } from './api-client';
 import { subscribeNativeEvents } from './native-messaging';
 import type { DaemonResponse } from '../types/native-protocol';
@@ -13,6 +14,29 @@ import * as chatStore from './chat-store';
 import * as privacyStore from './privacy-store';
 
 console.log('[Ssense] Service Worker initialized — Cloud-first / opt-in Offline mode.');
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+// The popup is not a persistent surface — it closes the moment the user
+// clicks away, and Chrome fully suspends it (and its in-memory state) if the
+// browser itself closes. `chrome.runtime.sendMessage` calls made while
+// nothing is listening just resolve to undefined; they are not queued. So
+// any event that can happen while the popup is closed (a 10GB download
+// finishing or failing, a serious privacy violation found on a page the
+// user already navigated away from) needs a channel that survives that —
+// which is exactly what chrome.notifications is for.
+function notify(id: string, title: string, message: string) {
+  try {
+    chrome.notifications.create(id, {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title,
+      message,
+      priority: 1,
+    }, () => void chrome.runtime.lastError); // swallow "duplicate id" etc.
+  } catch { /* notifications API unavailable in this context — non-fatal */ }
+}
 
 // Native download events are broadcast to the popup/options UI. The popup may
 // close during a download; progress is also persisted so it can recover.
@@ -28,20 +52,44 @@ subscribeNativeEvents(async (event) => {
       }
     });
     chrome.runtime.sendMessage({ ...event, type: 'OFFLINE_DOWNLOAD_PROGRESS' }).catch(() => {});
+  } else if (event.type === 'STATUS' && event.status === 'pause_acknowledged') {
+    // Fast ack for the PAUSE_DOWNLOAD request itself — not the terminal outcome
+    // of the download (that's the 'paused' status below). Nothing to persist;
+    // this just resolves the pause button's own pending promise.
+  } else if (event.type === 'STATUS' && event.status === 'paused') {
+    // User-initiated stop, not a failure: the partial file is intentionally kept
+    // on disk so a later "Resume"/"Download" click continues via HTTP Range.
+    await chrome.storage.local.set({
+      ssense_offline_error: '',
+      ssense_download_paused: true,
+    });
+    chrome.runtime.sendMessage({ type: 'OFFLINE_DOWNLOAD_PAUSED', message: event.message }).catch(() => {});
   } else if (event.type === 'STATUS' && event.status === 'success') {
     await chrome.storage.local.set({
       ssense_offline_mode: true,
       ssense_download_progress: { file: '', pct: 100, mbPerSec: 0, updatedAt: Date.now() },
       ssense_offline_error: '',
+      ssense_download_paused: false,
     });
     chrome.runtime.sendMessage({ type: 'OFFLINE_READY', message: event.message }).catch(() => {});
+    notify('ssense-offline-ready', 'Offline Mode ready', event.message || 'Model download complete — offline mode is ready to use.');
   } else if (event.type === 'STATUS' && event.status !== 'success') {
     await chrome.storage.local.set({
       ssense_offline_mode: false,
       ssense_offline_error: event.message || 'Offline model preparation failed.',
       ssense_download_progress: { file: '', pct: 0, mbPerSec: 0, updatedAt: Date.now() },
+      ssense_download_paused: false,
     });
     chrome.runtime.sendMessage({ type: 'OFFLINE_DOWNLOAD_ERROR', error: event.message || 'Offline model preparation failed.' }).catch(() => {});
+    notify('ssense-offline-error', 'Offline download failed', event.message || 'Offline model preparation failed. Open Ssense to resume.');
+  }
+});
+
+// Clicking the notification opens the popup context (side panel), since
+// that's where the Resume button and error detail actually live.
+chrome.notifications.onClicked.addListener((id) => {
+  if (id === 'ssense-offline-ready' || id === 'ssense-offline-error') {
+    chrome.action.openPopup?.().catch(() => {});
   }
 });
 
@@ -317,6 +365,17 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
               report: response.report
             }).catch(() => {});
 
+            // A low trust score is worth surfacing even if the user has since
+            // switched tabs or the popup isn't open — that's the whole point
+            // of an "audit", it should reach the user, not just the UI.
+            if (typeof response.report.dpdp_trust_score === 'number' && response.report.dpdp_trust_score < 40) {
+              notify(
+                `ssense-audit-${message.domain}`,
+                `Low privacy trust score: ${message.domain}`,
+                `DPDP trust score ${response.report.dpdp_trust_score}/100. This site's privacy policy has significant issues — open Ssense for details.`
+              );
+            }
+
             if (tabId) {
               chrome.tabs.sendMessage(tabId, {
                 type: 'ENFORCE_DPDP_RULES',
@@ -369,11 +428,19 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
       if (!navigator.onLine) {
         return { type: 'ERROR', requestId, success: false, error: 'Internet connection is required for the first offline model download.' };
       }
+      await chrome.storage.local.set({ ssense_download_paused: false });
       const response = await executeDownloadModels(message.requestId);
       if (response.type === 'STATUS' && response.status === 'success') {
         await chrome.storage.local.set({ ssense_offline_mode: true });
       }
       return response;
+    }
+
+    case 'PAUSE_DOWNLOAD': {
+      // Just relays the ack (see 'pause_acknowledged' above); the terminal
+      // 'paused' Status arrives later via subscribeNativeEvents on its own
+      // requestId and is what actually updates storage/UI state.
+      return await executePauseDownload(requestId);
     }
 
     case 'SET_OFFLINE_MODE': {
@@ -389,6 +456,7 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
       if (!navigator.onLine) {
         return { success: false, error: 'Connect to the internet to download Offline Mode models.' };
       }
+      await chrome.storage.local.set({ ssense_download_paused: false });
       const response = await executeDownloadModels(requestId);
       if (response.type === 'STATUS' && response.status === 'success') {
         await chrome.storage.local.set({ ssense_offline_mode: true });
@@ -400,6 +468,20 @@ async function handleMessage(message: any, sender: chrome.runtime.MessageSender)
     case 'OPEN_OPTIONS_PAGE': {
       chrome.runtime.openOptionsPage();
       return { success: true };
+    }
+
+    case 'OPEN_SIDE_PANEL': {
+      // Called from the floating widget's "expand" button — hands off to the
+      // real side panel (full audit report, history, settings) instead of
+      // the widget trying to be a second, smaller version of the same UI.
+      const windowId = sender.tab?.windowId;
+      if (windowId === undefined) return { success: false, error: 'No window context available.' };
+      try {
+        await chrome.sidePanel.open({ windowId });
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to open side panel.' };
+      }
     }
 
     case 'GET_TRUST_SCORE': {

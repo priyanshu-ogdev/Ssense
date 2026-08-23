@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 
 type Mode = 'cloud' | 'offline';
-type DownloadState = 'idle' | 'downloading' | 'ready' | 'error';
+type DownloadState = 'idle' | 'downloading' | 'paused' | 'stalled' | 'ready' | 'error';
+
+// If we're supposedly "downloading" but haven't heard a progress event in this long,
+// the daemon/service worker that was driving it is dead (e.g. Chrome was closed
+// mid-download) — not just between its ~2Hz progress ticks.
+const STALL_DETECT_MS = 12_000;
 
 interface Progress {
   file: string;
@@ -45,18 +50,44 @@ export default function Popup() {
   const [serviceStatus, setServiceStatus] = useState<'checking' | 'online' | 'offline' | 'not-configured'>('checking');
   const [lastError, setLastError] = useState('');
 
+  // Extracted so it can be re-run whenever offline-readiness actually changes
+  // (e.g. right after OFFLINE_READY fires), not just once at popup mount.
+  // Without this, finishing a download while the popup was open earlier — or
+  // while the daemon was still booting/loading its RAG index, which the daemon's
+  // own log shows can take ~90s — left serviceStatus permanently stuck on
+  // whatever it read at that one moment, even after everything came online.
+  const checkServiceHealth = async (offlineMode: boolean) => {
+    try {
+      const health = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK', requestId: requestId() });
+      if (offlineMode) setServiceStatus(health?.success ? 'online' : 'offline');
+      else if (health?.errorKind === 'auth') setServiceStatus('not-configured');
+      else setServiceStatus(health?.success ? 'online' : 'offline');
+    } catch { setServiceStatus('offline'); }
+  };
+
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!mounted) return;
-      try { setDomain(tab?.url?.startsWith('http') ? new URL(tab.url).hostname : ''); } catch { setDomain(''); }
+      // Only treat real http(s) pages as an auditable "domain" — chrome://, chrome-extension://,
+      // file://, etc. are internal/system pages with nothing to audit. Without this check,
+      // opening the popup while on the extension's own Settings page would show the extension's
+      // own ID (e.g. "bidahgmmmpfechedcpodhpfcejbmohbp") as if it were a website domain, since
+      // that's literally the "hostname" segment of a chrome-extension:// URL.
+      const rawUrl = tab?.url || '';
+      if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+        try { setDomain(new URL(rawUrl).hostname); } catch { setDomain(''); }
+      } else {
+        setDomain('');
+      }
 
       const data = await chrome.storage.local.get([
         'ssense_offline_mode',
         'ssense_download_progress',
         'ssense_offline_error',
+        'ssense_download_paused',
       ]);
       if (!mounted) return;
 
@@ -65,16 +96,22 @@ export default function Popup() {
       if (data.ssense_download_progress) {
         const p = data.ssense_download_progress as Progress;
         setProgress(p);
-        if (p.pct !== 0 && p.pct < 100) setDownloadState('downloading');
-        if (p.pct >= 100) setDownloadState('ready');
+        if (p.pct >= 100) {
+          setDownloadState('ready');
+        } else if (data.ssense_download_paused) {
+          // User paused explicitly — distinct from an auto-detected stale/dead
+          // download (see the age check below), so it's not mislabeled.
+          setDownloadState('paused');
+        } else if (p.pct !== 0 || p.updatedAt) {
+          // Stored progress exists but is it from a download that's still actually
+          // running, or one that died when Chrome (and the service worker driving it)
+          // closed? A stale updatedAt means nobody is writing new progress anymore.
+          const age = p.updatedAt ? Date.now() - p.updatedAt : Infinity;
+          setDownloadState(age > STALL_DETECT_MS ? 'stalled' : 'downloading');
+        }
       }
       setChecking(false);
-      try {
-        const health = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK', requestId: requestId() });
-        if (data.ssense_offline_mode) setServiceStatus(health?.success ? 'online' : 'offline');
-        else if (health?.errorKind === 'auth') setServiceStatus('not-configured');
-        else setServiceStatus(health?.success ? 'online' : 'offline');
-      } catch { setServiceStatus('offline'); }
+      await checkServiceHealth(data.ssense_offline_mode);
     })();
 
     const listener = (message: any) => {
@@ -92,10 +129,16 @@ export default function Popup() {
         setError(message.error || 'Offline model download failed.');
         setLastError(message.error || 'Offline model download failed.');
       }
+      if (message.type === 'OFFLINE_DOWNLOAD_PAUSED') {
+        // User-initiated stop, not an error — progress/percent stays exactly where
+        // it was so "Resume" picks up from the same point via HTTP Range.
+        setDownloadState('paused');
+      }
       if (message.type === 'OFFLINE_READY') {
         setMode('offline');
         setDownloadState('ready');
         setProgress({ file: '', pct: 100, mbPerSec: 0 });
+        checkServiceHealth(true);
       }
     };
 
@@ -105,6 +148,23 @@ export default function Popup() {
       chrome.runtime.onMessage.removeListener(listener);
     };
   }, []);
+
+  // Closes a gap the OFFLINE_READY handler above can't cover: if the popup is
+  // opened while the daemon is mid-boot (its own log shows RAG index loading
+  // alone can take ~90s) with models already downloaded from a prior session,
+  // the one-shot mount check catches it too early and nothing re-triggers a
+  // retry — there's no new OFFLINE_READY event coming. Poll briefly until the
+  // daemon actually answers, then stop.
+  useEffect(() => {
+    if (mode !== 'offline' || serviceStatus === 'online') return;
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      if (attempts > 12) { clearInterval(interval); return; } // ~1 minute cap
+      checkServiceHealth(true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [mode, serviceStatus]);
 
   const enableOffline = async () => {
     setError('');
@@ -128,6 +188,40 @@ export default function Popup() {
     } catch (err: any) {
       setDownloadState('error');
       setError(err?.message || 'The extension could not start Offline Mode.');
+    }
+  };
+
+  // Re-issues the exact same download request. The daemon detects the existing
+  // `.part` file on disk and resumes with an HTTP Range request instead of
+  // restarting from 0 — see download_file_with_resume in model_manager.rs.
+  const resumeDownload = () => enableOffline();
+
+  const [pausing, setPausing] = useState(false);
+
+  const pauseDownload = async () => {
+    setPausing(true);
+    // Safety net: pausing correctly depends on the daemon's 'paused' broadcast
+    // arriving later (it has to finish flushing the current chunk first), but
+    // that broadcast can be delayed or missed — leaving the UI stuck on
+    // "Preparing Offline Mode" with no button at all. If nothing has moved the
+    // state along within a bounded window, force it into 'stalled' so Resume
+    // is guaranteed to render regardless of what the daemon ends up doing;
+    // clicking it re-issues the same request either way.
+    const watchdog = setTimeout(() => {
+      setDownloadState((current) => (current === 'downloading' ? 'stalled' : current));
+    }, 8_000);
+    try {
+      await chrome.runtime.sendMessage({ type: 'PAUSE_DOWNLOAD', requestId: requestId() });
+      // The daemon acks this quickly, but the actual "paused" state (and the
+      // percent freezing in place) arrives via the OFFLINE_DOWNLOAD_PAUSED
+      // broadcast once the in-flight chunk finishes flushing to disk.
+    } catch {
+      // Native host may be briefly unreachable — the download itself is
+      // unaffected; the user can just try Pause again.
+      clearTimeout(watchdog);
+      setDownloadState((current) => (current === 'downloading' ? 'stalled' : current));
+    } finally {
+      setPausing(false);
     }
   };
 
@@ -165,6 +259,8 @@ export default function Popup() {
   };
 
   const offlineBusy = downloadState === 'downloading';
+  const offlineStalled = downloadState === 'stalled';
+  const offlinePaused = downloadState === 'paused';
 
   return (
     <div style={styles.root}>
@@ -199,6 +295,9 @@ export default function Popup() {
             <button
               aria-label={mode === 'offline' ? 'Disable Offline Mode' : 'Enable Offline Privacy Mode'}
               disabled={checking || offlineBusy}
+              // Note: NOT disabled while offlineStalled — a dead download must stay
+              // switchable so the user isn't locked into a stuck "Preparing…" state
+              // with no way out except the Resume button below.
               onClick={mode === 'offline' ? disableOffline : enableOffline}
               style={{
                 ...styles.switch,
@@ -210,22 +309,47 @@ export default function Popup() {
             </button>
           </div>
 
-          {offlineBusy && (
+          {(offlineBusy || offlineStalled || offlinePaused) && (
             <div style={styles.downloadBox}>
               <div style={styles.downloadHeader}>
-                <span>Preparing Offline Mode</span>
+                <span>{offlinePaused ? 'Download paused' : offlineStalled ? 'Download interrupted' : 'Preparing Offline Mode'}</span>
                 <strong>{pctText(progress.pct)}</strong>
               </div>
               <div style={styles.progressTrack}>
-                <div style={{ ...styles.progressBar, width: `${Math.max(1, progress.pct)}%` }} />
+                <div style={{ ...styles.progressBar, width: `${Math.max(1, progress.pct)}%`, ...(offlineStalled || offlinePaused ? { background: C.faint } : {}) }} />
               </div>
               <div style={styles.downloadMeta}>
                 <span>{progress.file || 'Connecting to model storage…'}</span>
-                <span>{progress.mbPerSec > 0 ? `${progress.mbPerSec.toFixed(1)} MB/s` : 'Starting…'}</span>
+                <span>{offlineStalled || offlinePaused ? 'Stopped' : progress.mbPerSec > 0 ? `${progress.mbPerSec.toFixed(1)} MB/s` : 'Starting…'}</span>
               </div>
-              <div style={styles.note}>
-                Large model files download once and resume automatically if interrupted.
-              </div>
+              {offlineStalled ? (
+                <>
+                  <div style={styles.note}>
+                    Chrome closed before this finished. The partial file is still on disk — resuming picks up where it left off instead of starting over.
+                  </div>
+                  <button style={styles.resumeButton} onClick={resumeDownload}>
+                    Resume Download
+                  </button>
+                </>
+              ) : offlinePaused ? (
+                <>
+                  <div style={styles.note}>
+                    Paused. Nothing was lost — resuming continues from exactly where you left off.
+                  </div>
+                  <button style={styles.resumeButton} onClick={resumeDownload}>
+                    Resume Download
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={styles.note}>
+                    Large model files download once and resume automatically if interrupted.
+                  </div>
+                  <button style={styles.pauseButton} disabled={pausing} onClick={pauseDownload}>
+                    {pausing ? 'Pausing…' : 'Pause Download'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -346,6 +470,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 7, fontSize: 9.5, color: C.muted,
   },
   note: { marginTop: 8, fontSize: 9.5, color: C.faint, lineHeight: 1.4 },
+  resumeButton: {
+    width: '100%', marginTop: 10, border: 'none', borderRadius: 8,
+    padding: '8px 12px', background: `linear-gradient(90deg, ${C.cyan}, ${C.blue})`,
+    color: C.bg, fontWeight: 750, fontSize: 11, cursor: 'pointer',
+  },
+  pauseButton: {
+    width: '100%', marginTop: 10, borderRadius: 8, border: `1px solid ${C.border}`,
+    padding: '8px 12px', background: 'rgba(255,255,255,.04)',
+    color: C.text, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+  },
   ready: { marginTop: 12, fontSize: 10.5, color: C.green, display: 'flex', gap: 7, alignItems: 'center' },
   readyDot: {
     width: 18, height: 18, borderRadius: '50%', background: 'rgba(74,222,128,.12)',

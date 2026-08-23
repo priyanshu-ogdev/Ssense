@@ -131,7 +131,7 @@ impl SqliteStore {
                     return None;
                 }
 
-                match serde_json::from_str(&json_str) {
+                match serde_json::from_str::<DpdpAuditReport>(&json_str) {
                     Ok(report) => {
                         info!("🎯 [SqliteStore] CACHE HIT: {} (Score: {})", domain, report.dpdp_trust_score);
                         Some(report)

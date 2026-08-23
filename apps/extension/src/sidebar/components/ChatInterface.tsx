@@ -270,18 +270,12 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
         setMessages([]);
         setSiteHistory(null);
         try {
-          const [scoreRes, historyRes, chatRes] = await Promise.all([
+          const [scoreRes, historyRes] = await Promise.all([
             chrome.runtime.sendMessage({ type: 'GET_TRUST_SCORE', domain: newDomain }),
             chrome.runtime.sendMessage({ type: 'GET_SITE_HISTORY', domain: newDomain }),
-            chrome.runtime.sendMessage({ type: 'GET_CHAT_HISTORY', domain: newDomain }),
           ]);
           if (scoreRes?.success) setTrustScore(scoreRes.score);
           if (historyRes?.success) setSiteHistory(historyRes.entry || null);
-          if (chatRes?.success && Array.isArray(chatRes.messages)) {
-            // Only role/text matter here — chat-store also carries id/domain/timestamp,
-            // which this view doesn't render.
-            setMessages(chatRes.messages.map((m: any) => ({ role: m.role, text: m.text })));
-          }
         } catch (e) {
           setServiceError('Could not retrieve this site\'s local history.');
         }
@@ -372,16 +366,6 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
     }
   }, [input, isThinking, domain, isSystemPage, serviceAvailable]);
 
-  const handleClearChat = useCallback(async () => {
-    if (!domain) return;
-    setMessages([]);
-    try {
-      await chrome.runtime.sendMessage({ type: 'CLEAR_CHAT_HISTORY', domain });
-    } catch {
-      // Best-effort — the visible chat is already cleared either way.
-    }
-  }, [domain]);
-
   const quickPrompts = domain ? [
     `Is ${domain} selling my data?`,
     `Where is my data stored?`,
@@ -442,15 +426,6 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
             <span aria-hidden="true">⚙️</span><span>Settings</span>
           </button>
           <span className="ssense-toolbar-spacer" />
-          {messages.length > 0 && (
-            <button
-              className="ssense-toolbar-btn"
-              onClick={handleClearChat}
-              title="Clear this site's saved chat history"
-            >
-              <span aria-hidden="true">🗑️</span><span>Clear chat</span>
-            </button>
-          )}
           <button
             className={`ssense-toolbar-btn${showShieldSettings ? ' ssense-toolbar-btn--active' : ''}`}
             onClick={() => setShowShieldSettings(!showShieldSettings)}
