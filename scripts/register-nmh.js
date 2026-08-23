@@ -13,7 +13,7 @@ if (!EXT_ID) {
 }
 
 // Resolve the absolute path to the compiled Rust binary
-let binPath = resolve(__dirname, '../apps/native-daemon/target/release/ssense-daemon');
+let binPath = resolve(__dirname, '../apps/native-daemon/target/release/ssense-native-daemon');
 const osPlatform = platform();
 
 if (osPlatform === 'win32') {
