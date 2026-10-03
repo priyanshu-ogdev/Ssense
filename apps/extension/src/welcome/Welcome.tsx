@@ -40,13 +40,16 @@ export const Welcome: React.FC = () => {
                 <button
                   type="button"
                   className="sx-btn sx-btn--ghost sx-btn--block"
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    chrome.storage.local.set({ ssense_onboarded: true }).catch(() => {});
+                    setStep(1);
+                  }}
                   style={{ justifyContent: 'center' }}
                 >
                   Skip for now (Continue as Guest)
                 </button>
               </div>
-              <SignInError message={error} />
+              <SignInError message={error ? `${error} (You can Skip for now to use local protection)` : ''} />
               <SignInPromise />
             </>
           )}
@@ -60,7 +63,12 @@ export const Welcome: React.FC = () => {
                 <li><b style={{ color: 'var(--ssense-text-primary)' }}>Another browser or computer?</b> Install Ssense there and sign in with the same Google account.</li>
               </ol>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="sx-btn sx-btn--primary" style={{ flex: 1 }} onClick={() => window.close()}><Icon name="check" size={15} /> Start browsing</button>
+                <button className="sx-btn sx-btn--primary" style={{ flex: 1 }} onClick={() => {
+                  chrome.storage.local.set({ ssense_onboarded: true }).catch(() => {});
+                  window.close();
+                }}>
+                  <Icon name="check" size={15} /> Start browsing
+                </button>
                 <button className="sx-btn" onClick={() => chrome.runtime.openOptionsPage()}><Icon name="settings" size={15} /> Settings</button>
               </div>
             </>

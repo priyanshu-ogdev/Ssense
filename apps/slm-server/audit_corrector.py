@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # omission_check is always False here — we only flag active claims.
 
 _NEGATION_PREFIX_RE = re.compile(
-    r"(?:\b(?:do\s+not|don'?t|does\s+not|doesn'?t|did\s+not|didn'?t|never|neither|nor|no|not|cannot|can'?t|won'?t|will\s+not)\b\s*(?:\w+\s+){0,4}$)",
+    r"(?:\b(?:do\s+not|don'?t|does\s+not|doesn'?t|did\s+not|didn'?t|never|neither|nor|no|not|cannot|can'?t|won'?t|will\s+not|prohibit(?:s|ed)?|strictly\s+prohibit(?:s|ed)?|disallow(?:s|ed)?|refrain(?:s|ed)?\s+from)\b\s*(?:\w+\s+){0,10}$)",
     re.I
 )
 
@@ -50,7 +50,7 @@ _STATUTORY_PATTERNS: List[Tuple[str, str, re.Pattern, str, str, bool]] = [
         "Section 9(1)",
         re.compile(
             r"(?:"
-            r"(?:knowingly|intentionally)?\s*(?:monitor|track|process|collect)(?:ing|s|ed)?\s+(?:and\s+\w+\s+)?(?:the\s+)?(?:browsing\s+)?(?:behaviou?r|activities|activity|data|personal\s+data)?(?:\s+of)?\s+(?:children|minors|users\s+under(?:\s+the\s+age\s+of)?\s+\d+)[^.]*?without\s+(?:verifiable\s+)?(?:parental|guardian)\s+consent"
+            r"(?:knowingly|intentionally)?\s*(?:monitor|track|process|collect)(?:ing|s|ed)?(?:\s+and\s+\w+)?\s+(?:the\s+)?(?:browsing\s+)?(?:behaviou?r|activities|activity|data|personal\s+data)?(?:\s+of\s+)?(?:children|minors|users\s+under(?:\s+the\s+age\s+of)?\s+\d+)[^.]*?without\s+(?:verifiable\s+)?(?:parental|guardian)\s+consent"
             r"|(?:targeted\s+advertising|behavioural\s+monitoring|behaviour(?:al)?\s+tracking)\s+(?:directed\s+at|of|for)\s+(?:children|minors)"
             r")",
             re.I | re.S,
@@ -66,10 +66,11 @@ _STATUTORY_PATTERNS: List[Tuple[str, str, re.Pattern, str, str, bool]] = [
         "Section 8(7)",
         re.compile(
             r"(?:"
-            r"retain\s+(?:your\s+)?(?:information|data|personal\s+data)\s+(?:forever|indefinitely|permanently|for\s+an?\s+indefinite\s+period)"
-            r"|(?:no|not|never)\s+(?:have\s+(?:the|any)\s+)?(?:right|ability|option)\s+to\s+(?:request\s+)?(?:erasure|deletion|correction|removal)"
-            r"|data\s+(?:is|are|will\s+be)\s+(?:retained|stored|kept)\s+(?:forever|indefinitely)"
-            r"|we\s+(?:do\s+not|don.t|cannot)\s+(?:delete|erase|remove)\s+(?:your\s+)?(?:data|information|personal\s+data)"
+            r"(?:retain|store)(?:s|ed|ing)?\s+(?:your\s+)?(?:information|data|personal\s+data|records|archives?)\s+(?:forever|indefinitely|permanently|for\s+an?\s+indefinite\s+period)"
+            r"|(?:no|not|never|without)\s+(?:have\s+(?:the|any)\s+)?(?:any\s+)?(?:right|ability|option)\s+to\s+(?:request\s+)?(?:erasure|deletion|correction|removal)"
+            r"|data\s+(?:is|are|will\s+be)\s+(?:retained|stored|kept)\s+(?:forever|indefinitely|permanently)"
+            r"|(?:stored|retained)\s+permanently"
+            r"|we\s+(?:do\s+not|don.t|cannot)\s+(?:delete|erase|remove)\s+(?:your\s+)?(?:data|information|personal\s+data|records|health\s+records)"
             r")",
             re.I | re.S,
         ),
@@ -101,7 +102,7 @@ _STATUTORY_PATTERNS: List[Tuple[str, str, re.Pattern, str, str, bool]] = [
         "Section 5(1)",
         re.compile(
             r"(?:"
-            r"(?:do\s+not|don.t)\s+(?:provide|give|offer|include)\s+(?:an?\s+)?(?:itemized|separate|individual|specific)\s+(?:notice|consent|checkbox)"
+            r"(?:do\s+not|don.t)\s+(?:provide|give|offer|include)\s+(?:an?\s+)?(?:itemized|separate|individual|specific)(?:\s+(?:itemized|separate|individual|specific))?\s+(?:notice|consent|checkbox|option)s?"
             r"|(?:unspecified|unknown|vague)\s+(?:commercial|business)?\s+purposes?"
             r"|by\s+(?:continuing\s+to\s+browse|browsing|using\s+(?:this\s+)?(?:site|website|service)),?\s+you\s+(?:agree|consent)\s+(?:to\s+all)?"
             r")",
@@ -118,9 +119,9 @@ _STATUTORY_PATTERNS: List[Tuple[str, str, re.Pattern, str, str, bool]] = [
         "Section 13(1)",
         re.compile(
             r"(?:"
-            r"(?:do\s+not\s+have|don.t\s+have|without)\s+(?:a\s+)?(?:data\s+protection\s+officer|dpo|grievance\s+officer|nodal\s+officer|grievance\s+redressal)"
+            r"(?:do\s+not\s+(?:have|maintain|appoint)|don.t\s+(?:have|maintain|appoint)|without)\s+(?:a\s+)?(?:data\s+protection\s+officer|dpo|grievance\s+officer|nodal\s+officer|grievance\s+redressal)"
             r"|complaints?\s+(?:will\s+be\s+)?(?:disregarded|ignored)"
-            r"|(?:no|not)\s+(?:providing|having|maintaining)\s+(?:a\s+)?(?:grievance|complaint)\s+(?:mechanism|officer|redressal)"
+            r"|(?:no|not)\s+(?:providing|having|maintaining|appointing)\s+(?:a\s+)?(?:grievance|complaint)\s+(?:mechanism|officer|redressal)"
             r")",
             re.I | re.S,
         ),
@@ -135,8 +136,8 @@ _STATUTORY_PATTERNS: List[Tuple[str, str, re.Pattern, str, str, bool]] = [
         "Section 6(1)",
         re.compile(
             r"(?:"
-            r"collect(?:ing|s|ed)?\s+(?:your\s+)?(?:biometric(?:\s+facial)?|facial\s+recognition|biometric\s+facial\s+recognition)\s+(?:data|markers?|templates?)[^.]*?without\s+(?:requiring\s+)?(?:any\s+)?(?:explicit|specific|informed|separate)?\s*(?:opt[-\s]in|consent)"
-            r"|(?:biometric(?:\s+facial)?|facial\s+recognition)\s+(?:data|markers?|templates?|scans?)\s+(?:collected\s+)?(?:upon\s+visiting|automatically)\s+without\s+(?:consent|explicit|opt[-\s]in)"
+            r"collect(?:ing|s|ed)?\s+[^.]*?(?:biometric(?:\s+facial)?|facial\s+recognition)\s+(?:data|markers?|templates?)[^.]*?without\s+(?:requiring\s+)?(?:any\s+)?(?:explicit|specific|informed|separate)?\s*(?:opt[-\s]in|consent)"
+            r"|(?:biometric(?:\s+facial)?|facial\s+recognition)\s+(?:data|markers?|templates?|scans?)\s+[^.]*?without\s+(?:consent|explicit|opt[-\s]in)"
             r")",
             re.I | re.S,
         ),

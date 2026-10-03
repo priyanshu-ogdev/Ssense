@@ -14,6 +14,7 @@ const NAV: [string, string, string][] = [
   ['account', 'Account', 'lock'],
   ['scanning', 'Scanning', 'scan'],
   ['alerts', 'Alerts & protection', 'bell'],
+  ['server', 'Server', 'globe'],
   ['sync', 'Sync & devices', 'sync'],
   ['appearance', 'Appearance', 'sparkle'],
   ['about', 'About', 'check'],
@@ -29,13 +30,74 @@ const Section: React.FC<{ id: string; title: string; desc?: string; children: Re
 export default function Options({ onBack }: { onBack?: () => void } = {}) {
   const { auth, reload } = useAuth();
   const { prefs, update } = usePrefs();
-  useSyncState();
+  const { state: syncState, syncNow } = useSyncState();
   const { msg, show } = useToast();
   useTheme(prefs?.theme);
   const [section, setSection] = useState('account');
   const [ignoreInput, setIgnoreInput] = useState('');
   const { busy, error, signIn } = useGoogleSignIn(() => { void reload(); show('Signed in'); });
   const version = chrome.runtime.getManifest?.().version ?? '1.0.0';
+
+  const [overrideEnabled, setOverrideEnabled] = useState(false);
+  const [serverUrl, setServerUrl] = useState((import.meta.env.VITE_SSENSE_SERVER_URL as string) || 'http://localhost:8000');
+  const [apiKey, setApiKey] = useState((import.meta.env.VITE_SSENSE_API_KEY as string) || '');
+  const [hmacSecret, setHmacSecret] = useState((import.meta.env.VITE_SSENSE_HMAC_SECRET as string) || '');
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    chrome.storage.local.get([
+      'ssense_override_enabled',
+      'ssense_server_url',
+      'ssense_api_key',
+      'ssense_hmac_secret',
+    ]).then((d) => {
+      if (d.ssense_override_enabled !== undefined) setOverrideEnabled(Boolean(d.ssense_override_enabled));
+      if (d.ssense_server_url) setServerUrl(d.ssense_server_url);
+      if (d.ssense_api_key) setApiKey(d.ssense_api_key);
+      if (d.ssense_hmac_secret) setHmacSecret(d.ssense_hmac_secret);
+    }).catch(() => {});
+  }, []);
+
+  const saveServerConfig = async (override?: boolean) => {
+    const isOverride = override !== undefined ? override : overrideEnabled;
+    await chrome.storage.local.set({
+      ssense_override_enabled: isOverride,
+      ssense_server_url: serverUrl.trim().replace(/\/$/, ''),
+      ssense_api_key: apiKey.trim(),
+      ssense_hmac_secret: hmacSecret.trim(),
+    });
+    show('Server configuration saved');
+  };
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setTestResult(null);
+    const target = serverUrl.trim().replace(/\/$/, '');
+    try {
+      const res = await send<any>({ type: 'GET_SERVER_PING', url: target });
+      if (res?.success || res?.online) {
+        setTestResult({
+          success: true,
+          message: `Connected to Ssense SLM Server${res.version ? ` (v${res.version})` : ''}`,
+        });
+      } else {
+        const direct = await fetch(`${target}/health`, { method: 'GET' }).catch(() => null);
+        if (direct && direct.ok) {
+          setTestResult({ success: true, message: 'Connected to Ssense SLM Server' });
+        } else {
+          setTestResult({
+            success: false,
+            message: res?.error || 'Cannot reach server. Verify host IP, port 8000, and firewall.',
+          });
+        }
+      }
+    } catch (e: any) {
+      setTestResult({ success: false, message: e?.message || 'Connection failed' });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const set = (patch: Parameters<typeof update>[0]) => { void update(patch); show('Saved'); };
 
@@ -217,6 +279,109 @@ export default function Options({ onBack }: { onBack?: () => void } = {}) {
         </Section>
 
 
+
+        <Section id="server" title="Server" desc="Configure your SLM inference server connection or connect across PCs on the same Wi-Fi / LAN.">
+          <Item title="Custom server override" hint="Enable custom server override for local cluster or self-hosted deployment.">
+            <Switch
+              label="Custom server override"
+              checked={overrideEnabled}
+              onChange={(v) => {
+                setOverrideEnabled(v);
+                void saveServerConfig(v);
+              }}
+            />
+          </Item>
+
+          {overrideEnabled && (
+            <div style={{ padding: '16px 0', display: 'grid', gap: 14 }}>
+              <div>
+                <b style={{ fontSize: 13.5, display: 'block', marginBottom: 4 }}>Server URL</b>
+                <input
+                  className="sx-input"
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  placeholder="https://api.example.com or http://localhost:8000"
+                  aria-label="Server URL"
+                />
+              </div>
+
+              <div>
+                <b style={{ fontSize: 13.5, display: 'block', marginBottom: 4 }}>API Key</b>
+                <input
+                  className="sx-input"
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="API Key"
+                  aria-label="API Key"
+                />
+              </div>
+
+              <div>
+                <b style={{ fontSize: 13.5, display: 'block', marginBottom: 4 }}>HMAC Secret</b>
+                <input
+                  className="sx-input"
+                  type="password"
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }}
+                  value={hmacSecret}
+                  onChange={(e) => setHmacSecret(e.target.value)}
+                  placeholder="HMAC Secret"
+                  aria-label="HMAC Secret"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                <button
+                  className="sx-btn sx-btn--primary"
+                  onClick={() => void saveServerConfig()}
+                  style={{ padding: '7px 16px', fontSize: 13 }}
+                >
+                  Save
+                </button>
+                <button
+                  className="sx-btn"
+                  onClick={() => void handleTestConnection()}
+                  disabled={testingConnection}
+                  style={{ padding: '7px 16px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {testingConnection ? <Spinner size={14} /> : <Icon name="refresh" size={14} />}
+                  <span>{testingConnection ? 'Testing…' : 'Test connection'}</span>
+                </button>
+              </div>
+
+              {testResult && (
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginTop: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: testResult.success ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    color: testResult.success ? '#10b981' : '#ef4444',
+                    border: `1px solid ${testResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  }}
+                >
+                  <Icon name={testResult.success ? 'check' : 'alert'} size={16} />
+                  <span>{testResult.success ? `✅ ${testResult.message}` : `❌ ${testResult.message}`}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+
+        <Section id="sync" title="Sync & devices" desc="Your audit history and site settings sync automatically across signed-in devices.">
+          <Item title="Cloud sync status" hint={syncState?.status === 'syncing' ? 'Sync in progress…' : syncState?.lastSyncAt ? `Last synced: ${new Date(syncState.lastSyncAt).toLocaleTimeString()}` : 'Not synced yet'}>
+            <button className="sx-btn sx-btn--sm" onClick={() => void syncNow()} disabled={syncState?.status === 'syncing'}>
+              <Icon name="sync" size={14} />
+              <span>{syncState?.status === 'syncing' ? 'Syncing…' : 'Sync now'}</span>
+            </button>
+          </Item>
+        </Section>
 
         <Section id="appearance" title="Appearance">
           <Item title="Theme" hint="Follow your system or choose one.">

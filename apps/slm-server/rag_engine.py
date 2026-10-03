@@ -199,7 +199,9 @@ class AsyncHybridRAG:
             "what", "who", "whom", "whose", "when", "where", "why", "how",
             "there", "here", "all", "any", "both", "each", "few", "more", "most",
             "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so",
-            "than", "too", "very", "can", "just", "now"
+            "than", "too", "very", "can", "just", "now",
+            "i", "me", "my", "myself", "we", "us", "our", "ours", "you", "your", "yours",
+            "he", "him", "his", "she", "her", "hers", "them", "tell", "give", "show", "please", "help"
         }
 
     async def initialize(self):
@@ -317,11 +319,12 @@ class AsyncHybridRAG:
         dense_scores  = np.dot(self.dense_embeddings, q_emb)
         top_dense_idx = fast_top_k(dense_scores, k=retrieval_depth)
 
-        # Relevance guard: if no lexical match and dense cosine similarity is below threshold (< 0.65),
-        # query is ungrounded / conversational / gibberish — return empty to trigger RAFT refusal
+        # Relevance guard: require either strong semantic grounding (dense >= 0.60)
+        # or moderate semantic grounding (dense >= 0.52) alongside lexical confirmation (bm25 >= 4.5).
+        # Out-of-domain, adversarial, or ungrounded queries return empty to trigger RAFT refusal.
         max_bm25 = float(np.max(bm25_scores)) if len(bm25_scores) > 0 else 0.0
         max_dense = float(np.max(dense_scores)) if len(dense_scores) > 0 else 0.0
-        if max_bm25 <= 0.0 and max_dense < 0.65:
+        if max_dense < 0.52 or (max_bm25 < 4.5 and max_dense < 0.60):
             return []
 
         # C. RRF merge with pre-filter state-isolation.

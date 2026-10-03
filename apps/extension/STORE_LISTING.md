@@ -82,13 +82,80 @@ Ssense adheres to strict data minimization principles:
 | `tabs` | Required to detect the active website domain to display its corresponding compliance score and allow site-specific chat sessions. |
 | `notifications` | Required to notify the user if a visited site is flagged for severe DPDP statutory violations or high-risk data practices. |
 | `identity` | Optional: Used only to detect the user's active Chrome profile name and email for one-click local device registration and quota management. |
+| `identity.email` | Optional: Used alongside the Chrome identity profile to associate multi-device sync keys with the user's authorized account. |
+| `alarms` | Required to schedule periodic, low-power background synchronization of compliance logs (`ssense-sync-periodic`) without continuous wake locks. |
 | `<all_urls>` (Host Permission) | Ssense is a universal web privacy shield. It must be capable of extracting public privacy policy links and blocking third-party tracking scripts across any website the user visits. No personal data from web pages is ever collected or exfiltrated. |
+
+---
+
+## 🔑 Google Cloud Console OAuth Configuration Guide
+
+To enable one-click Google Sign-in on first install:
+
+1. **Navigate to Google Cloud Console:**
+   - Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
+   - Select your project (e.g. `ssense-production`).
+2. **Configure OAuth Consent Screen:**
+   - User Type: **External**
+   - App Name: `Ssense — DPDP Privacy Shield`
+   - User Support Email: your developer email
+   - Scopes: Add `openid`, `.../auth/userinfo.email`, and `.../auth/userinfo.profile`.
+3. **Create OAuth Client ID (Chrome Extension):**
+   - Click **Create Credentials** → **OAuth client ID**.
+   - Application type: Select **Chrome extension**.
+   - Name: `Ssense Chrome Extension Client`
+   - **Item ID:** Paste your 32-character Chrome Web Store Item ID (found in the Developer Dashboard URL after creating the store draft).
+   - Click **Create**.
+4. **Deploy the Client ID:**
+   - Copy the generated Client ID (format: `xxxxxxxxxxxx-xxxxxxxxxxxxxxxx.apps.googleusercontent.com`).
+   - In `apps/extension/.env.production`, set:
+     ```env
+     VITE_GOOGLE_CLIENT_ID=xxxxxxxxxxxx-xxxxxxxxxxxxxxxx.apps.googleusercontent.com
+     ```
+   - In your backend server environment (`apps/slm-server/.env`), set:
+     ```env
+     SSENSE_GOOGLE_CLIENT_IDS=xxxxxxxxxxxx-xxxxxxxxxxxxxxxx.apps.googleusercontent.com
+     ```
+   - Run `npm run build` in `apps/extension` to bake the ID into `dist/manifest.json`.
+
+*(Note: If the server is offline or Google sign-in is not yet configured, Ssense seamlessly provides complete local protection and cached audits via Guest Mode).*
+
+---
+
+## 🖼️ Store Graphic Assets Specification
+
+| Asset Type | Dimensions | Format | Requirement |
+| :--- | :--- | :--- | :--- |
+| **Small Promo Tile** | 440 × 280 px | PNG / JPG (no alpha) | Mandatory |
+| **Store Icon** | 128 × 128 px | PNG with transparent background | Mandatory (included in `public/icons/icon128.png`) |
+| **Screenshots** | 1280 × 800 px | PNG / JPG | Minimum 1 (4 recommended):<br>1. *Audit Panel & Trust Score Ring*<br>2. *Interactive Co-Pilot in Thinking Mode*<br>3. *Active Fingerprint & Tracker Shield*<br>4. *Full Compliance History & Markdown Export* |
+| **Marquee Promo Tile** | 1400 × 560 px | PNG / JPG | Optional (for Web Store homepage feature) |
+
+---
+
+## 📦 How to Package for Store Submission
+
+1. Build the production bundle:
+   ```bash
+   cd apps/extension
+   npm run build
+   ```
+2. Create the zip archive from the `dist` directory:
+   - **Windows (PowerShell):**
+     ```powershell
+     Compress-Archive -Path apps\extension\dist\* -DestinationPath ssense-extension-v1.0.0.zip -Force
+     ```
+   - **Linux / macOS:**
+     ```bash
+     cd apps/extension/dist && zip -r ../../../ssense-extension-v1.0.0.zip .
+     ```
+3. Upload `ssense-extension-v1.0.0.zip` to the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 
 ---
 
 ## 📜 Privacy Policy (For Store Submission URL)
 
-**Effective Date:** September 23, 2026  
+**Effective Date:** October 3, 2026  
 **Product:** Ssense Chrome Extension (v1.0.0)
 
 **1. Data Collection & Processing**  
@@ -102,3 +169,4 @@ Ssense does not transmit user data to advertising networks, data brokers, or ana
 
 **4. User Rights**  
 In accordance with the DPDP Act 2023, you have the right to erase all locally held data at any time via the "Clear Data" option in the extension settings.
+

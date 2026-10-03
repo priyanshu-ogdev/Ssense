@@ -363,6 +363,14 @@ const parseMarkdown = (text: string): React.ReactNode[] => {
     if (line.trim() === '---' || line.trim() === '***') {
       return <hr key={idx} style={{ border: 'none', borderTop: '1px solid var(--ssense-border)', margin: '8px 0' }} />;
     }
+    if (line.trim().toLowerCase().startsWith('statutory analysis under dpdp act 2023:')) {
+      return (
+        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '8px 0 6px', padding: '6px 10px', borderRadius: 7, background: 'rgba(169, 155, 232, 0.1)', border: '1px solid rgba(169, 155, 232, 0.28)', color: 'var(--ssense-accent-violet)', fontSize: 11.5, fontWeight: 700 }}>
+          <Icon name="brain" size={14} />
+          <span>Statutory Analysis · DPDP Act 2023</span>
+        </div>
+      );
+    }
     if (line.startsWith('### ')) {
       return (
         <div key={idx} style={{ fontSize: 13, fontWeight: 700, margin: '6px 0 2px', color: 'var(--ssense-text-primary)' }}>
@@ -386,7 +394,7 @@ const parseMarkdown = (text: string): React.ReactNode[] => {
     }
     if (line.startsWith('> ')) {
       return (
-        <blockquote key={idx} style={{ margin: '4px 0', padding: '4px 10px', borderLeft: '2px solid var(--ssense-accent-cyan)', background: 'rgba(6,182,212,0.05)', borderRadius: '0 6px 6px 0', fontSize: 12.5, fontStyle: 'italic', color: 'var(--ssense-text-secondary)' }}>
+        <blockquote key={idx} style={{ margin: '4px 0', padding: '6px 12px', borderLeft: '2px solid var(--ssense-accent-cyan)', background: 'var(--ssense-accent-soft)', borderRadius: '0 7px 7px 0', fontSize: 12.5, fontStyle: 'italic', color: 'var(--ssense-text-primary)' }}>
           {parseInlineMarkdown(line.slice(2), idx)}
         </blockquote>
       );
@@ -403,9 +411,9 @@ const parseMarkdown = (text: string): React.ReactNode[] => {
     const numMatch = line.match(/^(\d+)\.\s+(.*)$/);
     if (numMatch) {
       return (
-        <div key={idx} style={{ display: 'flex', gap: 6, margin: '2px 0', paddingLeft: 4 }}>
-          <span style={{ color: 'var(--ssense-accent-cyan)', fontWeight: 600, fontSize: 12, minWidth: 16, flexShrink: 0 }}>{numMatch[1]}.</span>
-          <span style={{ flex: 1 }}>{parseInlineMarkdown(numMatch[2], idx)}</span>
+        <div key={idx} className="sx-reasoning-trail" style={{ display: 'flex', gap: 8, margin: '4px 0', padding: '6px 10px', borderRadius: 8 }}>
+          <span style={{ color: 'var(--ssense-accent-violet)', fontWeight: 700, fontSize: 11.5, minWidth: 16, flexShrink: 0 }}>{numMatch[1]}.</span>
+          <span style={{ flex: 1, fontSize: 12.5 }}>{parseInlineMarkdown(numMatch[2], idx)}</span>
         </div>
       );
     }
@@ -449,19 +457,43 @@ const ComplianceBadge = ({ score, delta }: { score: number | null; delta?: numbe
   );
 };
 
-const MessageBubble = React.memo(({ msg }: { msg: { role: 'user' | 'ai'; text: string } }) => (
-  <div className={`ssense-msg ssense-animate-in ${msg.role === 'user' ? 'ssense-msg-user' : 'ssense-msg-ai'}`}>
-    <div className={`ssense-msg-bubble ${msg.role}`}>
-      {msg.role === 'ai' && (
-        <div className="ssense-msg-header">
-          <div className="ssense-msg-header-dot" />
-          <span className="ssense-gradient-text">Ssense AI</span>
-        </div>
-      )}
-      {msg.role === 'ai' ? parseMarkdown(msg.text) : msg.text}
+const MessageBubble = React.memo(({ msg }: { msg: { role: 'user' | 'ai'; text: string } }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(msg.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className={`ssense-msg ssense-animate-in ${msg.role === 'user' ? 'ssense-msg-user' : 'ssense-msg-ai'}`}>
+      <div className={`ssense-msg-bubble ${msg.role}`} style={{ position: 'relative' }}>
+        {msg.role === 'ai' && (
+          <div className="ssense-msg-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="ssense-msg-header-dot" />
+              <span className="ssense-gradient-text" style={{ fontWeight: 700, letterSpacing: '0.02em' }}>Ssense AI</span>
+              <span style={{ fontSize: 9.5, opacity: 0.7, letterSpacing: '0.04em', background: 'var(--ssense-bg-elevated)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--ssense-border)' }}>
+                DPDP 2023 Verified
+              </span>
+            </div>
+            <button
+              onClick={handleCopy}
+              className="sx-icon-btn"
+              style={{ width: 22, height: 22, padding: 0 }}
+              title={copied ? 'Copied to clipboard' : 'Copy answer'}
+            >
+              <Icon name={copied ? 'checkCopy' : 'copy'} size={12} style={{ color: copied ? 'var(--ssense-accent-emerald)' : 'var(--ssense-text-muted)' }} />
+            </button>
+          </div>
+        )}
+        {msg.role === 'ai' ? parseMarkdown(msg.text) : msg.text}
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -957,6 +989,11 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
       port.onDisconnect.addListener(() => {
         clearStageTimers();
         clearTimeout(silenceTimer);
+        if (livePortRef.current === port) {
+          livePortRef.current = null;
+          setChattingFor(null);
+          setLoadingText('Connecting to Ssense AI...');
+        }
       });
 
       port.postMessage({
@@ -1006,8 +1043,6 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
   const viewedIsQueued = domain ? siteQueue.some(s => s.domain === normaliseDomain(domain)) : false;
   const viewedIsActive = domain != null && activeSite === normaliseDomain(domain);
 
-  const chevronStyle: React.CSSProperties = { transform: showAuditDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' };
-
   return (
     <div className="ssense-root">
       {/* Background glow */}
@@ -1015,10 +1050,13 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
 
       {/* Service unavailable banner */}
       {!serviceAvailable && (
-        <div className="ssense-service-banner">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>{serviceError || 'Ssense AI is unavailable. Check Settings.'}</span>
-          <button onClick={() => onOpenSettings ? onOpenSettings() : chrome.runtime.openOptionsPage()} style={{ marginLeft:'auto', background:'transparent', border:'1px solid rgba(244,63,94,0.4)', color:'var(--ssense-accent-rose)', borderRadius:6, padding:'3px 8px', fontSize:10, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:4 }}>
+        <div className="ssense-service-banner" style={{ background: 'rgba(240, 100, 95, 0.09)', borderBottom: '1px solid rgba(240, 100, 95, 0.25)', padding: '9px 16px' }}>
+          <Icon name="shieldAlert" size={16} style={{ color: 'var(--ssense-accent-rose)', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 650, fontSize: 11.5, color: 'var(--ssense-accent-rose)' }}>AI Server Offline · Local Protection Active</div>
+            <div style={{ fontSize: 10.5, color: 'var(--ssense-text-secondary)', marginTop: 1 }}>{serviceError || 'Cannot reach Ssense SLM Server. Local tracker blocking remains active.'}</div>
+          </div>
+          <button onClick={() => onOpenSettings ? onOpenSettings() : chrome.runtime.openOptionsPage()} style={{ marginLeft: 8, background: 'var(--ssense-bg-elevated)', border: '1px solid var(--ssense-border)', color: 'var(--ssense-text-primary)', borderRadius: 6, padding: '4px 9px', fontSize: 11, cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Icon name="settings" size={11} />
             <span>Settings</span>
           </button>
@@ -1049,8 +1087,14 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
         </div>
 
         <nav className="ssense-toolbar">
-          <button className="ssense-toolbar-btn" onClick={onOpenHistory} title="Past audits and browsing history"><span>🕘</span><span>History</span></button>
-          <button className="ssense-toolbar-btn" onClick={onOpenPrivacy} title="View retrieved privacy policy text"><span>🔎</span><span>Policy</span></button>
+          <button className="ssense-toolbar-btn" onClick={onOpenHistory} title="Past audits and browsing history">
+            <Icon name="history" size={13} />
+            <span>History</span>
+          </button>
+          <button className="ssense-toolbar-btn" onClick={onOpenPrivacy} title="View retrieved privacy policy text">
+            <Icon name="fileText" size={13} />
+            <span>Policy</span>
+          </button>
           <button className="ssense-toolbar-btn" onClick={() => onOpenSettings ? onOpenSettings() : chrome.runtime.openOptionsPage()} title="Settings">
             <Icon name="settings" size={13} />
             <span>Settings</span>
@@ -1060,8 +1104,10 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
             <span
               className={`ssense-quota-chip${chatQuota.remaining <= 15 ? ' ssense-quota-chip--low' : ''}`}
               title="Chat messages remaining this minute. Audits are never limited."
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              💬 {chatQuota.remaining}/{chatQuota.limit}
+              <Icon name="chat" size={11} />
+              <span>{chatQuota.remaining}/{chatQuota.limit}</span>
             </span>
           )}
           <div className="ssense-mode-switch" role="radiogroup" aria-label="Response length">
@@ -1069,26 +1115,38 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
               role="radio" aria-checked={responseMode === 'concise'}
               className={`ssense-mode-option ssense-mode-concise${responseMode === 'concise' ? ' ssense-mode-option--active' : ''}`}
               onClick={() => setResponseMode('concise')}
-              title="Regular: short, direct answers"
-            ><span>⚡</span><span>Regular</span></button>
+              title="Regular: short, direct answers (<45 words)"
+            >
+              <Icon name="zap" size={12} />
+              <span>Regular</span>
+            </button>
             <button
               role="radio" aria-checked={responseMode === 'thinking'}
               className={`ssense-mode-option ssense-mode-thinking${responseMode === 'thinking' ? ' ssense-mode-option--active' : ''}`}
               onClick={() => setResponseMode('thinking')}
-              title="Thinking: the model reasons through the DPDP provisions first — slower, more thorough"
-            ><span>🧠</span><span>Thinking</span></button>
+              title="Thinking: step-by-step statutory reasoning under DPDP Act"
+            >
+              <Icon name="brain" size={12} />
+              <span>Thinking</span>
+            </button>
           </div>
           <button
             className="ssense-toolbar-btn"
             onClick={() => runAudit(true)}
             disabled={!domain || isAuditing || isSystemPage}
             title="Run a fresh audit of this site's privacy policy — audits are never rate-limited"
-          ><span>{isAuditing ? '⏳' : '📋'}</span><span>{isAuditing ? 'Auditing…' : 'Audit'}</span></button>
+          >
+            <Icon name={isAuditing ? "sync" : "scan"} size={13} className={isAuditing ? "sx-ring-spin" : undefined} />
+            <span>{isAuditing ? 'Auditing…' : 'Audit'}</span>
+          </button>
           <button
             className={`ssense-toolbar-btn${showShield ? ' ssense-toolbar-btn--active' : ''}`}
             onClick={() => setShowShield(v => !v)}
             title="Active protection controls"
-          ><span>🛡️</span><span>Shield</span></button>
+          >
+            <Icon name="shield" size={13} />
+            <span>Shield</span>
+          </button>
         </nav>
       </header>
 
@@ -1109,25 +1167,29 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
                 style={{
                   display:'flex', alignItems:'center', gap:6, padding:'5px 9px', borderRadius:8,
                   fontSize:11, fontWeight:600, cursor: active ? 'default' : 'pointer',
-                  background: active ? 'rgba(6,182,212,0.16)' : 'var(--ssense-bg-elevated)',
+                  background: active ? 'rgba(63, 203, 176, 0.16)' : 'var(--ssense-bg-elevated)',
                   color: active ? 'var(--ssense-accent-cyan)' : 'var(--ssense-text-secondary)',
-                  border: `1px solid ${active ? 'rgba(6,182,212,0.35)' : 'var(--ssense-border)'}`,
+                  border: `1px solid ${active ? 'rgba(63, 203, 176, 0.35)' : 'var(--ssense-border)'}`,
                   opacity: !active && activeSite ? 0.6 : 1,
                   maxWidth: 160,
                 }}
               >
-                {s.pinned && <span style={{ fontSize:9 }}>📌</span>}
+                {s.pinned && <Icon name="pin" size={10} style={{ color: 'var(--ssense-accent-cyan)' }} />}
                 {s.unread && !active && <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--ssense-accent-rose)', flexShrink:0 }} />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.domain}</span>
                 <span
                   onClick={e => { e.stopPropagation(); togglePinThread(s.domain); }}
-                  style={{ opacity:0.6, fontSize:9, cursor:'pointer' }}
+                  style={{ opacity:0.6, display: 'inline-flex', alignItems: 'center', cursor:'pointer' }}
                   title={s.pinned ? 'Unpin' : 'Pin'}
-                >{s.pinned ? '' : '📌'}</span>
+                >
+                  <Icon name={s.pinned ? "pinOff" : "pin"} size={10} />
+                </span>
                 {active ? (
                   <span onClick={e => { e.stopPropagation(); deselectThread(); }} style={{ opacity:0.8, cursor:'pointer', fontWeight:700 }} title="Deselect">✕</span>
                 ) : (
-                  <span onClick={e => { e.stopPropagation(); removeThread(s.domain); }} style={{ opacity:0.4, cursor:'pointer' }} title="Remove thread">🗑</span>
+                  <span onClick={e => { e.stopPropagation(); removeThread(s.domain); }} style={{ opacity:0.4, display: 'inline-flex', alignItems: 'center', cursor:'pointer' }} title="Remove thread">
+                    <Icon name="trash" size={11} />
+                  </span>
                 )}
               </div>
             );
@@ -1198,25 +1260,35 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
 
       {/* Audit card */}
       {auditReport && !isSystemPage && (
-        <div className="ssense-audit-card">
+        <div className={`ssense-audit-card ${auditReport.dpdp_trust_score >= 80 ? 'sx-glow-emerald' : auditReport.dpdp_trust_score >= 50 ? 'sx-glow-amber' : 'sx-glow-rose'}`}>
           <div className="ssense-audit-header" onClick={() => setShowAuditDetails(v => !v)}>
-            <span className="ssense-gradient-text" style={{ fontWeight:600, fontSize:12 }}>
-              {auditReport.violations.length === 0 ? '✅ Policy Compliant' : `⚠️ ${auditReport.violations.length} Violation${auditReport.violations.length !== 1 ? 's' : ''} Found`}
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={chevronStyle}><polyline points="6 9 12 15 18 9"/></svg>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name={auditReport.violations.length === 0 ? "shieldCheck" : "shieldAlert"} size={16} style={{ color: auditReport.violations.length === 0 ? 'var(--ssense-accent-emerald)' : 'var(--ssense-accent-rose)' }} />
+              <span className="ssense-gradient-text" style={{ fontWeight: 700, fontSize: 12.5 }}>
+                {auditReport.violations.length === 0 ? 'DPDP Statutory Compliant' : `${auditReport.violations.length} Statutory Violation${auditReport.violations.length !== 1 ? 's' : ''} Detected`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ssense-text-secondary)', background: 'var(--ssense-bg-elevated)', padding: '2px 7px', borderRadius: 6, border: '1px solid var(--ssense-border)' }}>
+                {auditReport.dpdp_trust_score}/100
+              </span>
+              <Icon name="chevron" size={14} style={{ transform: showAuditDetails ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', color: 'var(--ssense-text-muted)' }} />
+            </div>
           </div>
 
           {showAuditDetails && (
             <div className="ssense-audit-body">
               {/* Cache & Offline metadata badges */}
               {cacheSource === 'offline_cache' && (
-                <div style={{ fontSize:10, color:'var(--ssense-accent-amber)', padding:'4px 8px', background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)' }}>
-                  📶 Offline Mode — Displaying cached audit ({cacheAgeDays}d old)
+                <div style={{ fontSize:10, color:'var(--ssense-accent-amber)', padding:'4px 8px', background:'rgba(245,158,11,0.08)', borderRadius:6, border:'1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Icon name="cloudOff" size={12} />
+                  <span>Offline Mode — Displaying cached audit ({cacheAgeDays}d old)</span>
                 </div>
               )}
               {cacheSource === 'persistent_cache' && cacheAgeDays > 0 && (
-                <div style={{ fontSize:10, color:'var(--ssense-text-muted)', padding:'2px 4px' }}>
-                  From cache · {cacheAgeDays} day{cacheAgeDays !== 1 ? 's' : ''} ago
+                <div style={{ fontSize:10, color:'var(--ssense-text-muted)', padding:'2px 4px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="history" size={11} />
+                  <span>From cache · {cacheAgeDays} day{cacheAgeDays !== 1 ? 's' : ''} ago</span>
                 </div>
               )}
 
@@ -1224,7 +1296,10 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--ssense-bg-elevated)', padding:8, borderRadius:6, border:'1px solid var(--ssense-border)' }}>
                 <div><div style={{ fontSize:10, color:'var(--ssense-text-muted)' }}>Trust Score</div><div style={{ fontSize:14, fontWeight:700, color:'var(--ssense-accent-cyan)' }}>{auditReport.dpdp_trust_score} / 100</div></div>
                 <div><div style={{ fontSize:10, color:'var(--ssense-text-muted)' }}>Subtlety</div><div style={{ fontSize:14, fontWeight:700, color:'var(--ssense-accent-violet)' }} title="Legal obfuscation score — higher means more complex evasive language">{auditReport.subtlety_score} / 100</div></div>
-                <button onClick={e => { e.stopPropagation(); exportAuditReport(); }} style={{ background:'var(--ssense-gradient-ai)', border:'none', color:'#fff', fontWeight:600, fontSize:10, padding:'4px 10px', borderRadius:6, cursor:'pointer' }}>Export</button>
+                <button onClick={e => { e.stopPropagation(); exportAuditReport(); }} style={{ background:'var(--ssense-gradient-ai)', border:'none', color:'#fff', fontWeight:600, fontSize:10, padding:'4px 10px', borderRadius:6, cursor:'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="download" size={11} />
+                  <span>Export</span>
+                </button>
               </div>
 
               <p className="ssense-audit-reasoning">{auditReport.global_legal_reasoning}</p>
@@ -1254,15 +1329,27 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
 
               {/* Violations */}
               {auditReport.violations.map((v, i) => (
-                <div key={i} className="ssense-violation-card">
-                  <div className="ssense-violation-top">
-                    <span className="ssense-violation-type">{v.violation_type.replace(/_/g,' ')}</span>
-                    <span className="ssense-violation-action">{v.network_action.replace(/_/g,' ')}</span>
+                <div key={i} className="ssense-violation-card" style={{ borderLeft: `3px solid ${v.network_action === 'BLOCK_THIRD_PARTY' ? 'var(--ssense-accent-rose)' : 'var(--ssense-accent-amber)'}` }}>
+                  <div className="ssense-violation-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className="ssense-violation-type">{v.violation_type.replace(/_/g,' ')}</span>
+                      {v.statute_reference && (
+                        <span className="sx-badge-statute" title="DPDP Statutory Reference">
+                          § {v.statute_reference}
+                        </span>
+                      )}
+                    </div>
+                    <span className={`sx-action-badge ${v.network_action === 'BLOCK_THIRD_PARTY' ? 'sx-action-badge--block' : 'sx-action-badge--warn'}`}>
+                      {v.network_action === 'BLOCK_THIRD_PARTY' ? 'BLOCKED' : 'WARNING'}
+                    </span>
                   </div>
                   {v.evidence_quote && (
                     <blockquote className="ssense-evidence" title="Click to highlight in page" onClick={() => chrome.tabs.query({ active:true, currentWindow:true }, tabs => { if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type:'HIGHLIGHT_IN_DOM', quote:v.evidence_quote }).catch(()=>{}); })}>
                       "{v.evidence_quote}"
-                      <div style={{ fontSize:9.5, color:'var(--ssense-accent-cyan)', marginTop:4, fontStyle:'normal' }}>🔍 Click to highlight in page</div>
+                      <div style={{ fontSize:10, color:'var(--ssense-accent-cyan)', marginTop:5, fontStyle:'normal', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <Icon name="search" size={11} />
+                        <span>Click to highlight in page</span>
+                      </div>
                     </blockquote>
                   )}
                   {v.offending_entities?.length > 0 && (
@@ -1297,7 +1384,23 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
                   <h2 className="ssense-gradient-text" style={{ fontSize:22, fontWeight:700, margin:0, letterSpacing:'-0.02em' }}>Ssense Co-Pilot</h2>
                   <p style={{ color:'var(--ssense-text-secondary)', fontSize:13, marginTop:8, lineHeight:1.5 }}>Ask anything about {activeSite}'s data practices.</p>
                   <div className="ssense-quick-prompts">
-                    {quickPrompts.map((p, i) => <button key={i} className="ssense-quick-prompt" onClick={() => handleSend(p)}>{p}</button>)}
+                    {quickPrompts.map((p, i) => (
+                      <button key={i} className="sx-chip-interactive" onClick={() => handleSend(p)}>
+                        <Icon name={i === 0 ? "shieldAlert" : i === 1 ? "lock" : "clock"} size={12} style={{ color: 'var(--ssense-accent-cyan)' }} />
+                        <span>{p}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!serviceAvailable && activeSite && (
+                <div className="sx-card" style={{ padding: '12px 14px', margin: '0 4px', background: 'var(--ssense-bg-surface)', border: '1px solid var(--ssense-border)', display: 'grid', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--ssense-accent-emerald)', fontWeight: 650, fontSize: 12 }}>
+                    <Icon name="shieldCheck" size={15} />
+                    <span>Real-Time Local Protection Active</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ssense-text-secondary)', lineHeight: 1.45 }}>
+                    Local tracking protection, dark pattern blocking, and Global Privacy Control (GPC) continue working locally. AI conversational answers will resume when the server reconnects.
                   </div>
                 </div>
               )}
@@ -1322,11 +1425,18 @@ export const ChatInterface: React.FC<{ onOpenHistory?: () => void; onOpenPrivacy
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            placeholder={isSystemPage ? 'Disabled on system pages' : !activeSite ? 'Select a site above to chat…' : isOffline ? 'Chat requires an internet connection' : cooldownLeft > 0 ? `Chat resumes in ${cooldownLeft}s…` : `Ask about ${activeSite}'s privacy practices…`}
+            placeholder={
+              isSystemPage ? 'Disabled on system pages'
+              : !serviceAvailable ? 'AI server offline · Local protection & cached audits active'
+              : !activeSite ? 'Select a site above to chat…'
+              : isOffline ? 'Chat requires an internet connection'
+              : cooldownLeft > 0 ? `Chat resumes in ${cooldownLeft}s…`
+              : `Ask about ${activeSite}'s privacy practices…`
+            }
             className="ssense-input-field"
             disabled={isChatting || !activeSite || isSystemPage || !serviceAvailable || cooldownLeft > 0 || isOffline}
           />
-          <button onClick={() => handleSend()} disabled={!input.trim() || isChatting || !activeSite || isSystemPage || !serviceAvailable || cooldownLeft > 0 || isOffline} className={`ssense-send-btn${input.trim() && !isChatting && cooldownLeft === 0 && !isOffline ? ' active' : ''}`}>
+          <button onClick={() => handleSend()} disabled={!input.trim() || isChatting || !activeSite || isSystemPage || !serviceAvailable || cooldownLeft > 0 || isOffline} className={`ssense-send-btn${input.trim() && !isChatting && cooldownLeft === 0 && !isOffline && serviceAvailable ? ' active' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>

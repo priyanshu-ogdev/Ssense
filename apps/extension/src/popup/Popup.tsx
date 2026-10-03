@@ -129,29 +129,33 @@ const Main: React.FC<{
       </div>
 
       <div style={{ margin: '8px 14px 2px', display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input
-          className="sx-input sx-mono"
-          style={{ fontSize: 11.5, padding: '6px 10px', height: 32 }}
-          placeholder="Type command / query (e.g. audit, cookies)..."
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              const val = (e.target as HTMLInputElement).value;
-              if (val.trim()) {
-                chrome.tabs.create({ url: chrome.runtime.getURL(`sidepanel.html?q=${encodeURIComponent(val.trim())}`) });
+        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+          <Icon name="search" size={13} style={{ position: 'absolute', left: 10, color: 'var(--ssense-text-muted)', pointerEvents: 'none' }} />
+          <input
+            className="sx-input sx-mono"
+            style={{ fontSize: 11.5, padding: '6px 10px 6px 30px', height: 32 }}
+            placeholder="Type query or command (e.g. audit, retention)..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = (e.target as HTMLInputElement).value;
+                if (val.trim()) {
+                  chrome.tabs.create({ url: chrome.runtime.getURL(`sidepanel.html?q=${encodeURIComponent(val.trim())}`) });
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        </div>
         <button
           className="sx-btn sx-btn--primary sx-btn--sm"
-          style={{ height: 32, padding: '0 10px', fontSize: 11 }}
+          style={{ height: 32, padding: '0 12px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5 }}
           onClick={(e) => {
-            const input = (e.currentTarget.previousElementSibling as HTMLInputElement)?.value;
-            chrome.tabs.create({ url: chrome.runtime.getURL(`sidepanel.html?q=${encodeURIComponent(input || '')}`) });
+            const inputEl = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement | null;
+            chrome.tabs.create({ url: chrome.runtime.getURL(`sidepanel.html?q=${encodeURIComponent(inputEl?.value || '')}`) });
           }}
-          title="Send command to AI Co-pilot"
+          title="Send query to DPDP AI Co-pilot"
         >
-          Send
+          <Icon name="sparkle" size={12} />
+          <span>Ask AI</span>
         </button>
       </div>
 
@@ -218,11 +222,12 @@ const ThisSite: React.FC<{ host: string | null; rows: SiteRow[]; loading: boolea
   const status = row?.status ?? (autoScan ? 'scanning' : 'paused');
   const scanning = status === 'scanning';
   const meta = STATUS_META[status];
+  const heroGlow = scanning ? 'sx-glow-cyan' : typeof row?.score === 'number' ? (row.score >= 80 ? 'sx-glow-emerald' : row.score >= 50 ? 'sx-glow-amber' : 'sx-glow-rose') : '';
 
   return (
     <div className="pp-site-layout">
       <div className="pp-site-left">
-        <div className="sx-card pp-hero">
+        <div className={`sx-card pp-hero ${heroGlow}`}>
           <ScoreRing score={row?.score ?? null} size={76} scanning={scanning} />
           <div style={{ minWidth: 0, display: 'grid', gap: 6 }}>
             <div className="sx-trunc" style={{ fontSize: 15, fontWeight: 700 }} title={host}>{host}</div>
@@ -240,7 +245,21 @@ const ThisSite: React.FC<{ host: string | null; rows: SiteRow[]; loading: boolea
         {(status === 'error' || status === 'nopolicy') && row?.error && (
           <div style={{ fontSize: 12, lineHeight: 1.5, padding: '9px 11px', borderRadius: 9, background: 'var(--ssense-bg-elevated)', color: 'var(--ssense-text-secondary)' }}>{row.error}</div>
         )}
-        {note && <div role="alert" style={{ fontSize: 12, padding: '9px 11px', borderRadius: 9, background: 'var(--ssense-bad-soft)', color: 'var(--ssense-accent-rose)' }}>{note}</div>}
+        {note && (
+          <div role="alert" style={{ fontSize: 11.5, padding: '9px 11px', borderRadius: 9, background: 'var(--ssense-bad-soft)', color: 'var(--ssense-accent-rose)', display: 'flex', alignItems: 'flex-start', gap: 7, lineHeight: 1.45 }}>
+            <Icon name="alert" size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <span>{note}</span>
+              {(note.toLowerCase().includes('server') || note.toLowerCase().includes('sign in') || note.toLowerCase().includes('connection')) && (
+                <div style={{ marginTop: 4 }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); }} style={{ color: 'var(--ssense-accent)', textDecoration: 'underline', fontWeight: 600 }}>
+                    {note.toLowerCase().includes('sign in') ? 'Sign in in Settings →' : 'Configure server in Settings →'}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="sx-btn sx-btn--primary" style={{ flex: 1 }} onClick={scanNow} disabled={busy || scanning || row?.ignored}>
